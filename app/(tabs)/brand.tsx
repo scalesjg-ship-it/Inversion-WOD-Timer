@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
+import { TvLogoTransfer } from '@/src/branding/lan/TvLogoTransfer';
 import { prepareLogo } from '@/src/branding/logo';
 import { THEME_PRESETS, type BrandColors, type LogoPlacement, type ThemePreset } from '@/src/branding/types';
 import { ColorPicker } from '@/src/components/ColorPicker';
@@ -96,6 +97,8 @@ export default function BrandScreen() {
           Your gym name, colors, and logo stay on this device. The timer reads them on every screen.
         </Text>
 
+        {Platform.isTV ? <TvLogoTransfer branding={branding} update={update} accent={accent} /> : null}
+
         <View
           testID="brand-preview"
           style={[styles.preview, { backgroundColor: branding.backgroundColor }]}
@@ -143,26 +146,22 @@ export default function BrandScreen() {
         <ColorPicker label="Accent" testID="color-ui" value={branding.uiColor} onChange={(uiColor) => void update({ uiColor })} />
 
         <Text style={styles.fieldLabel}>Logo</Text>
-        {Platform.isTV ? (
-          <Text style={styles.help} testID="tv-brand-note">
-            {branding.logoUri
-              ? 'This TV is using the logo saved on this device.'
-              : 'Set up branding on your phone. Logo upload stays on the phone, and this TV shows the colors and name saved here.'}
-          </Text>
-        ) : (
-        <View style={styles.row}>
-          <Pressable accessibilityRole="button" testID="pick-logo" onPress={() => void pickLibrary()} style={styles.secondary}>
-            <Text style={styles.secondaryLabel}>Photo library</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" testID="pick-file" onPress={() => void pickFile()} style={styles.secondary}>
-            <Text style={styles.secondaryLabel}>Files</Text>
-          </Pressable>
-        </View>
+        {Platform.isTV ? null : (
+          <View style={styles.row}>
+            <Pressable accessibilityRole="button" testID="pick-logo" onPress={() => void pickLibrary()} style={styles.secondary}>
+              <Text style={styles.secondaryLabel}>Photo library</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" testID="pick-file" onPress={() => void pickFile()} style={styles.secondary}>
+              <Text style={styles.secondaryLabel}>Files</Text>
+            </Pressable>
+          </View>
         )}
         {branding.logoUri ? (
           <Pressable accessibilityRole="button" testID="remove-logo" onPress={() => void update({ logoUri: null })}>
             <Text style={[styles.link, { color: accent }]}>Remove logo</Text>
           </Pressable>
+        ) : Platform.isTV ? (
+          <Text style={styles.help}>The logo is saved on this TV after the phone sends it.</Text>
         ) : (
           <Text style={styles.help}>Any gym logo works. Pick it from your photo library or Files. It stays on this device.</Text>
         )}

@@ -14,6 +14,7 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Americana uses your photo library so your gym logo can appear on the timer.",
+        "NSLocalNetworkUsageDescription": "Americana listens on your Wi-Fi so a phone on the same network can send a gym logo to this TV. The logo is saved on this TV and is not sent to a server.",
         "UIBackgroundModes": ["audio"]
       }
     },
@@ -26,11 +27,15 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "permissions": [
+        "INTERNET",
         "VIBRATE",
         "WAKE_LOCK",
         "POST_NOTIFICATIONS",
         "RECEIVE_BOOT_COMPLETED",
         "SCHEDULE_EXACT_ALARM"
+      ],
+      "blockedPermissions": [
+        "android.permission.CHANGE_NETWORK_STATE"
       ]
     },
     "web": {
@@ -40,6 +45,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/withTvLogoLan",
       "expo-image",
       [
         "expo-splash-screen",
