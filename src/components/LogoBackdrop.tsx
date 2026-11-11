@@ -3,36 +3,46 @@ import { StyleSheet, View } from 'react-native';
 
 import type { Branding } from '@/src/branding/types';
 import { WATERMARK_OPACITY, watermarkFrame } from '@/src/branding/watermark';
+import type { WatermarkInsets } from '@/src/branding/watermark';
 
 export function LogoBackdrop({
   branding,
   width,
   height,
+  insets,
 }: {
   branding: Branding;
   width: number;
   height: number;
+  insets?: WatermarkInsets;
 }) {
   if (!branding.logoUri || branding.logoPlacement === 'corner' || width <= 0 || height <= 0) {
     return null;
   }
 
   if (branding.logoPlacement === 'watermark') {
-    const frame = watermarkFrame(width, height);
+    const frame = watermarkFrame(width, height, insets);
+    if (frame.size <= 1) return null;
     return (
-      <Image
-        source={{ uri: branding.logoUri }}
-        contentFit="contain"
-        accessible={false}
+      <View
+        pointerEvents="none"
         style={{
           position: 'absolute',
           width: frame.size,
           height: frame.size,
           left: frame.left,
           top: frame.top,
-          opacity: WATERMARK_OPACITY,
+          overflow: 'hidden',
         }}
-      />
+      >
+        <Image
+          source={{ uri: branding.logoUri }}
+          contentFit="contain"
+          contentPosition="center"
+          accessible={false}
+          style={{ width: '100%', height: '100%', opacity: WATERMARK_OPACITY }}
+        />
+      </View>
     );
   }
 

@@ -2,10 +2,10 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
-import { readableDigitColor, screenColors } from '@/src/branding/color';
+import { phaseLabelInk, readableDigitColor, screenColors } from '@/src/branding/color';
 import type { Branding } from '@/src/branding/types';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
 import { BigButton } from '@/src/components/ui';
@@ -14,7 +14,7 @@ import { chrome } from '@/src/theme/chrome';
 import { formatSnapshot, phaseLabel, roundLabel } from '@/src/timer/labels';
 import { useTimer } from '@/src/timer/useTimer';
 import type { Phase } from '@/src/timer/types';
-import { clockFontSize, isTenFootLayout, tvSafeInset } from '@/src/tv/layout';
+import { fitClock, isTenFootLayout, tvSafeInset } from '@/src/tv/layout';
 import type { RemoteCommand } from '@/src/tv/remoteMap';
 import { useRemoteCommands } from '@/src/tv/useRemoteCommands';
 
@@ -27,17 +27,40 @@ export default function TimerScreen() {
   const [label] = useState(session.label);
   const timer = useTimer(config, { autoStart: true, gymName: branding.gymName });
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   const landscape = width > height;
   const tenFoot = isTenFootLayout(width, height, Platform.isTV === true);
-  const clockSize = clockFontSize(width, height, tenFoot);
-  const safeInset = tvSafeInset(tenFoot);
+  const overscan = tvSafeInset(tenFoot);
+  const safe = {
+    top: Math.max(insets.top, overscan),
+    right: Math.max(insets.right, overscan),
+    bottom: Math.max(insets.bottom, overscan),
+    left: Math.max(insets.left, overscan),
+  };
   const [controlsHeld, setControlsHeld] = useState(false);
   const controlsVisible = tenFoot ? controlsHeld : true;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const palette = screenColors(branding);
   const phaseColor = phaseInk(timer.snapshot.phase, branding, timer.snapshot.warningActive);
   const digits = palette.digits;
+  const clockText = formatSnapshot(timer.snapshot, config);
+  const side = Math.max(safe.left, safe.right, 16);
+  const clock = fitClock({
+    text: clockText,
+    screenWidth: width,
+    screenHeight: height,
+    tenFoot,
+    horizontalInset: side * 2,
+    verticalInset:
+      safe.top +
+      safe.bottom +
+      58 +
+      36 +
+      96 +
+      (landscape ? 16 : 80),
+  });
+  const labelGap = 10 - Math.round(clock.fontSize * 0.22);
 
   useEffect(() => {
     if (!timer.snapshot.running) return undefined;
@@ -86,14 +109,17 @@ export default function TimerScreen() {
         return exhaustive;
       }
     }
-  }, [timer]);
+  }, [timer, setConfirmOpen, setControlsHeld]);
 
   useRemoteCommands(
     { mode: config.mode, controlsVisible, confirmOpen },
     onRemote,
   );
 
-  const phaseText = readableDigitColor(phaseColor, branding.backgroundColor);
+  const phaseText = phaseLabelInk(phaseColor, branding.digitColor, branding.backgroundColor);
+  const attention = readableDigitColor(chrome.gold, branding.backgroundColor);
+  const cornerVisible = Boolean(branding.logoUri) && branding.logoPlacement === 'corner';
+  const headerSlot = Math.max(cornerVisible ? 108 : 76, safe.left + 64, safe.right + (cornerVisible ? 96 : 64));
 
   return (
     <View
@@ -105,56 +131,87 @@ export default function TimerScreen() {
       }}
     >
       <View style={[styles.edge, { backgroundColor: phaseColor }]} />
-      <LogoBackdrop branding={branding} width={frame.width} height={frame.height} />
+      <LogoBackdrop branding={branding} width={frame.width} height={frame.height} insets={safe} />
       <View pointerEvents="none" style={[styles.wash, { backgroundColor: phaseColor }]} />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${phaseLabel(timer.snapshot.phase, config.mode)}, ${formatSnapshot(timer.snapshot, config)}`}
+        accessibilityLabel={`${phaseLabel(timer.snapshot.phase, config.mode)}, ${clockText}`}
         testID="timer-face"
         onPress={onClock}
         style={styles.face}
         focusable={false}
       >
-        <View style={styles.clockAnchor}>
-          <Text style={[styles.phase, { color: phaseText }]} testID="timer-phase">
+        <View style={styles.clockBlock}>
+          <Text
+            style={[styles.phase, { color: phaseText, marginBottom: labelGap }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+            testID="timer-phase"
+          >
             {phaseLabel(timer.snapshot.phase, config.mode)}
           </Text>
           <Text
-            style={[styles.clock, { color: digits, fontSize: clockSize, lineHeight: Math.round(clockSize * 1.02) }]}
+            style={[
+              styles.clock,
+              {
+                color: digits,
+                fontSize: clock.fontSize,
+                lineHeight: clock.lineHeight,
+                width: clock.width,
+              },
+            ]}
             numberOfLines={1}
             adjustsFontSizeToFit
+            minimumFontScale={0.35}
             testID="timer-clock"
           >
-            {formatSnapshot(timer.snapshot, config)}
+            {clockText}
           </Text>
-          <View pointerEvents="none" style={styles.meta}>
-            <Text style={styles.round} testID="timer-round">
+          <View pointerEvents="none" style={[styles.meta, { marginTop: labelGap }]}>
+            <Text style={[styles.round, { color: palette.text }]} testID="timer-round">
               {roundLabel(timer.snapshot, config)}
             </Text>
-            <Text style={styles.label}>{label}</Text>
+            <Text style={[styles.label, { color: palette.muted }]}>{label}</Text>
             {timer.snapshot.warningActive ? (
-              <Text style={styles.warning} testID="timer-warning">
+              <Text style={[styles.warning, { color: attention }]} testID="timer-warning">
                 Last {config.warningSeconds} seconds
               </Text>
             ) : null}
             {timer.snapshot.paused ? (
-              <Text style={styles.paused} testID="timer-paused">
+              <Text style={[styles.paused, { color: attention }]} testID="timer-paused">
                 Paused · tap to resume
               </Text>
             ) : null}
-            {timer.snapshot.running ? <Text style={styles.hint}>Tap the clock to pause</Text> : null}
+            {timer.snapshot.running ? (
+              <Text style={[styles.hint, { color: palette.muted }]}>Tap the clock to pause</Text>
+            ) : null}
           </View>
         </View>
       </Pressable>
-      <SafeAreaView pointerEvents="box-none" style={[styles.overlay, { padding: safeInset }]} edges={['top', 'bottom']}>
+      <View pointerEvents="box-none" style={[styles.overlay, { paddingTop: safe.top }]}>
         <View style={styles.top} pointerEvents="box-none">
-          <Pressable accessibilityRole="button" testID="timer-back" onPress={() => router.back()} hitSlop={12}>
-            <Text style={styles.back}>Back</Text>
-          </Pressable>
-          <Text style={styles.gym} numberOfLines={1} adjustsFontSizeToFit>
+          <Text
+            style={[styles.gym, { color: palette.text, paddingHorizontal: headerSlot }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.45}
+            pointerEvents="none"
+          >
             {branding.gymName}
           </Text>
-          <CornerLogo branding={branding} />
+          <Pressable
+            accessibilityRole="button"
+            testID="timer-back"
+            onPress={() => router.back()}
+            hitSlop={12}
+            style={[styles.backButton, { left: Math.max(18, safe.left) }]}
+          >
+            <Text style={[styles.back, { color: palette.text }]}>Back</Text>
+          </Pressable>
+          <View style={[styles.cornerSlot, { right: Math.max(18, safe.right) }]}>
+            <CornerLogo branding={branding} />
+          </View>
         </View>
         {confirmOpen ? (
           <View style={styles.confirm} testID="reset-confirm">
@@ -164,7 +221,17 @@ export default function TimerScreen() {
           </View>
         ) : null}
         {controlsVisible ? (
-        <View pointerEvents="box-none" style={landscape ? styles.controlsLandscape : styles.controls}>
+        <View
+          pointerEvents="box-none"
+          style={[
+            landscape ? styles.controlsLandscape : styles.controls,
+            {
+              bottom: safe.bottom + 8,
+              right: Math.max(18, safe.right),
+              left: landscape ? undefined : Math.max(18, safe.left),
+            },
+          ]}
+        >
           {timer.snapshot.phase === 'idle' || timer.snapshot.phase === 'finished' ? (
             <BigButton
               label={timer.snapshot.phase === 'finished' ? 'Go again' : 'Start'}
@@ -181,7 +248,7 @@ export default function TimerScreen() {
           ) : null}
         </View>
         ) : null}
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
@@ -222,7 +289,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  clockAnchor: {
+  clockBlock: {
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -230,86 +298,108 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
   },
   top: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 18,
-    paddingTop: 6,
-    minHeight: 56,
+    height: 64,
+    justifyContent: 'center',
+  },
+  backButton: {
+    position: 'absolute',
+    left: 18,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    zIndex: 1,
   },
   back: {
-    color: chrome.text,
     fontFamily: 'OswaldMedium',
     fontSize: 18,
   },
+  cornerSlot: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
   gym: {
-    flex: 1,
+    position: 'absolute',
+    left: 0,
+    right: 0,
     textAlign: 'center',
-    color: chrome.text,
+    paddingHorizontal: 108,
     fontFamily: 'OswaldMedium',
     fontSize: 18,
     letterSpacing: 0.4,
   },
   phase: {
     position: 'absolute',
+    left: 0,
+    right: 0,
     bottom: '100%',
-    marginBottom: 8,
-    width: 520,
-    marginLeft: -260,
-    left: '50%',
     textAlign: 'center',
     fontFamily: 'OswaldMedium',
     fontSize: 22,
+    lineHeight: 30,
     letterSpacing: 4,
     textTransform: 'uppercase',
   },
   clock: {
+    textAlign: 'center',
     fontFamily: 'Oswald',
     fontVariant: ['tabular-nums'],
-    textShadowColor: 'rgba(0,0,0,0.85)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 18,
+    includeFontPadding: false,
+    backgroundColor: 'transparent',
+    textShadowColor: 'rgba(0,0,0,0.28)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   meta: {
     position: 'absolute',
+    left: 0,
+    right: 0,
     top: '100%',
-    marginTop: 8,
-    width: 520,
-    marginLeft: -260,
-    left: '50%',
     alignItems: 'center',
+    paddingHorizontal: 24,
   },
   round: {
-    color: chrome.text,
+    textAlign: 'center',
+    alignSelf: 'stretch',
     fontFamily: 'Oswald',
     fontSize: 28,
+    lineHeight: 36,
     letterSpacing: 0.6,
   },
   label: {
-    color: chrome.muted,
+    textAlign: 'center',
+    alignSelf: 'stretch',
     fontFamily: 'OswaldMedium',
     fontSize: 16,
+    lineHeight: 22,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   warning: {
     marginTop: 8,
-    color: chrome.gold,
+    textAlign: 'center',
+    alignSelf: 'stretch',
     fontFamily: 'Oswald',
     fontSize: 28,
+    lineHeight: 36,
     letterSpacing: 1,
   },
   paused: {
     marginTop: 8,
-    color: chrome.gold,
+    textAlign: 'center',
+    alignSelf: 'stretch',
     fontFamily: 'Oswald',
     fontSize: 26,
+    lineHeight: 34,
     letterSpacing: 1,
   },
   hint: {
-    color: chrome.muted,
     marginTop: 4,
+    textAlign: 'center',
+    alignSelf: 'stretch',
     fontSize: 14,
+    lineHeight: 20,
   },
   confirm: {
     position: 'absolute',

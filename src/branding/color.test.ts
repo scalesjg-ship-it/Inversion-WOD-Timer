@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { contrastRatio, digitColor, hsvToHex, normalizeHex, readableDigitColor, relativeLuminance } from './color';
+import { contrastRatio, digitColor, hsvToHex, normalizeHex, phaseLabelInk, readableDigitColor, relativeLuminance } from './color';
+import { THEME_PRESETS } from './types';
 
 describe('brand colors', () => {
   it('accepts six-digit hex with or without a hash', () => {
@@ -23,6 +24,27 @@ describe('brand colors', () => {
     expect(readableDigitColor('#FF4D2E', '#07080A')).toBe('#FF4D2E');
     expect(readableDigitColor('#FFFFFF', '#FFFFFF')).toBe('#07080A');
     expect(readableDigitColor('#F4F7FB', '#FFFFFF')).toBe('#07080A');
+  });
+
+  it('uses the clock ink when a phase accent is the dark color on a dark background', () => {
+    expect(phaseLabelInk('#07080A', '#F4F7FB', '#284163')).toBe('#F4F7FB');
+    expect(phaseLabelInk('#07080A', '#FFFFFF', '#466496')).toBe('#FFFFFF');
+    expect(contrastRatio(phaseLabelInk('#07080A', '#FFFFFF', '#466496'), '#466496')).toBeGreaterThanOrEqual(3);
+    expect(phaseLabelInk('#F5C451', '#F4F7FB', '#07080A')).toBe('#F5C451');
+    expect(phaseLabelInk('#FF4D2E', '#F4F7FB', '#07080A')).toBe('#FF4D2E');
+    expect(phaseLabelInk('#3DDC97', '#F4F7FB', '#07080A')).toBe('#3DDC97');
+  });
+
+  it('keeps every phase label readable on light backgrounds and built-in themes', () => {
+    expect(phaseLabelInk('#F5C451', '#F4F7FB', '#FFFFFF')).toBe('#07080A');
+    expect(phaseLabelInk('#3DDC97', '#F4F7FB', '#FFFFFF')).toBe('#07080A');
+    expect(phaseLabelInk('#FF4D2E', '#F4F7FB', '#FFFFFF')).toBe('#FF4D2E');
+
+    for (const theme of THEME_PRESETS) {
+      for (const accent of [theme.workColor, theme.restColor, theme.leadInColor, theme.warningColor, '#07080A', '#FFFFFF']) {
+        expect(contrastRatio(phaseLabelInk(accent, theme.digitColor, theme.backgroundColor), theme.backgroundColor)).toBeGreaterThanOrEqual(3);
+      }
+    }
   });
 
   it('round-trips a hue through hex', () => {

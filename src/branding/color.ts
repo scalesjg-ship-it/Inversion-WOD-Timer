@@ -40,6 +40,22 @@ export function readableDigitColor(preferred: string, background: string): strin
   return contrastRatio(LIGHT_INK, background) >= contrastRatio(DARK_INK, background) ? LIGHT_INK : DARK_INK;
 }
 
+/**
+ * Phase titles keep their accent only when it clears the clock's contrast bar
+ * and sits on the same side of the background as the digits. A near-black
+ * lead-in on a dark gym color otherwise falls through to the clock ink.
+ */
+export function phaseLabelInk(accent: string, digitColor: string, background: string): string {
+  const digits = readableDigitColor(digitColor, background);
+  const preferred = normalizeHex(accent);
+  if (!preferred || contrastRatio(preferred, background) < 3) return digits;
+  const backgroundLuminance = relativeLuminance(background);
+  const accentIsLight = relativeLuminance(preferred) > backgroundLuminance;
+  const digitsAreLight = relativeLuminance(digits) > backgroundLuminance;
+  if (accentIsLight !== digitsAreLight) return digits;
+  return preferred;
+}
+
 export function inkOn(color: string): string {
   return contrastRatio(DARK_INK, color) >= contrastRatio(LIGHT_INK, color) ? DARK_INK : LIGHT_INK;
 }
