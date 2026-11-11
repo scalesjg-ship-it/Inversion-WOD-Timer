@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
-import { digitColor } from '@/src/branding/color';
+import { readableDigitColor, screenColors } from '@/src/branding/color';
 import type { Branding } from '@/src/branding/types';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
 import { BigButton } from '@/src/components/ui';
@@ -27,8 +27,9 @@ export default function TimerScreen() {
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   const landscape = width > height;
   const clockSize = Math.round(Math.min(Math.min(width, height) * (landscape ? 0.46 : 0.3), 280));
-  const color = phaseInk(timer.snapshot.phase, branding);
-  const digits = digitColor(color);
+  const palette = screenColors(branding);
+  const phaseColor = phaseInk(timer.snapshot.phase, branding, timer.snapshot.warningActive);
+  const digits = palette.digits;
 
   useEffect(() => {
     if (!timer.snapshot.running) return undefined;
@@ -44,16 +45,16 @@ export default function TimerScreen() {
 
   return (
     <View
-      style={styles.root}
+      style={[styles.root, { backgroundColor: branding.backgroundColor }]}
       testID="screen-timer"
       onLayout={(event) => {
         const next = event.nativeEvent.layout;
         setFrame({ width: next.width, height: next.height });
       }}
     >
-      <View style={[styles.edge, { backgroundColor: color }]} />
+      <View style={[styles.edge, { backgroundColor: phaseColor }]} />
       <LogoBackdrop branding={branding} width={frame.width} height={frame.height} />
-      <View pointerEvents="none" style={[styles.wash, { backgroundColor: color }]} />
+      <View pointerEvents="none" style={[styles.wash, { backgroundColor: phaseColor }]} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.top}>
           <Pressable accessibilityRole="button" testID="timer-back" onPress={() => router.back()} hitSlop={12}>
@@ -72,7 +73,7 @@ export default function TimerScreen() {
             onPress={onClock}
             style={styles.face}
           >
-            <Text style={[styles.phase, { color: digits }]} testID="timer-phase">
+            <Text style={[styles.phase, { color: readableDigitColor(phaseColor, branding.backgroundColor) }]} testID="timer-phase">
               {phaseLabel(timer.snapshot.phase, config.mode)}
             </Text>
             <Text
@@ -121,17 +122,18 @@ export default function TimerScreen() {
   );
 }
 
-function phaseInk(phase: Phase, branding: Branding): string {
+function phaseInk(phase: Phase, branding: Branding, warningActive: boolean): string {
+  if (warningActive && (phase === 'work' || phase === 'leadIn')) return branding.warningColor;
   switch (phase) {
     case 'work':
-      return branding.primaryColor;
+      return branding.workColor;
     case 'rest':
-      return branding.accentColor;
+      return branding.restColor;
     case 'leadIn':
-      return chrome.gold;
+      return branding.leadInColor;
     case 'idle':
     case 'finished':
-      return chrome.text;
+      return branding.digitColor;
     default: {
       const unused: never = phase;
       return unused;
@@ -142,7 +144,7 @@ function phaseInk(phase: Phase, branding: Branding): string {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: chrome.bg,
+    backgroundColor: '#07080A',
   },
   edge: {
     height: 8,

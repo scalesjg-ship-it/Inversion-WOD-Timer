@@ -1,4 +1,4 @@
-export type TimerMode = 'forTime' | 'amrap' | 'emom' | 'tabata' | 'intervals' | 'rounds';
+export type TimerMode = 'forTime' | 'amrap' | 'emom' | 'tabata' | 'intervals' | 'rounds' | 'countdown';
 
 export type Phase = 'idle' | 'leadIn' | 'work' | 'rest' | 'finished';
 
@@ -13,6 +13,11 @@ export interface TimerConfig {
   rounds: number;
   /** Seconds before the end of a work segment to fire the warning. 0 disables it. */
   warningSeconds: number;
+  /**
+   * Remaining-second marks that beep during a countdown.
+   * Marks of 3, 2, and 1 are short ticks. Longer marks are warning horns.
+   */
+  warningMarksSeconds?: number[];
 }
 
 export interface Segment {
@@ -21,6 +26,8 @@ export interface Segment {
   round: number;
   /** Offset from the start of the segment when the warning cue fires. */
   warningOffsetMs?: number;
+  /** Extra beeps inside a countdown work segment, measured from the segment start. */
+  extraCues?: { offsetMs: number; kind: 'warning' | 'tick'; remainingMs: number }[];
 }
 
 export type Cue =

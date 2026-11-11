@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
-import { digitColor } from '@/src/branding/color';
+import { readableDigitColor } from '@/src/branding/color';
 import { chrome } from '@/src/theme/chrome';
 import { modeTitle } from '@/src/timer/labels';
 import type { TimerMode } from '@/src/timer/types';
@@ -29,11 +29,15 @@ const MODES: { mode: TimerMode; detail: string }[] = [
     mode: 'intervals',
     detail: 'Your own work, rest, and number of rounds.',
   },
+  {
+    mode: 'countdown',
+    detail: 'Any length. Name it, save it, and set warning beeps.',
+  },
 ];
 
 export default function WodScreen() {
   const { branding } = useBranding();
-  const accent = digitColor(branding.primaryColor);
+  const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -50,7 +54,13 @@ export default function WodScreen() {
               testID={`mode-${item.mode}`}
               accessibilityRole="button"
               accessibilityLabel={modeTitle(item.mode)}
-              onPress={() => router.push({ pathname: '/setup', params: { mode: item.mode } })}
+              onPress={() => {
+                if (item.mode === 'countdown') {
+                  router.push('/countdown');
+                  return;
+                }
+                router.push({ pathname: '/setup', params: { mode: item.mode } });
+              }}
               style={({ pressed }) => [styles.card, { opacity: pressed ? 0.78 : 1 }]}
             >
               <View style={[styles.bar, { backgroundColor: accent }]} />

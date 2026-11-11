@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
-import { digitColor } from '@/src/branding/color';
+import { readableDigitColor } from '@/src/branding/color';
 import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
@@ -34,7 +34,7 @@ export default function SetupScreen() {
   const mode = readMode(params.mode);
   const { branding } = useBranding();
   const { setSession } = useTimerSession();
-  const accent = digitColor(branding.primaryColor);
+  const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
 
   if (!mode) {
     return (
@@ -168,18 +168,13 @@ function SetupForm({
             />
           </View>
         ) : null}
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Lead-in</Text>
-          <NumberStepper
-            value={leadInSeconds}
-            min={0}
-            max={60}
-            suffix="sec"
-            testID="lead-in"
-            accent={accent}
-            onChange={setLeadInSeconds}
-          />
-        </View>
+        <TimeField
+          label="Lead-in"
+          seconds={leadInSeconds}
+          onChange={(value) => setLeadInSeconds(Math.min(600, value))}
+          testID="lead-in"
+          accent={accent}
+        />
       </ScrollView>
       <View style={styles.footer}>
         <BigButton testID="start-timer" label="Start" color={accent} onPress={() => onStart(config)} />
@@ -202,6 +197,8 @@ function summaryFor(config: TimerConfig, capOn: boolean): string {
       return `${lead} · ${formatSeconds(config.workSeconds)} on / ${formatSeconds(config.restSeconds)} off · ${config.rounds} rounds`;
     case 'rounds':
       return lead;
+    case 'countdown':
+      return `${lead} · ${formatSeconds(config.workSeconds)}`;
     default: {
       const exhaustive: never = config.mode;
       return exhaustive;

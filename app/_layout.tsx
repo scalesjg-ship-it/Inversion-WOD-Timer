@@ -54,6 +54,7 @@ function RootGate({ fontsLoaded }: { fontsLoaded: boolean }) {
       >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="setup" />
+        <Stack.Screen name="countdown" />
         <Stack.Screen name="timer" options={{ gestureEnabled: false, animation: 'fade' }} />
       </Stack>
     </>

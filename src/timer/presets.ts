@@ -1,3 +1,4 @@
+import { FINAL_BEEP_SECONDS, WARNING_MARK_CHOICES } from './countdown';
 import { normalizeConfig } from './engine';
 import type { TimerConfig, TimerMode } from './types';
 
@@ -54,6 +55,28 @@ export const BUILTIN_PRESETS: RoundPreset[] = [
     builtIn: true,
   },
 ];
+
+export interface CountdownPreset {
+  kind: 'countdown';
+  id: string;
+  name: string;
+  durationSeconds: number;
+  leadInSeconds: number;
+  warningMarksSeconds: number[];
+  builtIn: boolean;
+}
+
+export function configFromCountdown(preset: CountdownPreset): TimerConfig {
+  return normalizeConfig({
+    mode: 'countdown',
+    leadInSeconds: preset.leadInSeconds,
+    workSeconds: preset.durationSeconds,
+    restSeconds: 0,
+    rounds: 1,
+    warningSeconds: 0,
+    warningMarksSeconds: preset.warningMarksSeconds,
+  });
+}
 
 export function configFromPreset(preset: RoundPreset): TimerConfig {
   return normalizeConfig({
@@ -115,6 +138,16 @@ export function defaultConfig(mode: TimerMode): TimerConfig {
       });
     case 'rounds':
       return configFromPreset(BUILTIN_PRESETS[0]);
+    case 'countdown':
+      return normalizeConfig({
+        mode,
+        leadInSeconds: 10,
+        workSeconds: 5 * 60,
+        restSeconds: 0,
+        rounds: 1,
+        warningSeconds: 0,
+        warningMarksSeconds: [...WARNING_MARK_CHOICES.map((choice) => choice.seconds), ...FINAL_BEEP_SECONDS],
+      });
     default: {
       const exhaustive: never = mode;
       return exhaustive;

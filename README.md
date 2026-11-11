@@ -17,6 +17,7 @@ Conditioning (WOD tab):
 - **EMOM** repeats an interval (every X minutes, or any other length) for a number of rounds. There is no extra rest segment; the next interval starts when the previous one ends.
 - **Tabata** defaults to 20 seconds on, 10 seconds off, 8 rounds.
 - **Intervals** is custom work, rest, and rounds.
+- **Countdown** is any length, with hours, minutes, and seconds, quick adds (+30s, +1m, +5m), a lead-in that can be zero, and warning beeps at 1:00, 0:30, 0:10, and the last 3 seconds. Named countdowns save on the device next to round presets.
 
 The last round never adds a trailing rest.
 
@@ -43,10 +44,11 @@ Custom notification sounds and background audio are not fully available in Expo 
 The Brand tab stores, on this device only:
 
 - Gym name
-- Work color and rest color (used for the clock and controls). A very dark color is lightened on the digits so they stay readable on the black clock.
-- A logo from the photo library or from Files. It is resized and kept locally.
-- Placement: faded watermark behind the digits, darkened full-bleed (optional blur), or a corner mark.
+- Colors for work, rest, lead-in, warning, the clock digits, the background, and the accent. Each one has swatches, a hue strip, and a hex field. Preset themes are Inversion, Dark, High-contrast, Neon, and Fight (red/blue). If a digit color cannot be read on the background, Americana swaps in black or white.
+- A logo from the photo library or from Files. Any image is accepted. It is resized and kept locally. The default placement is a large faded watermark, about 88% of the shorter screen edge, centered. Full bleed (optional blur) and a corner mark are the other placements.
 - Reset to Inversion, which restores the CrossFit Inversion name and colors and clears the logo.
+
+Every mode has a lead-in length, including zero.
 
 ## Develop
 

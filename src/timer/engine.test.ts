@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { addCountdownSeconds, joinDuration, splitDuration } from './countdown';
 import { formatCountdown, formatCountUp } from './format';
 import {
   complete,
@@ -315,5 +316,82 @@ describe('notification plan', () => {
     expect(plan.length).toBeGreaterThan(10);
     expect(selectUpcoming(plan, state, 0, 8)).toHaveLength(8);
     expect(selectUpcoming(plan, pause(state, 1_000), 1_000, 8)).toHaveLength(0);
+  });
+});
+
+describe('custom countdown', () => {
+  const countdown = {
+    mode: 'countdown' as const,
+    leadInSeconds: 0,
+    workSeconds: 90,
+    restSeconds: 0,
+    rounds: 1,
+    warningSeconds: 0,
+    warningMarksSeconds: [60, 30, 10, 3, 2, 1],
+  };
+
+  it('beeps at 1:00, 0:30, 0:10 and ticks the last three seconds, each once', () => {
+    const seen = cuesWhileRunning(countdown);
+    expect(seen.filter((cue) => cue.type === 'warning')).toEqual([
+      { type: 'warning', round: 1 },
+      { type: 'warning', round: 1 },
+      { type: 'warning', round: 1 },
+    ]);
+    expect(seen.filter((cue) => cue.type === 'tick')).toEqual([
+      { type: 'tick', remainingMs: 3000 },
+      { type: 'tick', remainingMs: 2000 },
+      { type: 'tick', remainingMs: 1000 },
+    ]);
+
+    const state = createInitial(countdown);
+    expect(cuesBetween(state, 29_999, 30_000)).toContainEqual({ type: 'warning', round: 1 });
+    expect(cuesBetween(state, 59_999, 60_000)).toContainEqual({ type: 'warning', round: 1 });
+    expect(cuesBetween(state, 79_999, 80_000)).toContainEqual({ type: 'warning', round: 1 });
+    expect(cuesBetween(state, 86_999, 87_000)).toContainEqual({ type: 'tick', remainingMs: 3000 });
+
+    const running = start(state, 0);
+    expect(project(running, 79_000).warningActive).toBe(false);
+    expect(project(running, 80_000).warningActive).toBe(true);
+    expect(project(running, 80_000).displayMs).toBe(10_000);
+    expect(reconcile(running, 90_000).status).toBe('finished');
+  });
+
+  it('accepts a zero lead-in and a custom lead-in', () => {
+    const immediate = start(createInitial(countdown), 0);
+    expect(project(immediate, 0).phase).toBe('work');
+    const lead = start(createInitial({ ...countdown, leadInSeconds: 5, workSeconds: 30, warningMarksSeconds: [] }), 0);
+    expect(project(lead, 4_999).phase).toBe('leadIn');
+    expect(project(lead, 4_999).displayMs).toBe(1);
+    expect(project(lead, 5_000).phase).toBe('work');
+    expect(project(lead, 5_000).displayMs).toBe(30_000);
+  });
+
+  it('drops warning marks that are longer than the countdown', () => {
+    const config = normalizeConfig({
+      ...countdown,
+      workSeconds: 20,
+      warningMarksSeconds: [60, 10, 3, 2, 1, 0, -4],
+    });
+    expect(config.warningMarksSeconds).toEqual([10, 3, 2, 1]);
+    expect(config.rounds).toBe(1);
+    expect(config.restSeconds).toBe(0);
+  });
+
+  it('keeps warning alignment after a pause', () => {
+    let state = start(createInitial(countdown), 1_000);
+    state = pause(state, 1_000 + 20_000);
+    state = start(state, 1_000 + 20_000 + 3_600_000);
+    expect(cuesBetween(state, 20_000, 29_999).some((cue) => cue.type === 'warning')).toBe(false);
+    expect(cuesBetween(state, 29_999, 30_000)).toContainEqual({ type: 'warning', round: 1 });
+  });
+});
+
+describe('countdown duration edits', () => {
+  it('adds quick increments and splits hours, minutes, and seconds', () => {
+    expect(addCountdownSeconds(5, 30)).toBe(35);
+    expect(addCountdownSeconds(50, 60)).toBe(110);
+    expect(addCountdownSeconds(10, 5 * 60)).toBe(310);
+    expect(addCountdownSeconds(2, -30)).toBe(1);
+    expect(splitDuration(joinDuration(1, 2, 3))).toEqual({ hours: 1, minutes: 2, seconds: 3 });
   });
 });

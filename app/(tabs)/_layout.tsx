@@ -2,12 +2,12 @@ import { Tabs } from 'expo-router';
 import { Text, type TextStyle } from 'react-native';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
-import { digitColor } from '@/src/branding/color';
+import { readableDigitColor } from '@/src/branding/color';
 import { chrome } from '@/src/theme/chrome';
 
 export default function TabLayout() {
   const { branding } = useBranding();
-  const tint = digitColor(branding.primaryColor);
+  const tint = readableDigitColor(branding.uiColor, branding.backgroundColor);
 
   return (
     <Tabs

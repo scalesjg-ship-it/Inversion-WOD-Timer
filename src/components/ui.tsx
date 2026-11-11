@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { inkOn } from '@/src/branding/color';
 import { chrome } from '@/src/theme/chrome';
 
 export function BigButton({
@@ -30,7 +31,7 @@ export function BigButton({
         { opacity: pressed ? 0.72 : 1 },
       ]}
     >
-      <Text style={[styles.bigLabel, { color: solid ? '#140C0A' : chrome.text }]}>{label}</Text>
+      <Text style={[styles.bigLabel, { color: solid ? inkOn(color) : chrome.text }]}>{label}</Text>
     </Pressable>
   );
 }

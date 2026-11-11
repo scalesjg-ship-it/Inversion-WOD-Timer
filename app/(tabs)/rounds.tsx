@@ -5,28 +5,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
-import { digitColor } from '@/src/branding/color';
+import { readableDigitColor } from '@/src/branding/color';
 import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import { formatSeconds } from '@/src/timer/format';
-import { configFromPreset, BUILTIN_PRESETS, type RoundPreset } from '@/src/timer/presets';
-import { loadCustomPresets, saveCustomPresets } from '@/src/timer/presetStorage';
+import { configFromCountdown, configFromPreset, BUILTIN_PRESETS, type CountdownPreset, type RoundPreset } from '@/src/timer/presets';
+import { loadCountdownPresets, loadCustomPresets, saveCountdownPresets, saveCustomPresets } from '@/src/timer/presetStorage';
 
 const WARNING_CHOICES = [0, 10, 30];
 
 export default function RoundsScreen() {
   const { branding } = useBranding();
   const { setSession } = useTimerSession();
-  const accent = digitColor(branding.primaryColor);
-  const restColor = digitColor(branding.accentColor);
+  const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
+  const restColor = readableDigitColor(branding.restColor, branding.backgroundColor);
   const [custom, setCustom] = useState<RoundPreset[]>([]);
+  const [countdowns, setCountdowns] = useState<CountdownPreset[]>([]);
   const [draft, setDraft] = useState<RoundPreset>(BUILTIN_PRESETS[0]);
   const [selectedId, setSelectedId] = useState(BUILTIN_PRESETS[0].id);
   const [presetName, setPresetName] = useState('');
 
   useEffect(() => {
     void loadCustomPresets().then(setCustom);
+    void loadCountdownPresets().then(setCountdowns);
   }, []);
 
   const apply = (preset: RoundPreset) => {
@@ -181,18 +183,44 @@ export default function RoundsScreen() {
             onChange={(warningSeconds) => edit({ warningSeconds })}
           />
         </View>
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Lead-in</Text>
-          <NumberStepper
-            value={draft.leadInSeconds}
-            min={0}
-            max={60}
-            suffix="sec"
-            testID="lead-in"
-            accent={accent}
-            onChange={(leadInSeconds) => edit({ leadInSeconds })}
-          />
-        </View>
+        <TimeField
+          label="Lead-in"
+          seconds={draft.leadInSeconds}
+          onChange={(leadInSeconds) => edit({ leadInSeconds: Math.min(600, leadInSeconds) })}
+          testID="lead-in"
+          accent={accent}
+        />
+        {countdowns.length > 0 ? (
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Saved countdowns</Text>
+            {countdowns.map((preset) => (
+              <Pressable
+                key={preset.id}
+                accessibilityRole="button"
+                testID={`saved-countdown-${preset.id}`}
+                onPress={() => {
+                  unlockAudio();
+                  setSession({ config: configFromCountdown(preset), label: preset.name });
+                  router.push('/timer');
+                }}
+                style={styles.preset}
+              >
+                <Text style={styles.presetName}>{preset.name}</Text>
+                <Text style={styles.presetMeta}>{preset.durationSeconds}s</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    const next = countdowns.filter((item) => item.id !== preset.id);
+                    setCountdowns(next);
+                    void saveCountdownPresets(next);
+                  }}
+                >
+                  <Text style={[styles.delete, { color: restColor }]}>Delete</Text>
+                </Pressable>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
 
         <View style={styles.saveRow}>
           <TextInput

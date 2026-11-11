@@ -1,3 +1,4 @@
+import { COUNTDOWN_MAX_SECONDS, sanitizeWarningMarks } from './countdown';
 import type {
   Cue,
   EngineState,
@@ -12,7 +13,7 @@ export type { Cue, EngineState, Segment, SoundName, TimedCue, TimerConfig, Timer
 export type { Phase, TimerMode } from './types';
 
 const MAX_ROUNDS = 99;
-const MAX_LEAD_IN_SECONDS = 90;
+const MAX_LEAD_IN_SECONDS = 600;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -35,6 +36,20 @@ export function normalizeConfig(input: TimerConfig): TimerConfig {
       restSeconds: 0,
       rounds: 1,
       warningSeconds: 0,
+      warningMarksSeconds: [],
+    };
+  }
+
+  if (input.mode === 'countdown') {
+    const workSeconds = Math.min(COUNTDOWN_MAX_SECONDS, Math.max(1, safeInt(input.workSeconds, 60)));
+    return {
+      mode: 'countdown',
+      leadInSeconds,
+      workSeconds,
+      restSeconds: 0,
+      rounds: 1,
+      warningSeconds: 0,
+      warningMarksSeconds: sanitizeWarningMarks(input.warningMarksSeconds, workSeconds),
     };
   }
 
@@ -51,6 +66,7 @@ export function normalizeConfig(input: TimerConfig): TimerConfig {
     restSeconds,
     rounds: input.mode === 'amrap' ? 1 : rounds,
     warningSeconds,
+    warningMarksSeconds: [],
   };
 }
 
@@ -73,6 +89,16 @@ export function buildSegments(config: TimerConfig): Segment[] {
   const restMs = config.restSeconds * 1000;
   const warningOffsetMs =
     config.warningSeconds > 0 ? (config.workSeconds - config.warningSeconds) * 1000 : undefined;
+  const extraCues = (config.warningMarksSeconds ?? []).flatMap((mark) => {
+    if (mark <= 0 || mark >= config.workSeconds) return [];
+    return [
+      {
+        offsetMs: (config.workSeconds - mark) * 1000,
+        kind: mark <= 3 ? ('tick' as const) : ('warning' as const),
+        remainingMs: mark * 1000,
+      },
+    ];
+  });
 
   for (let round = 1; round <= config.rounds; round += 1) {
     segments.push({
@@ -80,6 +106,7 @@ export function buildSegments(config: TimerConfig): Segment[] {
       durationMs: workMs,
       round,
       warningOffsetMs,
+      extraCues: extraCues.length > 0 ? extraCues : undefined,
     });
     if (round < config.rounds && restMs > 0) {
       segments.push({ phase: 'rest', durationMs: restMs, round });
@@ -145,6 +172,15 @@ export function cueTimeline(state: EngineState): TimedCue[] {
       });
     }
 
+    for (const extra of segment.extraCues ?? []) {
+      const atElapsedMs = cursor + extra.offsetMs;
+      if (extra.kind === 'tick') {
+        cues.push({ atElapsedMs, cue: { type: 'tick', remainingMs: extra.remainingMs } });
+      } else {
+        cues.push({ atElapsedMs, cue: { type: 'warning', round: segment.round } });
+      }
+    }
+
     if (segment.phase === 'work' && Number.isFinite(segment.durationMs)) {
       cues.push({
         atElapsedMs: cursor + segment.durationMs,
@@ -181,6 +217,18 @@ function finishedDisplayMs(config: TimerConfig): number {
   return 0;
 }
 
+function warningIsActive(segment: Segment, elapsedInPhaseMs: number, remainingInPhaseMs: number): boolean {
+  if (segment.phase !== 'work') return false;
+  if (segment.warningOffsetMs != null && elapsedInPhaseMs >= segment.warningOffsetMs) return true;
+  const cues = segment.extraCues ?? [];
+  if (cues.length === 0 || !Number.isFinite(remainingInPhaseMs)) return false;
+  const atLeastTen = cues.filter((cue) => cue.remainingMs >= 10_000);
+  const windowMs = atLeastTen.length > 0
+    ? Math.min(...atLeastTen.map((cue) => cue.remainingMs))
+    : Math.max(...cues.map((cue) => cue.remainingMs));
+  return remainingInPhaseMs <= windowMs && remainingInPhaseMs > 0;
+}
+
 export function snapshotFromElapsed(state: EngineState, elapsed: number): TimerSnapshot {
   const total = totalDurationMs(state.segments);
   const shell = {
@@ -214,10 +262,7 @@ export function snapshotFromElapsed(state: EngineState, elapsed: number): TimerS
         ? Math.max(0, segment.durationMs - elapsedInPhaseMs)
         : Number.POSITIVE_INFINITY;
       const countUp = state.config.mode === 'forTime' && segment.phase === 'work';
-      const warningActive =
-        segment.phase === 'work' &&
-        segment.warningOffsetMs != null &&
-        elapsedInPhaseMs >= segment.warningOffsetMs;
+      const warningActive = warningIsActive(segment, elapsedInPhaseMs, remainingInPhaseMs);
       return {
         ...shell,
         phase: segment.phase,

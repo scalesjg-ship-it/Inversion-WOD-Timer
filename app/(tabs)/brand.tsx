@@ -14,9 +14,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
-import { digitColor, normalizeHex } from '@/src/branding/color';
+import { readableDigitColor } from '@/src/branding/color';
 import { prepareLogo } from '@/src/branding/logo';
-import { COLOR_SWATCHES, type LogoPlacement } from '@/src/branding/types';
+import { THEME_PRESETS, type BrandColors, type LogoPlacement, type ThemePreset } from '@/src/branding/types';
+import { ColorPicker } from '@/src/components/ColorPicker';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
 import { Chip } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
@@ -29,7 +30,8 @@ const PLACEMENTS: { id: LogoPlacement; label: string }[] = [
 
 export default function BrandScreen() {
   const { branding, update, reset } = useBranding();
-  const accent = digitColor(branding.primaryColor);
+  const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
+  const digits = readableDigitColor(branding.digitColor, branding.backgroundColor);
   const [frame, setFrame] = useState({ width: 0, height: 0 });
 
   const storeLogo = async (uri: string) => {
@@ -95,7 +97,7 @@ export default function BrandScreen() {
 
         <View
           testID="brand-preview"
-          style={styles.preview}
+          style={[styles.preview, { backgroundColor: branding.backgroundColor }]}
           onLayout={(event) => {
             const { width, height } = event.nativeEvent.layout;
             setFrame({ width, height });
@@ -108,8 +110,8 @@ export default function BrandScreen() {
             </Text>
             <CornerLogo branding={branding} size={42} />
           </View>
-          <Text style={[styles.previewClock, { color: accent }]}>05:00</Text>
-          <Text style={[styles.previewPhase, { color: accent }]}>Work</Text>
+          <Text style={[styles.previewClock, { color: digits }]}>05:00</Text>
+          <Text style={[styles.previewPhase, { color: readableDigitColor(branding.workColor, branding.backgroundColor) }]}>Work</Text>
         </View>
 
         <Text style={styles.fieldLabel}>Gym name</Text>
@@ -118,34 +120,26 @@ export default function BrandScreen() {
           onCommit={(gymName) => void update({ gymName })}
         />
 
-        <Text style={styles.fieldLabel}>Colors</Text>
+        <Text style={styles.fieldLabel}>Themes</Text>
         <View style={styles.chips}>
-          {COLOR_SWATCHES.map((swatch) => (
+          {THEME_PRESETS.map((theme) => (
             <Chip
-              key={swatch.name}
-              label={swatch.name}
-              color={swatch.primary}
-              selected={
-                branding.primaryColor.toUpperCase() === swatch.primary &&
-                branding.accentColor.toUpperCase() === swatch.accent
-              }
-              onPress={() => void update({ primaryColor: swatch.primary, accentColor: swatch.accent })}
-              testID={`swatch-${swatch.name.toLowerCase()}`}
+              key={theme.id}
+              label={theme.name}
+              color={theme.uiColor}
+              selected={themeMatches(branding, theme)}
+              onPress={() => void update(colorsOf(theme))}
+              testID={`theme-${theme.id}`}
             />
           ))}
         </View>
-        <HexField
-          label="Work"
-          testID="brand-primary"
-          value={branding.primaryColor}
-          onCommit={(primaryColor) => void update({ primaryColor })}
-        />
-        <HexField
-          label="Rest"
-          testID="brand-accent"
-          value={branding.accentColor}
-          onCommit={(accentColor) => void update({ accentColor })}
-        />
+        <ColorPicker label="Work" testID="color-work" value={branding.workColor} onChange={(workColor) => void update({ workColor })} />
+        <ColorPicker label="Rest" testID="color-rest" value={branding.restColor} onChange={(restColor) => void update({ restColor })} />
+        <ColorPicker label="Lead-in" testID="color-lead" value={branding.leadInColor} onChange={(leadInColor) => void update({ leadInColor })} />
+        <ColorPicker label="Warning" testID="color-warning" value={branding.warningColor} onChange={(warningColor) => void update({ warningColor })} />
+        <ColorPicker label="Digits" testID="color-digits" value={branding.digitColor} onChange={(digitColor) => void update({ digitColor })} />
+        <ColorPicker label="Background" testID="color-background" value={branding.backgroundColor} onChange={(backgroundColor) => void update({ backgroundColor })} />
+        <ColorPicker label="Accent" testID="color-ui" value={branding.uiColor} onChange={(uiColor) => void update({ uiColor })} />
 
         <Text style={styles.fieldLabel}>Logo</Text>
         <View style={styles.row}>
@@ -161,7 +155,7 @@ export default function BrandScreen() {
             <Text style={[styles.link, { color: accent }]}>Remove logo</Text>
           </Pressable>
         ) : (
-          <Text style={styles.help}>No logo yet. The default look is CrossFit Inversion colors without a mark.</Text>
+          <Text style={styles.help}>Any gym logo works. Pick it from your photo library or Files. It stays on this device.</Text>
         )}
         <View style={styles.chips}>
           {PLACEMENTS.map((placement) => (
@@ -198,6 +192,23 @@ export default function BrandScreen() {
   );
 }
 
+function colorsOf(theme: ThemePreset): BrandColors {
+  return {
+    workColor: theme.workColor,
+    restColor: theme.restColor,
+    leadInColor: theme.leadInColor,
+    warningColor: theme.warningColor,
+    digitColor: theme.digitColor,
+    backgroundColor: theme.backgroundColor,
+    uiColor: theme.uiColor,
+  };
+}
+
+function themeMatches(branding: BrandColors, theme: ThemePreset): boolean {
+  const colors = colorsOf(theme);
+  return (Object.keys(colors) as (keyof BrandColors)[]).every((key) => branding[key].toUpperCase() === colors[key].toUpperCase());
+}
+
 function GymNameField({ value, onCommit }: { value: string; onCommit: (name: string) => void }) {
   const [text, setText] = useState(value);
   const [tracked, setTracked] = useState(value);
@@ -222,50 +233,6 @@ function GymNameField({ value, onCommit }: { value: string; onCommit: (name: str
       style={styles.input}
       maxLength={48}
     />
-  );
-}
-
-function HexField({
-  label,
-  value,
-  onCommit,
-  testID,
-}: {
-  label: string;
-  value: string;
-  onCommit: (hex: string) => void;
-  testID: string;
-}) {
-  const [text, setText] = useState(value);
-  const [tracked, setTracked] = useState(value);
-  if (value !== tracked) {
-    setTracked(value);
-    setText(value);
-  }
-
-  return (
-    <View style={styles.hexRow}>
-      <View style={[styles.swatch, { backgroundColor: value }]} />
-      <View style={styles.hexCopy}>
-        <Text style={styles.hexLabel}>{label}</Text>
-        <TextInput
-          testID={testID}
-          value={text}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          onChangeText={setText}
-          onEndEditing={() => {
-            const next = normalizeHex(text);
-            if (!next) {
-              setText(value);
-              return;
-            }
-            onCommit(next);
-          }}
-          style={styles.hexInput}
-        />
-      </View>
-    </View>
   );
 }
 

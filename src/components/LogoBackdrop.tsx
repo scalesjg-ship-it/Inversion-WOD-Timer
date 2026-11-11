@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
 import type { Branding } from '@/src/branding/types';
+import { WATERMARK_OPACITY, watermarkFrame } from '@/src/branding/watermark';
 
 export function LogoBackdrop({
   branding,
@@ -17,7 +18,7 @@ export function LogoBackdrop({
   }
 
   if (branding.logoPlacement === 'watermark') {
-    const size = Math.min(width, height) * 0.78;
+    const frame = watermarkFrame(width, height);
     return (
       <Image
         source={{ uri: branding.logoUri }}
@@ -25,11 +26,11 @@ export function LogoBackdrop({
         accessible={false}
         style={{
           position: 'absolute',
-          width: size,
-          height: size,
-          left: (width - size) / 2,
-          top: (height - size) / 2,
-          opacity: 0.2,
+          width: frame.size,
+          height: frame.size,
+          left: frame.left,
+          top: frame.top,
+          opacity: WATERMARK_OPACITY,
         }}
       />
     );
