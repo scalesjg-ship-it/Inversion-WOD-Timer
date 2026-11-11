@@ -17,7 +17,7 @@ Conditioning (WOD tab):
 - **EMOM** repeats an interval (every X minutes, or any other length) for a number of rounds. There is no extra rest segment; the next interval starts when the previous one ends.
 - **Tabata** defaults to 20 seconds on, 10 seconds off, 8 rounds.
 - **Intervals** is custom work, rest, and rounds.
-- **Countdown** is any length, with hours, minutes, and seconds, quick adds (+30s, +1m, +5m), a lead-in that can be zero, and warning beeps at 1:00, 0:30, 0:10, and the last 3 seconds. Named countdowns save on the device next to round presets.
+- **Countdown** is any length, with hours, minutes, and seconds, quick adds (+30s, +1m, +5m), a lead-in that can be zero, and warning beeps at 1:00, 0:30, 0:10, and the last 3 seconds.
 
 The last round never adds a trailing rest.
 
@@ -25,7 +25,9 @@ Rounds tab, for jiu-jitsu and striking:
 
 - Round length, rest length, round count, lead-in, and a warning before the round ends (off, 10 seconds, 30 seconds, or any other value shorter than the round).
 - Built-in presets: **BJJ roll** 5:00 / 1:00, **Boxing** 3:00 / 1:00, **MMA** 5:00 / 1:00, **Muay Thai** 3:00 / 1:00 × 5 rounds. Muay Thai round length is the common gym class, not a stadium contract.
-- Custom presets are saved on the device.
+- Custom round presets are saved on the device, along with named presets for every other mode.
+
+Every conditioning mode, the countdown, and the rounds screen can save as many named presets as you want. They stay in local storage on that phone or TV (`americana.presets.v1`). Nothing is uploaded. A preset can be loaded back into the setup, started directly, renamed, updated, or deleted. The WOD tab lists them under My presets when any are saved. Countdown and round presets saved by earlier versions are migrated into that same list.
 
 The running clock is sized for the room, in portrait and landscape. Work and rest use different colors. Tap the clock to pause or resume. Reset is a separate control. For Time also has Stop, which freezes the elapsed time. The screen stays awake while the timer is running.
 

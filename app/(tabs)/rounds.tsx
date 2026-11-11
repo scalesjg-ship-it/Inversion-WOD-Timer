@@ -1,90 +1,83 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
+import { PresetShelf } from '@/src/components/PresetShelf';
 import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import { formatSeconds } from '@/src/timer/format';
-import { configFromCountdown, configFromPreset, BUILTIN_PRESETS, type CountdownPreset, type RoundPreset } from '@/src/timer/presets';
-import { loadCountdownPresets, loadCustomPresets, saveCountdownPresets, saveCustomPresets } from '@/src/timer/presetStorage';
+import { BUILTIN_PRESETS, configFromPreset, type RoundPreset } from '@/src/timer/presets';
+import { listPresets, type SavedPreset } from '@/src/timer/presetStorage';
 
 const WARNING_CHOICES = [0, 10, 30];
 
+function readParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? '' : value ?? '';
+}
+
+function draftFromSaved(preset: SavedPreset): RoundPreset {
+  return {
+    id: preset.id,
+    name: preset.name,
+    roundSeconds: preset.config.workSeconds,
+    restSeconds: preset.config.restSeconds,
+    rounds: preset.config.rounds,
+    warningSeconds: preset.config.warningSeconds,
+    leadInSeconds: preset.config.leadInSeconds,
+    builtIn: false,
+  };
+}
+
 export default function RoundsScreen() {
+  const params = useLocalSearchParams<{ presetId?: string }>();
+  const presetId = readParam(params.presetId);
   const { branding } = useBranding();
   const { setSession } = useTimerSession();
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
   const restColor = readableDigitColor(branding.restColor, branding.backgroundColor);
-  const [custom, setCustom] = useState<RoundPreset[]>([]);
-  const [countdowns, setCountdowns] = useState<CountdownPreset[]>([]);
   const [draft, setDraft] = useState<RoundPreset>(BUILTIN_PRESETS[0]);
   const [selectedId, setSelectedId] = useState(BUILTIN_PRESETS[0].id);
-  const [presetName, setPresetName] = useState('');
 
-  useEffect(() => {
-    void loadCustomPresets().then(setCustom);
-    void loadCountdownPresets().then(setCountdowns);
+  const applySaved = useCallback((preset: SavedPreset) => {
+    setDraft(draftFromSaved(preset));
+    setSelectedId(preset.id);
   }, []);
 
+  useEffect(() => {
+    if (!presetId) return undefined;
+    let active = true;
+    void listPresets('rounds').then((presets) => {
+      if (!active) return;
+      const match = presets.find((preset) => preset.id === presetId);
+      if (match) applySaved(match);
+    });
+    return () => {
+      active = false;
+    };
+  }, [applySaved, presetId]);
+
   const apply = (preset: RoundPreset) => {
-    setDraft(preset);
+    setDraft({ ...preset });
     setSelectedId(preset.id);
-    setPresetName(preset.builtIn ? '' : preset.name);
   };
 
   const edit = (patch: Partial<RoundPreset>) => {
     setDraft((current) => ({ ...current, ...patch }));
-    setSelectedId('custom');
+    setSelectedId((current) => (BUILTIN_PRESETS.some((preset) => preset.id === current) ? 'custom' : current));
   };
 
-  const start = () => {
+  const start = (config = configFromPreset(draft), label = draft.name) => {
     unlockAudio();
-    setSession({
-      config: configFromPreset(draft),
-      label: draft.name,
-    });
+    setSession({ config, label });
     router.push('/timer');
   };
 
-  const savePreset = () => {
-    const name = presetName.trim();
-    if (!name) {
-      Alert.alert('Name the preset', 'Give the preset a name before saving it on this device.');
-      return;
-    }
-    const preset: RoundPreset = {
-      ...draft,
-      id: `custom-${Date.now()}`,
-      name,
-      builtIn: false,
-    };
-    const next = [...custom, preset];
-    setCustom(next);
-    setSelectedId(preset.id);
-    setDraft(preset);
-    void saveCustomPresets(next);
-  };
-
-  const removePreset = (preset: RoundPreset) => {
-    Alert.alert('Delete preset', `Remove ${preset.name}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          const next = custom.filter((item) => item.id !== preset.id);
-          setCustom(next);
-          void saveCustomPresets(next);
-          if (selectedId === preset.id) apply(BUILTIN_PRESETS[0]);
-        },
-      },
-    ]);
-  };
+  const builtInSelected = BUILTIN_PRESETS.some((preset) => preset.id === selectedId);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -98,40 +91,26 @@ export default function RoundsScreen() {
         <Text style={styles.lede}>Jiu-jitsu, striking, and sparring. Rest is a different color from work.</Text>
         <View style={styles.presets}>
           {BUILTIN_PRESETS.map((preset) => (
-            <Pressable
+            <StandardCard
               key={preset.id}
-              testID={`preset-${preset.id}`}
-              accessibilityRole="button"
+              preset={preset}
+              accent={accent}
+              selected={selectedId === preset.id}
               onPress={() => apply(preset)}
-              style={[
-                styles.preset,
-                { borderColor: selectedId === preset.id ? accent : chrome.line },
-              ]}
-            >
-              <Text style={styles.presetName}>{preset.name}</Text>
-              <Text style={styles.presetMeta}>{presetMeta(preset)}</Text>
-            </Pressable>
-          ))}
-          {custom.map((preset) => (
-            <Pressable
-              key={preset.id}
-              testID={`preset-${preset.id}`}
-              accessibilityRole="button"
-              onPress={() => apply(preset)}
-              onLongPress={() => removePreset(preset)}
-              style={[
-                styles.preset,
-                { borderColor: selectedId === preset.id ? accent : chrome.line },
-              ]}
-            >
-              <Text style={styles.presetName}>{preset.name}</Text>
-              <Text style={styles.presetMeta}>{presetMeta(preset)}</Text>
-              <Pressable accessibilityRole="button" onPress={() => removePreset(preset)} hitSlop={8}>
-                <Text style={[styles.delete, { color: restColor }]}>Delete</Text>
-              </Pressable>
-            </Pressable>
+            />
           ))}
         </View>
+
+        <PresetShelf
+          mode="rounds"
+          accent={accent}
+          config={configFromPreset(draft)}
+          selectedId={selectedId}
+          nameHint={builtInSelected ? draft.name : undefined}
+          onLoad={applySaved}
+          onStart={(preset) => start(preset.config, preset.name)}
+          onClearSelection={() => apply(BUILTIN_PRESETS[0])}
+        />
 
         <TimeField
           label="Round"
@@ -190,56 +169,42 @@ export default function RoundsScreen() {
           testID="lead-in"
           accent={accent}
         />
-        {countdowns.length > 0 ? (
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Saved countdowns</Text>
-            {countdowns.map((preset) => (
-              <Pressable
-                key={preset.id}
-                accessibilityRole="button"
-                testID={`saved-countdown-${preset.id}`}
-                onPress={() => {
-                  unlockAudio();
-                  setSession({ config: configFromCountdown(preset), label: preset.name });
-                  router.push('/timer');
-                }}
-                style={styles.preset}
-              >
-                <Text style={styles.presetName}>{preset.name}</Text>
-                <Text style={styles.presetMeta}>{preset.durationSeconds}s</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => {
-                    const next = countdowns.filter((item) => item.id !== preset.id);
-                    setCountdowns(next);
-                    void saveCountdownPresets(next);
-                  }}
-                >
-                  <Text style={[styles.delete, { color: restColor }]}>Delete</Text>
-                </Pressable>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-
-        <View style={styles.saveRow}>
-          <TextInput
-            testID="preset-name"
-            value={presetName}
-            onChangeText={setPresetName}
-            placeholder="Preset name"
-            placeholderTextColor={chrome.muted}
-            style={styles.nameInput}
-          />
-          <Pressable accessibilityRole="button" testID="save-preset" onPress={savePreset} style={styles.save}>
-            <Text style={[styles.saveLabel, { color: accent }]}>Save</Text>
-          </Pressable>
-        </View>
       </ScrollView>
       <View style={styles.footer}>
-        <BigButton testID="start-rounds" label="Start rounds" color={accent} onPress={start} />
+        <BigButton testID="start-rounds" label="Start rounds" color={accent} onPress={() => start()} />
       </View>
     </SafeAreaView>
+  );
+}
+
+function StandardCard({
+  preset,
+  accent,
+  selected,
+  onPress,
+}: {
+  preset: RoundPreset;
+  accent: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const [webFocused, setWebFocused] = useState(false);
+  return (
+    <Pressable
+      testID={`preset-${preset.id}`}
+      accessibilityRole="button"
+      onPress={onPress}
+      onFocus={() => setWebFocused(true)}
+      onBlur={() => setWebFocused(false)}
+      style={({ focused }) => [
+        styles.preset,
+        { borderColor: selected ? accent : chrome.line },
+        focused || webFocused ? { borderWidth: 6, borderColor: accent } : null,
+      ]}
+    >
+      <Text style={styles.presetName}>{preset.name}</Text>
+      <Text style={styles.presetMeta}>{presetMeta(preset)}</Text>
+    </Pressable>
   );
 }
 
@@ -300,11 +265,6 @@ const styles = StyleSheet.create({
     color: chrome.muted,
     fontSize: 13,
   },
-  delete: {
-    fontFamily: 'OswaldMedium',
-    fontSize: 14,
-    marginTop: 4,
-  },
   field: {
     gap: 10,
   },
@@ -319,33 +279,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-  },
-  saveRow: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-  },
-  nameInput: {
-    flex: 1,
-    minHeight: 52,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: chrome.line,
-    backgroundColor: chrome.surface,
-    color: chrome.text,
-    paddingHorizontal: 14,
-    fontSize: 16,
-  },
-  save: {
-    minHeight: 52,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveLabel: {
-    fontFamily: 'Oswald',
-    fontSize: 20,
-    letterSpacing: 0.6,
   },
   footer: {
     paddingHorizontal: 20,
