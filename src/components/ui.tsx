@@ -35,12 +35,12 @@ export function BigButton({
         styles.big,
         solid
           ? { backgroundColor: color }
-          : { backgroundColor: 'transparent', borderWidth: 1, borderColor: chrome.line },
+          : { backgroundColor: 'transparent', borderWidth: 1, borderColor: color },
         { opacity: pressed ? 0.72 : 1 },
         ring(Boolean(focused) || webFocused, solid ? inkOn(color) : color),
       ]}
     >
-      <Text style={[styles.bigLabel, { color: solid ? inkOn(color) : chrome.text }]}>{label}</Text>
+      <Text style={[styles.bigLabel, { color: solid ? inkOn(color) : color }]}>{label}</Text>
     </Pressable>
   );
 }
