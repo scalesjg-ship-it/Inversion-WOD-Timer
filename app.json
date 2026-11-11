@@ -10,7 +10,7 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "com.garrettscales.americana",
-      "supportsTablet": true,
+      "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Americana uses your photo library so your gym logo can appear on the timer.",
