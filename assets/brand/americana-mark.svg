@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <title>Americana</title>
+  <desc>Round timer mark: a thick ring, a twelve o'clock tick, and a bold A. Neutral gym brand, not tied to one gym.</desc>
+  <g id="back">
+    <rect width="1024" height="1024" fill="#0C0D10"/>
+    <circle cx="512" cy="512" r="430" fill="#17191F"/>
+  </g>
+  <g id="front">
+    <circle cx="512" cy="512" r="430" fill="none" stroke="#FF3B24" stroke-width="44"/>
+    <circle cx="512" cy="512" r="348" fill="none" stroke="#F4F1EA" stroke-width="12"/>
+    <rect x="488" y="78" width="48" height="78" rx="10" fill="#FF3B24"/>
+    <path fill="#F4F1EA" fill-rule="evenodd" d="M512 268 L734 790 H612 L568 668 H456 L412 790 H290 Z M512 430 L448 612 H576 Z"/>
+    <rect x="438" y="508" width="148" height="42" rx="8" fill="#FF3B24"/>
+  </g>
+</svg>

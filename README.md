@@ -95,23 +95,24 @@ D-pad and select cover every action. Home and the microphone button stay with th
 
 ## What you need before the stores
 
-Proposed bundle id, still a placeholder until you register it: `com.garrettscales.americana` for iOS, tvOS, the sideload APK, and Fire TV. Change it in `app.json` before the first upload for each store. It cannot be changed after that upload.
+Bundle id, set in `app.json` for iOS, tvOS, the sideload APK, and Fire TV: `com.garrettscales.americana`. Register that id before the first upload. It cannot be changed after that upload.
 
 - Apple Developer Program, individual account, already Garrett's.
 - An Amazon Appstore developer account. There is no Google Play listing and no Play submit profile.
 - Display name **Americana**. Whether it is free on App Store Connect or Amazon was not checked.
-- A privacy policy URL and a support URL.
-- `extra.eas.projectId` is a placeholder. `eas init` replaces it.
+- Privacy and support pages live in `site/`. Deploy that folder to Vercel as a static site (root directory `site`, no build command). Use the deployed `/privacy` and `/support` URLs in both stores.
+- Listing copy is in `store/listing.md`. Store screenshots are in `store/screenshots/`.
+- `extra.eas.projectId` is still a placeholder. `eas init` replaces it.
 
-Placeholder art, every file named `placeholder-` or called out here, must be replaced before review:
+Store art is generated from `assets/brand/americana-mark.svg` by `python3 scripts/render-brand.py`. Review the mark before you upload it. The files are:
 
 - `assets/images/icon.png` — 1024×1024 iOS icon
-- Android adaptive icons and `assets/images/splash-icon.png`, `favicon.png`, `notification-icon.png`
-- `assets/tv/placeholder-tvos-icon-*-1280x768.png` — tvOS layered icon, front and back, 1280×768
-- `assets/tv/placeholder-tvos-icon-*-400x240.png` and `*-800x480.png` — small tvOS icon layers
-- `assets/tv/placeholder-topshelf-1920x720.png` and `placeholder-topshelf-3840x1440.png` — Top Shelf
-- `assets/tv/placeholder-topshelf-wide-2320x720.png` and `placeholder-topshelf-wide-4640x1440.png` — wide Top Shelf
-- `assets/tv/placeholder-android-tv-banner.png` (320×180) and `placeholder-android-tv-icon.png` — Android TV launcher art. Amazon's Fire TV listing icons are uploaded in the Amazon console, not only in this binary.
+- `assets/images/android-icon-foreground.png`, `android-icon-background.png`, `android-icon-monochrome.png`
+- `assets/images/splash-icon.png`, `favicon.png`, `notification-icon.png`
+- `assets/tv/tvos-icon-front-1280x768.png` and `tvos-icon-back-1280x768.png`, plus 800×480 and 400×240 layers
+- `assets/tv/topshelf-1920x720.png`, `topshelf-3840x1440.png`, `topshelf-wide-2320x720.png`, `topshelf-wide-4640x1440.png`
+- `assets/tv/android-tv-banner.png` (320×180) and `android-tv-icon.png` — Android TV launcher art
+- `assets/store/amazon-icon-512.png`, `amazon-icon-114.png`, `firetv-background-1280x720.png`, `firetv-background-1920x1080.png` — upload these in the Amazon console. They are not the Android TV launcher banner.
 
 ## Build with EAS
 
@@ -143,11 +144,13 @@ tvOS uses the same distribution certificate as iOS and a separate tvOS provision
 2. Create the iOS app in App Store Connect. Name Americana if it is available. SKU `americana`.
 3. Add the tvOS version to that app (same bundle id) or create a separate tvOS app if you want a different listing. Same id is the proposal.
 4. Build with `production-ios` and `production-tvos`. Submit the iOS build with `eas submit --profile production-ios --platform ios`, or Transporter. Upload the tvOS build with Transporter after the tvOS profile is in place.
-5. Still required before review, all still open:
-   - iPhone screenshots at the sizes App Store Connect asks for
-   - Apple TV screenshots, 1920×1080
-   - Final iOS 1024 icon and the tvOS layered icon plus Top Shelf images listed above
-   - Description, keywords, support URL, privacy policy URL
+5. Ready in the repo, still yours to upload:
+   - iPhone screenshots: `store/screenshots/iphone-6.9/` (1320×2868) and `store/screenshots/iphone-6.5/` (1284×2778)
+   - Apple TV screenshots: `store/screenshots/apple-tv/` (1920×1080)
+   - The 1024 icon, tvOS layers, and Top Shelf images listed above
+   - Description, keywords, and age-rating answers in `store/listing.md`
+   - Support and privacy URLs after you deploy `site/`
+6. Still required in App Store Connect:
    - Age rating and App Privacy (photos stay on device, notifications are local, no tracking)
    - Export compliance: `ITSAppUsesNonExemptEncryption` is already false
    - Reviewer note: on-device timer, no account. On Apple TV, use the remote: select starts and pauses, menu leaves the timer.
@@ -158,13 +161,14 @@ Do not create a Google Play app.
 
 1. Open an Amazon developer account and create the app in the Appstore console.
 2. Upload the APK from `eas build --profile production-firetv --platform android`.
-3. Package name placeholder: `com.garrettscales.americana`.
-4. Still required before the Amazon listing can go live:
-   - 512×512 icon and the other icon sizes the console asks for
-   - Fire TV screenshots, 1920×1080
-   - Short and long description, content rating, privacy policy URL
-   - Target the Fire TV device family
-5. The phone sideload file is the `production-android-apk` build. Install it with `adb install`. It is not a store upload.
+3. Package name: `com.garrettscales.americana`.
+4. Ready in the repo, still yours to upload:
+   - `assets/store/amazon-icon-512.png`, `amazon-icon-114.png`, and the Fire TV backgrounds
+   - Fire TV screenshots in `store/screenshots/fire-tv/` (1920×1080)
+   - Short and long description in `store/listing.md`
+   - Privacy policy URL after you deploy `site/`
+5. Target the Fire TV device family in the console.
+6. The phone sideload file is the `production-android-apk` build. Install it with `adb install`. It is not a store upload.
 
 ## Not in this version
 
@@ -173,4 +177,4 @@ Do not create a Google Play app.
 - Logo picking is phone-only.
 - Locked-screen sound on phones depends on notification permission. TVs keep the screen on.
 - Expo Go can try the phone clock. It cannot run the TV build.
-- Placeholder icons, splash, tvOS layers, and Top Shelf art must be replaced before review.
+- Store art is generated. Look at the mark before you upload it. `eas init` still has to replace the project id.

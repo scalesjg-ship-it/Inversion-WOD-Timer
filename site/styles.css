@@ -1,0 +1,87 @@
+:root {
+  color-scheme: dark;
+  --bg: #0c0d10;
+  --ink: #f4f1ea;
+  --muted: #b7b1a6;
+  --red: #ff3b24;
+  --line: #2a2c33;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+a {
+  color: var(--red);
+}
+
+nav {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+  font-size: 0.95rem;
+}
+
+nav a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+nav a[aria-current="page"],
+nav a:hover {
+  color: var(--ink);
+}
+
+h1 {
+  font-size: 2.4rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  margin: 0 0 0.4rem;
+  text-transform: uppercase;
+}
+
+.mark {
+  color: var(--red);
+}
+
+h2 {
+  margin: 2rem 0 0.4rem;
+  font-size: 1.15rem;
+}
+
+p,
+li {
+  color: var(--ink);
+}
+
+.lede {
+  color: var(--muted);
+  font-size: 1.15rem;
+}
+
+ul {
+  padding-left: 1.2rem;
+}
+
+footer {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
