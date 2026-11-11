@@ -52,7 +52,7 @@ Every mode has a lead-in length, including zero.
 
 ## Develop
 
-Requirements: Node 20 or newer, npm.
+Requirements: Node 20 or newer, npm. The repo `.npmrc` sets `legacy-peer-deps=true`. `react-native-tvos` is published as a prerelease (`0.88.1-0`), so a plain `npm ci` fails peer resolution without that file. EAS Build reads the same `.npmrc`.
 
 ```bash
 npm install
@@ -102,7 +102,7 @@ Bundle id, set in `app.json` for iOS, tvOS, the sideload APK, and Fire TV: `com.
 - Display name **Americana**. Whether it is free on App Store Connect or Amazon was not checked.
 - Privacy and support pages live in `site/`. Deploy that folder to Vercel as a static site (root directory `site`, no build command). Use the deployed `/privacy` and `/support` URLs in both stores.
 - Listing copy is in `store/listing.md`. Store screenshots are in `store/screenshots/`.
-- `extra.eas.projectId` is still a placeholder. `eas init` replaces it.
+- The Expo project is `scalesgym/americana` (`extra.eas.projectId` in `app.json`). Do not run `eas init` again unless that project is gone.
 
 Store art is generated from `assets/brand/americana-mark.svg` by `python3 scripts/render-brand.py`. Review the mark before you upload it. The files are:
 
@@ -127,14 +127,13 @@ Store art is generated from `assets/brand/americana-mark.svg` by `python3 script
 
 ```bash
 eas login
-eas init
 eas build --profile production-ios --platform ios
 eas build --profile production-tvos --platform ios
 eas build --profile production-android-apk --platform android
 eas build --profile production-firetv --platform android
 ```
 
-`eas.json` submit has an iOS profile only. There is no Google Play submit config.
+`eas.json` submit profiles `production-ios` and `production-tvos` set the App Store Connect app id and Apple team id. The App Store Connect API key is not in the repo. `eas submit` prompts for it, or you can set `EXPO_ASC_API_KEY_PATH`, `EXPO_ASC_KEY_ID`, and `EXPO_ASC_ISSUER_ID` in the environment. There is no Google Play submit profile.
 
 tvOS uses the same distribution certificate as iOS and a separate tvOS provisioning profile. EAS creates iOS profiles. For `production-tvos`, create the tvOS profile in the Apple developer site, download it, and supply it as a local credential. See the Expo TV guide.
 
@@ -143,7 +142,7 @@ tvOS uses the same distribution certificate as iOS and a separate tvOS provision
 1. Register the App ID `com.garrettscales.americana` on the existing individual Apple Developer account.
 2. Create the iOS app in App Store Connect. Name Americana if it is available. SKU `americana`.
 3. Add the tvOS version to that app (same bundle id) or create a separate tvOS app if you want a different listing. Same id is the proposal.
-4. Build with `production-ios` and `production-tvos`. Submit the iOS build with `eas submit --profile production-ios --platform ios`, or Transporter. Upload the tvOS build with Transporter after the tvOS profile is in place.
+4. Build with `production-ios` and `production-tvos`. Submit with `eas submit --profile production-ios --platform ios` and `eas submit --profile production-tvos --platform ios`. Both profiles target App Store Connect app `6833266123` on team `BNP9QFC679`. Supply the API key in the environment. Transporter still works if you download the `.ipa`. The tvOS upload needs the tvOS provisioning profile in place first.
 5. Ready in the repo, still yours to upload:
    - iPhone screenshots: `store/screenshots/iphone-6.9/` (1320×2868) and `store/screenshots/iphone-6.5/` (1284×2778)
    - Apple TV screenshots: `store/screenshots/apple-tv/` (1920×1080)
@@ -177,4 +176,4 @@ Do not create a Google Play app.
 - Logo picking is phone-only.
 - Locked-screen sound on phones depends on notification permission. TVs keep the screen on.
 - Expo Go can try the phone clock. It cannot run the TV build.
-- Store art is generated. Look at the mark before you upload it. `eas init` still has to replace the project id.
+- Store art is generated. Look at the mark before you upload it.

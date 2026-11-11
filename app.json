@@ -2,6 +2,7 @@
   "expo": {
     "name": "Americana",
     "slug": "americana",
+    "owner": "scalesgym",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
@@ -108,7 +109,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "00000000-0000-4000-8000-000000000000"
+        "projectId": "68a244bc-3ff3-4015-8734-401aa1a93257"
       }
     }
   }
