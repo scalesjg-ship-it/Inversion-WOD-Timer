@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
+import { PresetShelf } from '@/src/components/PresetShelf';
 import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
@@ -12,11 +13,15 @@ import { chrome } from '@/src/theme/chrome';
 import { normalizeConfig } from '@/src/timer/engine';
 import { modeTitle } from '@/src/timer/labels';
 import { defaultConfig } from '@/src/timer/presets';
-import { formatSeconds } from '@/src/timer/format';
+import { listPresets, presetSummary, type SavedPreset } from '@/src/timer/presetStorage';
 import type { TimerConfig, TimerMode } from '@/src/timer/types';
 
+function readParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? '' : value ?? '';
+}
+
 function readMode(value: string | string[] | undefined): TimerMode | null {
-  const raw = Array.isArray(value) ? value[0] : value;
+  const raw = readParam(value);
   switch (raw) {
     case 'forTime':
     case 'amrap':
@@ -30,8 +35,9 @@ function readMode(value: string | string[] | undefined): TimerMode | null {
 }
 
 export default function SetupScreen() {
-  const params = useLocalSearchParams<{ mode?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; presetId?: string }>();
   const mode = readMode(params.mode);
+  const presetId = readParam(params.presetId);
   const { branding } = useBranding();
   const { setSession } = useTimerSession();
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
@@ -47,11 +53,13 @@ export default function SetupScreen() {
 
   return (
     <SetupForm
+      key={mode}
       mode={mode}
       accent={accent}
-      onStart={(config) => {
+      presetId={presetId}
+      onStart={(config, label) => {
         unlockAudio();
-        setSession({ config, label: modeTitle(mode) });
+        setSession({ config, label });
         router.push('/timer');
       }}
     />
@@ -61,11 +69,13 @@ export default function SetupScreen() {
 function SetupForm({
   mode,
   accent,
+  presetId,
   onStart,
 }: {
   mode: TimerMode;
   accent: string;
-  onStart: (config: TimerConfig) => void;
+  presetId: string;
+  onStart: (config: TimerConfig, label: string) => void;
 }) {
   const initial = defaultConfig(mode);
   const [leadInSeconds, setLeadInSeconds] = useState(initial.leadInSeconds);
@@ -73,6 +83,39 @@ function SetupForm({
   const [restSeconds, setRestSeconds] = useState(initial.restSeconds);
   const [rounds, setRounds] = useState(initial.rounds);
   const [capOn, setCapOn] = useState(false);
+  const [selectedId, setSelectedId] = useState('');
+  const [runLabel, setRunLabel] = useState(modeTitle(mode));
+
+  const loadPreset = useCallback((preset: SavedPreset) => {
+    setLeadInSeconds(preset.config.leadInSeconds);
+    setRestSeconds(preset.config.restSeconds);
+    setRounds(preset.config.rounds);
+    if (preset.config.mode === 'forTime') {
+      if (preset.config.workSeconds > 0) {
+        setCapOn(true);
+        setWorkSeconds(preset.config.workSeconds);
+      } else {
+        setCapOn(false);
+      }
+    } else {
+      setWorkSeconds(preset.config.workSeconds);
+    }
+    setSelectedId(preset.id);
+    setRunLabel(preset.name);
+  }, []);
+
+  useEffect(() => {
+    if (!presetId) return undefined;
+    let active = true;
+    void listPresets(mode).then((presets) => {
+      if (!active) return;
+      const match = presets.find((preset) => preset.id === presetId);
+      if (match) loadPreset(match);
+    });
+    return () => {
+      active = false;
+    };
+  }, [loadPreset, mode, presetId]);
 
   const config = normalizeConfig({
     mode,
@@ -83,7 +126,7 @@ function SetupForm({
     warningSeconds: 0,
   });
 
-  const summary = summaryFor(config, capOn);
+  const summary = presetSummary(config);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -96,6 +139,18 @@ function SetupForm({
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>{modeTitle(mode)}</Text>
         <Text style={styles.summary}>{summary}</Text>
+        <PresetShelf
+          mode={mode}
+          accent={accent}
+          config={config}
+          selectedId={selectedId}
+          onLoad={loadPreset}
+          onStart={(preset) => onStart(preset.config, preset.name)}
+          onClearSelection={() => {
+            setSelectedId('');
+            setRunLabel(modeTitle(mode));
+          }}
+        />
         {mode === 'forTime' ? (
           <View style={styles.switchRow}>
             <View>
@@ -177,33 +232,10 @@ function SetupForm({
         />
       </ScrollView>
       <View style={styles.footer}>
-        <BigButton testID="start-timer" label="Start" color={accent} onPress={() => onStart(config)} />
+        <BigButton testID="start-timer" label="Start" color={accent} onPress={() => onStart(config, runLabel)} />
       </View>
     </SafeAreaView>
   );
-}
-
-function summaryFor(config: TimerConfig, capOn: boolean): string {
-  const lead = config.leadInSeconds > 0 ? `${config.leadInSeconds}s lead-in` : 'No lead-in';
-  switch (config.mode) {
-    case 'forTime':
-      return capOn && config.workSeconds > 0 ? `${lead} · cap ${formatSeconds(config.workSeconds)}` : `${lead} · count up`;
-    case 'amrap':
-      return `${lead} · ${formatSeconds(config.workSeconds)}`;
-    case 'emom':
-      return `${lead} · every ${formatSeconds(config.workSeconds)} · ${config.rounds} rounds`;
-    case 'tabata':
-    case 'intervals':
-      return `${lead} · ${formatSeconds(config.workSeconds)} on / ${formatSeconds(config.restSeconds)} off · ${config.rounds} rounds`;
-    case 'rounds':
-      return lead;
-    case 'countdown':
-      return `${lead} · ${formatSeconds(config.workSeconds)}`;
-    default: {
-      const exhaustive: never = config.mode;
-      return exhaustive;
-    }
-  }
 }
 
 function ChipRow({

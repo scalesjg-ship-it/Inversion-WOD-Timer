@@ -1,77 +1,76 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { CountdownPreset, RoundPreset } from './presets';
+import type { TimerConfig, TimerMode } from './types';
+import {
+  PRESET_STORAGE_KEY,
+  applyDelete,
+  applyRename,
+  applySave,
+  applyUpdate,
+  listMode,
+  readStoredPresets,
+  serializePresetDocument,
+  type PresetResult,
+  type SavedPreset,
+} from './presetStore';
 
-const KEY = 'americana.presets.v1';
+export type { PresetResult, SavedPreset };
+export { PRESET_STORAGE_KEY, nextPresetName, presetSummary, suggestPresetName } from './presetStore';
 
-function isRoundPreset(value: unknown): value is RoundPreset {
-  if (!value || typeof value !== 'object') return false;
-  const preset = value as Partial<RoundPreset> & { kind?: string };
-  if (preset.kind === 'countdown') return false;
-  return (
-    typeof preset.id === 'string' &&
-    typeof preset.name === 'string' &&
-    typeof preset.roundSeconds === 'number' &&
-    typeof preset.restSeconds === 'number' &&
-    typeof preset.rounds === 'number' &&
-    typeof preset.warningSeconds === 'number' &&
-    typeof preset.leadInSeconds === 'number'
-  );
-}
-
-function isCountdownPreset(value: unknown): value is CountdownPreset {
-  if (!value || typeof value !== 'object') return false;
-  const preset = value as Partial<CountdownPreset>;
-  return (
-    preset.kind === 'countdown' &&
-    typeof preset.id === 'string' &&
-    typeof preset.name === 'string' &&
-    typeof preset.durationSeconds === 'number' &&
-    typeof preset.leadInSeconds === 'number' &&
-    Array.isArray(preset.warningMarksSeconds) &&
-    preset.warningMarksSeconds.every((mark) => typeof mark === 'number')
-  );
-}
-
-async function loadAll(): Promise<unknown[]> {
+/**
+ * Presets stay on this device under `americana.presets.v1`.
+ * A legacy array of countdown and round presets is rewritten as `{ version: 2, presets }`.
+ */
+export async function loadPresets(): Promise<SavedPreset[]> {
+  let parsed: unknown;
   try {
-    const raw = await AsyncStorage.getItem(KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const raw = await AsyncStorage.getItem(PRESET_STORAGE_KEY);
+    if (raw == null) return [];
+    parsed = JSON.parse(raw);
   } catch {
     return [];
   }
+  const { presets, migrated } = readStoredPresets(parsed);
+  if (migrated) await AsyncStorage.setItem(PRESET_STORAGE_KEY, serializePresetDocument(presets));
+  return presets;
 }
 
-async function writeAll(entries: unknown[]): Promise<void> {
-  await AsyncStorage.setItem(KEY, JSON.stringify(entries));
+async function writePresets(presets: readonly SavedPreset[]): Promise<void> {
+  await AsyncStorage.setItem(PRESET_STORAGE_KEY, serializePresetDocument(presets));
 }
 
-export async function loadCustomPresets(): Promise<RoundPreset[]> {
-  const all = await loadAll();
-  return all.filter(isRoundPreset).map((preset) => ({ ...preset, builtIn: false }));
+export async function listPresets(mode: TimerMode): Promise<SavedPreset[]> {
+  return listMode(await loadPresets(), mode);
 }
 
-export async function loadCountdownPresets(): Promise<CountdownPreset[]> {
-  const all = await loadAll();
-  return all.filter(isCountdownPreset).map((preset) => ({ ...preset, builtIn: false, kind: 'countdown' }));
+export async function savePreset(input: {
+  name: string;
+  config: TimerConfig;
+  overwrite?: boolean;
+  now?: number;
+}): Promise<PresetResult> {
+  const current = await loadPresets();
+  const next = applySave(current, input);
+  if (next.result.ok) await writePresets(next.presets);
+  return next.result;
 }
 
-export async function saveCustomPresets(presets: RoundPreset[]): Promise<void> {
-  const all = await loadAll();
-  const countdowns = all.filter(isCountdownPreset);
-  const rounds = presets
-    .filter((preset) => !preset.builtIn)
-    .map((preset) => ({ ...preset, builtIn: false }));
-  await writeAll([...rounds, ...countdowns]);
+export async function renamePreset(id: string, name: string, now = Date.now()): Promise<PresetResult> {
+  const current = await loadPresets();
+  const next = applyRename(current, id, name, now);
+  if (next.result.ok) await writePresets(next.presets);
+  return next.result;
 }
 
-export async function saveCountdownPresets(presets: CountdownPreset[]): Promise<void> {
-  const all = await loadAll();
-  const rounds = all.filter(isRoundPreset);
-  const countdowns = presets
-    .filter((preset) => !preset.builtIn)
-    .map((preset) => ({ ...preset, builtIn: false, kind: 'countdown' as const }));
-  await writeAll([...rounds, ...countdowns]);
+export async function updatePreset(id: string, config: TimerConfig, now = Date.now()): Promise<PresetResult> {
+  const current = await loadPresets();
+  const next = applyUpdate(current, id, config, now);
+  if (next.result.ok) await writePresets(next.presets);
+  return next.result;
+}
+
+export async function deletePreset(id: string): Promise<void> {
+  const current = await loadPresets();
+  if (!current.some((preset) => preset.id === id)) return;
+  await writePresets(applyDelete(current, id));
 }

@@ -56,28 +56,6 @@ export const BUILTIN_PRESETS: RoundPreset[] = [
   },
 ];
 
-export interface CountdownPreset {
-  kind: 'countdown';
-  id: string;
-  name: string;
-  durationSeconds: number;
-  leadInSeconds: number;
-  warningMarksSeconds: number[];
-  builtIn: boolean;
-}
-
-export function configFromCountdown(preset: CountdownPreset): TimerConfig {
-  return normalizeConfig({
-    mode: 'countdown',
-    leadInSeconds: preset.leadInSeconds,
-    workSeconds: preset.durationSeconds,
-    restSeconds: 0,
-    rounds: 1,
-    warningSeconds: 0,
-    warningMarksSeconds: preset.warningMarksSeconds,
-  });
-}
-
 export function configFromPreset(preset: RoundPreset): TimerConfig {
   return normalizeConfig({
     mode: 'rounds',

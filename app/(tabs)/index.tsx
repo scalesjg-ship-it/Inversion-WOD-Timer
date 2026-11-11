@@ -1,13 +1,16 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
+import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import { isTenFootLayout, tvSafeInset } from '@/src/tv/layout';
 import { modeTitle } from '@/src/timer/labels';
+import { loadPresets, presetSummary, type SavedPreset } from '@/src/timer/presetStorage';
 import type { TimerMode } from '@/src/timer/types';
 
 const MODES: { mode: TimerMode; detail: string }[] = [
@@ -33,16 +36,36 @@ const MODES: { mode: TimerMode; detail: string }[] = [
   },
   {
     mode: 'countdown',
-    detail: 'Any length. Name it, save it, and set warning beeps.',
+    detail: 'Any length, with warning beeps. Save it with your other presets.',
   },
 ];
 
 export default function WodScreen() {
   const { branding } = useBranding();
+  const { setSession } = useTimerSession();
   const { width, height } = useWindowDimensions();
   const tenFoot = isTenFootLayout(width, height, Platform.isTV === true);
   const inset = tvSafeInset(tenFoot);
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
+  const [presets, setPresets] = useState<SavedPreset[] | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      void loadPresets().then((next) => {
+        if (active) setPresets(next);
+      });
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
+
+  const startPreset = (preset: SavedPreset) => {
+    unlockAudio();
+    setSession({ config: preset.config, label: preset.name });
+    router.push('/timer');
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -60,9 +83,107 @@ export default function WodScreen() {
             <ModeCard key={item.mode} item={item} accent={accent} preferred={index === 0} tenFoot={tenFoot} />
           ))}
         </View>
+        {presets && presets.length > 0 ? (
+          <>
+            <Text style={styles.section}>My presets</Text>
+            <View style={styles.list}>
+              {presets.map((preset) => (
+                <SavedPresetCard
+                  key={preset.id}
+                  preset={preset}
+                  accent={accent}
+                  tenFoot={tenFoot}
+                  onOpen={() => openPreset(preset)}
+                  onStart={() => startPreset(preset)}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
         <Text style={styles.hint}>Jiu-jitsu, boxing, and sparring rounds are on the Rounds tab.</Text>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function openPreset(preset: SavedPreset) {
+  switch (preset.mode) {
+    case 'countdown':
+      router.push({ pathname: '/countdown', params: { presetId: preset.id } });
+      return;
+    case 'rounds':
+      router.navigate({ pathname: '/rounds', params: { presetId: preset.id } });
+      return;
+    case 'forTime':
+    case 'amrap':
+    case 'emom':
+    case 'tabata':
+    case 'intervals':
+      router.push({ pathname: '/setup', params: { mode: preset.mode, presetId: preset.id } });
+      return;
+    default: {
+      const exhaustive: never = preset.mode;
+      return exhaustive;
+    }
+  }
+}
+
+function SavedPresetCard({
+  preset,
+  accent,
+  tenFoot,
+  onOpen,
+  onStart,
+}: {
+  preset: SavedPreset;
+  accent: string;
+  tenFoot: boolean;
+  onOpen: () => void;
+  onStart: () => void;
+}) {
+  const [webFocused, setWebFocused] = useState(false);
+  const [startFocused, setStartFocused] = useState(false);
+  return (
+    <View style={[styles.card, tenFoot && styles.cardTv]}>
+      <View style={[styles.bar, { backgroundColor: accent }]} />
+      <Pressable
+        testID={`my-preset-${preset.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={`${preset.name}, ${modeTitle(preset.mode)}`}
+        accessibilityHint="Opens this preset in its setup"
+        onPress={onOpen}
+        onFocus={() => setWebFocused(true)}
+        onBlur={() => setWebFocused(false)}
+        style={({ pressed, focused }) => [
+          styles.cardBody,
+          { opacity: pressed ? 0.78 : 1 },
+          focused || webFocused ? { borderWidth: 6, borderColor: accent } : null,
+        ]}
+      >
+        <Text style={[styles.cardTitle, tenFoot && styles.cardTitleTv]} numberOfLines={2}>
+          {preset.name}
+        </Text>
+        <Text style={[styles.cardDetail, tenFoot && styles.cardDetailTv]}>
+          {modeTitle(preset.mode)} · {presetSummary(preset.config)}
+        </Text>
+      </Pressable>
+      <Pressable
+        testID={`my-preset-start-${preset.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={`Start ${preset.name}`}
+        onPress={onStart}
+        onFocus={() => setStartFocused(true)}
+        onBlur={() => setStartFocused(false)}
+        style={({ pressed, focused }) => [
+          styles.start,
+          tenFoot && styles.startTv,
+          { opacity: pressed ? 0.78 : 1 },
+          focused || startFocused ? { borderWidth: 6, borderColor: accent } : null,
+        ]}
+      >
+        <Text style={[styles.startLabel, { color: accent }, tenFoot && styles.startLabelTv]}>Start</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -199,6 +320,25 @@ const styles = StyleSheet.create({
     fontFamily: 'Oswald',
     fontSize: 34,
     paddingRight: 16,
+  },
+  start: {
+    minHeight: 64,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  startTv: {
+    minHeight: 96,
+    paddingHorizontal: 28,
+  },
+  startLabel: {
+    fontFamily: 'Oswald',
+    fontSize: 20,
+    letterSpacing: 0.6,
+  },
+  startLabelTv: {
+    fontSize: 32,
   },
   hint: {
     marginTop: 8,
