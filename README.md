@@ -45,7 +45,8 @@ The Brand tab stores, on this device only:
 
 - Gym name
 - Colors for work, rest, lead-in, warning, the clock digits, the background, and the accent. Each one has swatches, a hue strip, and a hex field. Preset themes are Inversion, Dark, High-contrast, Neon, and Fight (red/blue). If a digit color cannot be read on the background, Americana swaps in black or white.
-- A logo from the photo library or from Files. Any image is accepted. It is resized and kept locally. The default placement is a large faded watermark, about 88% of the shorter screen edge, centered. Full bleed (optional blur) and a corner mark are the other placements.
+- A logo from the photo library or from Files on a phone. Any image is accepted. It is resized and kept locally. The default placement is a large faded watermark, about 88% of the shorter screen edge, centered. Full bleed (optional blur) and a corner mark are the other placements.
+- On Apple TV and Fire TV, Brand shows a QR code. Scan it with a phone on the same Wi-Fi, pick a logo, and optionally set the gym name, colors, and placement. The TV saves that logo with the same resize step as a photo picked on the device. The page is served by the TV. The image is not sent to a server on the internet. The listener stops when you leave Brand, or after 10 minutes.
 - Reset to Inversion, which restores the CrossFit Inversion name and colors and clears the logo.
 
 Every mode has a lead-in length, including zero.
@@ -91,7 +92,15 @@ On the running timer:
 | Down or swipe down | Hide those controls |
 | Back or Menu | Leave the timer for the mode list |
 
-D-pad and select cover every action. Home and the microphone button stay with the TV. Logo upload stays on the phone. A TV shows branding saved on that device, or a note to set the logo on a phone.
+D-pad and select cover every action. Home and the microphone button stay with the TV. On Brand, scan the QR code with a phone on the same Wi-Fi to send a logo. Remove logo stays on the remote. A guest network that isolates devices will not connect.
+
+### Local logo transfer
+
+The TV listens with [`react-native-tcp-socket`](https://github.com/Rapsssito/react-native-tcp-socket). Its podspec includes tvOS (`:tvos => "10.0"`) and the iOS implementation is CocoaAsyncSocket, which also ships a tvOS target. Android uses `java.net.ServerSocket`, which Fire TV can run. `expo-network` `getIpAddressAsync` is supported on tvOS and supplies the address in the QR code. The code itself is drawn from the pure JavaScript `uqr` matrix with views, so the screen does not add another native graphics library.
+
+The phone may send one JPEG, PNG, or HEIC up to 10 MB. The bytes are written to a temp file and passed through `prepareLogo`, the same resizer a local pick uses. If that TV cannot decode HEIC, the page asks for a JPEG or PNG. The QR contains a one-time token. A second send needs the new code shown after a successful save.
+
+`NSLocalNetworkUsageDescription` is set for the local listener. tvOS does not show a local-network permission prompt. Android release builds do not turn on cleartext traffic for the public internet: the TV is the server, and the phone browser is the client. `INTERNET` is declared so the TV can accept the connection. `CHANGE_NETWORK_STATE`, which the socket library's manifest requests, is blocked. It is not needed to listen.
 
 ## What you need before the stores
 
@@ -171,9 +180,9 @@ Do not create a Google Play app.
 
 ## Not in this version
 
-- No accounts, cloud sync, or shared gym profiles. Branding is per device, including each TV.
+- No accounts, cloud sync, or shared gym profiles. Branding is per device, including each TV. A phone can hand a logo to a TV on the same Wi-Fi. That transfer stays on the local network.
 - No store submission is performed from this repo.
-- Logo picking is phone-only.
+- On a phone, the logo comes from the photo library or Files. On a TV, it comes from the QR page.
 - Locked-screen sound on phones depends on notification permission. TVs keep the screen on.
 - Expo Go can try the phone clock. It cannot run the TV build.
 - Store art is generated. Look at the mark before you upload it.
