@@ -1,10 +1,12 @@
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { chrome } from '@/src/theme/chrome';
+import { isTenFootLayout, tvSafeInset } from '@/src/tv/layout';
 import { modeTitle } from '@/src/timer/labels';
 import type { TimerMode } from '@/src/timer/types';
 
@@ -37,23 +39,53 @@ const MODES: { mode: TimerMode; detail: string }[] = [
 
 export default function WodScreen() {
   const { branding } = useBranding();
+  const { width, height } = useWindowDimensions();
+  const tenFoot = isTenFootLayout(width, height, Platform.isTV === true);
+  const inset = tvSafeInset(tenFoot);
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} testID="screen-wod">
-        <Text style={[styles.wordmark, { color: accent }]}>Americana</Text>
-        <Text style={styles.gym} numberOfLines={2} adjustsFontSizeToFit>
+      <ScrollView
+        contentContainerStyle={[styles.content, tenFoot && { paddingHorizontal: inset, paddingBottom: inset }]}
+        testID="screen-wod"
+      >
+        <Text style={[styles.wordmark, { color: accent }, tenFoot && styles.wordmarkTv]}>Americana</Text>
+        <Text style={[styles.gym, tenFoot && styles.gymTv]} numberOfLines={2} adjustsFontSizeToFit>
           {branding.gymName}
         </Text>
         <Text style={styles.section}>Conditioning</Text>
         <View style={styles.list}>
-          {MODES.map((item) => (
+          {MODES.map((item, index) => (
+            <ModeCard key={item.mode} item={item} accent={accent} preferred={index === 0} tenFoot={tenFoot} />
+          ))}
+        </View>
+        <Text style={styles.hint}>Jiu-jitsu, boxing, and sparring rounds are on the Rounds tab.</Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function ModeCard({
+  item,
+  accent,
+  preferred,
+  tenFoot,
+}: {
+  item: (typeof MODES)[number];
+  accent: string;
+  preferred: boolean;
+  tenFoot: boolean;
+}) {
+  const [webFocused, setWebFocused] = useState(false);
+  return (
             <Pressable
-              key={item.mode}
               testID={`mode-${item.mode}`}
               accessibilityRole="button"
               accessibilityLabel={modeTitle(item.mode)}
+              hasTVPreferredFocus={preferred}
+              onFocus={() => setWebFocused(true)}
+              onBlur={() => setWebFocused(false)}
               onPress={() => {
                 if (item.mode === 'countdown') {
                   router.push('/countdown');
@@ -61,20 +93,20 @@ export default function WodScreen() {
                 }
                 router.push({ pathname: '/setup', params: { mode: item.mode } });
               }}
-              style={({ pressed }) => [styles.card, { opacity: pressed ? 0.78 : 1 }]}
+              style={({ pressed, focused }) => [
+                styles.card,
+                tenFoot && styles.cardTv,
+                { opacity: pressed ? 0.78 : 1 },
+                focused || webFocused ? { borderWidth: 6, borderColor: accent } : null,
+              ]}
             >
               <View style={[styles.bar, { backgroundColor: accent }]} />
               <View style={styles.cardBody}>
-                <Text style={styles.cardTitle}>{modeTitle(item.mode)}</Text>
-                <Text style={styles.cardDetail}>{item.detail}</Text>
+                <Text style={[styles.cardTitle, tenFoot && styles.cardTitleTv]}>{modeTitle(item.mode)}</Text>
+                <Text style={[styles.cardDetail, tenFoot && styles.cardDetailTv]}>{item.detail}</Text>
               </View>
               <Text style={[styles.chevron, { color: accent }]}>›</Text>
             </Pressable>
-          ))}
-        </View>
-        <Text style={styles.hint}>Jiu-jitsu, boxing, and sparring rounds are on the Rounds tab.</Text>
-      </ScrollView>
-    </SafeAreaView>
   );
 }
 
@@ -100,6 +132,25 @@ const styles = StyleSheet.create({
     fontSize: 36,
     lineHeight: 40,
     color: chrome.text,
+  },
+  wordmarkTv: {
+    fontSize: 28,
+    marginTop: 12,
+  },
+  gymTv: {
+    fontSize: 72,
+    lineHeight: 80,
+  },
+  cardTv: {
+    minHeight: 140,
+    borderRadius: 24,
+  },
+  cardTitleTv: {
+    fontSize: 48,
+  },
+  cardDetailTv: {
+    fontSize: 24,
+    lineHeight: 32,
   },
   section: {
     marginTop: 12,

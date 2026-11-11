@@ -11,8 +11,10 @@ import {
   pause,
   project,
   reconcile,
+  seekBy,
   soundsForCues,
   start,
+  stepRound,
   totalDurationMs,
 } from './engine';
 import { notificationPlan, selectUpcoming } from './notificationPlan';
@@ -383,6 +385,43 @@ describe('custom countdown', () => {
     state = start(state, 1_000 + 20_000 + 3_600_000);
     expect(cuesBetween(state, 20_000, 29_999).some((cue) => cue.type === 'warning')).toBe(false);
     expect(cuesBetween(state, 29_999, 30_000)).toContainEqual({ type: 'warning', round: 1 });
+  });
+});
+
+describe('remote seek and round changes', () => {
+  it('moves a countdown ten seconds in either direction and clamps at the ends', () => {
+    let state = start(createInitial({
+      mode: 'countdown',
+      leadInSeconds: 0,
+      workSeconds: 60,
+      restSeconds: 0,
+      rounds: 1,
+      warningSeconds: 0,
+    }), 0);
+    state = seekBy(state, 10_000, 0);
+    expect(project(state, 0).displayMs).toBe(50_000);
+    state = seekBy(state, -30_000, 0);
+    expect(project(state, 0).totalElapsedMs).toBe(0);
+    state = seekBy(state, 120_000, 0);
+    expect(project(state, 0).phase).toBe('finished');
+  });
+
+  it('steps to the next and previous work round', () => {
+    let state = start(createInitial({
+      mode: 'tabata',
+      leadInSeconds: 10,
+      workSeconds: 20,
+      restSeconds: 10,
+      rounds: 8,
+      warningSeconds: 0,
+    }), 0);
+    state = stepRound(state, 1, 12_000);
+    expect(project(state, 12_000).round).toBe(2);
+    expect(project(state, 12_000).phase).toBe('work');
+    state = stepRound(state, -1, 12_000);
+    expect(project(state, 12_000).round).toBe(1);
+    state = stepRound(state, -1, 12_000);
+    expect(project(state, 12_000).round).toBe(1);
   });
 });
 

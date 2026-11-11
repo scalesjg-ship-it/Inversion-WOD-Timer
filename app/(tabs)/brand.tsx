@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -142,6 +143,13 @@ export default function BrandScreen() {
         <ColorPicker label="Accent" testID="color-ui" value={branding.uiColor} onChange={(uiColor) => void update({ uiColor })} />
 
         <Text style={styles.fieldLabel}>Logo</Text>
+        {Platform.isTV ? (
+          <Text style={styles.help} testID="tv-brand-note">
+            {branding.logoUri
+              ? 'This TV is using the logo saved on this device.'
+              : 'Set up branding on your phone. Logo upload stays on the phone, and this TV shows the colors and name saved here.'}
+          </Text>
+        ) : (
         <View style={styles.row}>
           <Pressable accessibilityRole="button" testID="pick-logo" onPress={() => void pickLibrary()} style={styles.secondary}>
             <Text style={styles.secondaryLabel}>Photo library</Text>
@@ -150,6 +158,7 @@ export default function BrandScreen() {
             <Text style={styles.secondaryLabel}>Files</Text>
           </Pressable>
         </View>
+        )}
         {branding.logoUri ? (
           <Pressable accessibilityRole="button" testID="remove-logo" onPress={() => void update({ logoUri: null })}>
             <Text style={[styles.link, { color: accent }]}>Remove logo</Text>

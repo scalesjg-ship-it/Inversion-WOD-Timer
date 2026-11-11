@@ -1,7 +1,7 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
@@ -14,6 +14,9 @@ import { chrome } from '@/src/theme/chrome';
 import { formatSnapshot, phaseLabel, roundLabel } from '@/src/timer/labels';
 import { useTimer } from '@/src/timer/useTimer';
 import type { Phase } from '@/src/timer/types';
+import { clockFontSize, isTenFootLayout, tvSafeInset } from '@/src/tv/layout';
+import type { RemoteCommand } from '@/src/tv/remoteMap';
+import { useRemoteCommands } from '@/src/tv/useRemoteCommands';
 
 const KEEP_AWAKE = 'americana-timer';
 
@@ -26,7 +29,12 @@ export default function TimerScreen() {
   const { width, height } = useWindowDimensions();
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   const landscape = width > height;
-  const clockSize = Math.round(Math.min(Math.min(width, height) * (landscape ? 0.46 : 0.3), 280));
+  const tenFoot = isTenFootLayout(width, height, Platform.isTV === true);
+  const clockSize = clockFontSize(width, height, tenFoot);
+  const safeInset = tvSafeInset(tenFoot);
+  const [controlsHeld, setControlsHeld] = useState(false);
+  const controlsVisible = tenFoot ? controlsHeld : true;
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const palette = screenColors(branding);
   const phaseColor = phaseInk(timer.snapshot.phase, branding, timer.snapshot.warningActive);
   const digits = palette.digits;
@@ -42,6 +50,48 @@ export default function TimerScreen() {
   const onClock = () => {
     if (timer.snapshot.running || timer.snapshot.paused) timer.toggle();
   };
+
+  const onRemote = useCallback((command: RemoteCommand) => {
+    switch (command.type) {
+      case 'toggle':
+        timer.toggle();
+        break;
+      case 'confirmReset':
+        setConfirmOpen(true);
+        setControlsHeld(true);
+        break;
+      case 'dismissConfirm':
+        setConfirmOpen(false);
+        break;
+      case 'seek':
+        timer.seekTimer(command.seconds);
+        break;
+      case 'stepRound':
+        timer.stepRoundTimer(command.direction);
+        break;
+      case 'showControls':
+        setControlsHeld(true);
+        break;
+      case 'hideControls':
+        setControlsHeld(false);
+        setConfirmOpen(false);
+        break;
+      case 'exit':
+        router.navigate('/');
+        break;
+      case 'ignore':
+        break;
+      default: {
+        const exhaustive: never = command;
+        return exhaustive;
+      }
+    }
+  }, [timer]);
+
+  useRemoteCommands(
+    { mode: config.mode, controlsVisible, confirmOpen },
+    onRemote,
+  );
 
   const phaseText = readableDigitColor(phaseColor, branding.backgroundColor);
 
@@ -63,6 +113,7 @@ export default function TimerScreen() {
         testID="timer-face"
         onPress={onClock}
         style={styles.face}
+        focusable={false}
       >
         <View style={styles.clockAnchor}>
           <Text style={[styles.phase, { color: phaseText }]} testID="timer-phase">
@@ -95,7 +146,7 @@ export default function TimerScreen() {
           </View>
         </View>
       </Pressable>
-      <SafeAreaView pointerEvents="box-none" style={styles.overlay} edges={['top', 'bottom']}>
+      <SafeAreaView pointerEvents="box-none" style={[styles.overlay, { padding: safeInset }]} edges={['top', 'bottom']}>
         <View style={styles.top} pointerEvents="box-none">
           <Pressable accessibilityRole="button" testID="timer-back" onPress={() => router.back()} hitSlop={12}>
             <Text style={styles.back}>Back</Text>
@@ -105,6 +156,14 @@ export default function TimerScreen() {
           </Text>
           <CornerLogo branding={branding} />
         </View>
+        {confirmOpen ? (
+          <View style={styles.confirm} testID="reset-confirm">
+            <Text style={styles.confirmTitle}>Reset this timer?</Text>
+            <BigButton label="Reset" color={digits} onPress={() => { timer.resetTimer(); setConfirmOpen(false); }} testID="confirm-reset" />
+            <BigButton label="Cancel" color={digits} variant="ghost" onPress={() => setConfirmOpen(false)} testID="confirm-cancel" />
+          </View>
+        ) : null}
+        {controlsVisible ? (
         <View pointerEvents="box-none" style={landscape ? styles.controlsLandscape : styles.controls}>
           {timer.snapshot.phase === 'idle' || timer.snapshot.phase === 'finished' ? (
             <BigButton
@@ -121,6 +180,7 @@ export default function TimerScreen() {
             <BigButton label="Reset" color={digits} variant="ghost" onPress={timer.resetTimer} testID="timer-reset" />
           ) : null}
         </View>
+        ) : null}
       </SafeAreaView>
     </View>
   );
@@ -250,6 +310,28 @@ const styles = StyleSheet.create({
     color: chrome.muted,
     marginTop: 4,
     fontSize: 14,
+  },
+  confirm: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '32%',
+    alignSelf: 'center',
+    width: 420,
+    marginHorizontal: 'auto',
+    gap: 12,
+    padding: 24,
+    borderRadius: 20,
+    backgroundColor: 'rgba(7,8,10,0.92)',
+    borderWidth: 2,
+    borderColor: 'rgba(244,247,251,0.3)',
+  },
+  confirmTitle: {
+    color: chrome.text,
+    fontFamily: 'Oswald',
+    fontSize: 36,
+    textAlign: 'center',
+    marginBottom: 8,
   },
   controls: {
     position: 'absolute',

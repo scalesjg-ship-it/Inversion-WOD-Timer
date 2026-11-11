@@ -23,18 +23,44 @@
         "buildType": "apk"
       }
     },
-    "production": {
+    "production-ios": {
       "autoIncrement": true,
+      "distribution": "store",
       "ios": {},
+      "channel": "production-ios"
+    },
+    "production-tvos": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "env": {
+        "EXPO_TV": "1"
+      },
+      "ios": {},
+      "channel": "production-tvos"
+    },
+    "production-android-apk": {
+      "autoIncrement": true,
+      "distribution": "internal",
       "android": {
-        "buildType": "app-bundle"
-      }
+        "buildType": "apk"
+      },
+      "channel": "production-android-apk"
+    },
+    "production-firetv": {
+      "autoIncrement": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_TV": "1"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "channel": "production-firetv"
     }
   },
   "submit": {
-    "production": {
-      "ios": {},
-      "android": {}
+    "production-ios": {
+      "ios": {}
     }
   }
 }

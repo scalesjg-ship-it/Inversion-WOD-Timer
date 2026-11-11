@@ -4,6 +4,11 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { inkOn } from '@/src/branding/color';
 import { chrome } from '@/src/theme/chrome';
 
+function ring(focused: boolean, color: string) {
+  if (!focused) return null;
+  return { borderWidth: 6, borderColor: color };
+}
+
 export function BigButton({
   label,
   onPress,
@@ -18,17 +23,21 @@ export function BigButton({
   variant?: 'solid' | 'ghost';
 }) {
   const solid = variant === 'solid';
+  const [webFocused, setWebFocused] = useState(false);
   return (
     <Pressable
       accessibilityRole="button"
       testID={testID}
       onPress={onPress}
-      style={({ pressed }) => [
+      onFocus={() => setWebFocused(true)}
+      onBlur={() => setWebFocused(false)}
+      style={({ pressed, focused }) => [
         styles.big,
         solid
           ? { backgroundColor: color }
           : { backgroundColor: 'transparent', borderWidth: 1, borderColor: chrome.line },
         { opacity: pressed ? 0.72 : 1 },
+        ring(Boolean(focused) || webFocused, solid ? inkOn(color) : color),
       ]}
     >
       <Text style={[styles.bigLabel, { color: solid ? inkOn(color) : chrome.text }]}>{label}</Text>
@@ -66,6 +75,8 @@ export function NumberStepper({
     setText(String(clamped));
   };
 
+  const [decFocused, setDecFocused] = useState(false);
+  const [incFocused, setIncFocused] = useState(false);
   return (
     <View style={styles.stepper}>
       <Pressable
@@ -73,7 +84,13 @@ export function NumberStepper({
         accessibilityLabel={`Decrease ${suffix}`}
         testID={`${testID}-dec`}
         onPress={() => commit(value - 1)}
-        style={({ pressed }) => [styles.step, { opacity: pressed ? 0.6 : 1, borderColor: accent }]}
+        onFocus={() => setDecFocused(true)}
+        onBlur={() => setDecFocused(false)}
+        style={({ pressed, focused }) => [
+          styles.step,
+          { opacity: pressed ? 0.6 : 1, borderColor: accent },
+          ring(Boolean(focused) || decFocused, accent),
+        ]}
       >
         <Text style={[styles.stepGlyph, { color: accent }]}>−</Text>
       </Pressable>
@@ -100,7 +117,13 @@ export function NumberStepper({
         accessibilityLabel={`Increase ${suffix}`}
         testID={`${testID}-inc`}
         onPress={() => commit(value + 1)}
-        style={({ pressed }) => [styles.step, { opacity: pressed ? 0.6 : 1, borderColor: accent }]}
+        onFocus={() => setIncFocused(true)}
+        onBlur={() => setIncFocused(false)}
+        style={({ pressed, focused }) => [
+          styles.step,
+          { opacity: pressed ? 0.6 : 1, borderColor: accent },
+          ring(Boolean(focused) || incFocused, accent),
+        ]}
       >
         <Text style={[styles.stepGlyph, { color: accent }]}>+</Text>
       </Pressable>
@@ -163,18 +186,22 @@ export function Chip({
   color: string;
   testID?: string;
 }) {
+  const [webFocused, setWebFocused] = useState(false);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       testID={testID}
       onPress={onPress}
-      style={[
+      onFocus={() => setWebFocused(true)}
+      onBlur={() => setWebFocused(false)}
+      style={({ focused }) => [
         styles.chip,
         {
           borderColor: selected ? color : chrome.line,
           backgroundColor: selected ? `${color}22` : chrome.surface,
         },
+        ring(Boolean(focused) || webFocused, color),
       ]}
     >
       <Text style={[styles.chipLabel, { color: selected ? chrome.text : chrome.muted }]}>{label}</Text>

@@ -1,10 +1,10 @@
 # Americana
 
-Americana is a gym timer for CrossFit Inversion and any gym that wants the same clock with its own name, colors, and logo. One Expo codebase ships to the Apple App Store and Google Play.
+Americana is a gym timer for CrossFit Inversion and any gym that wants the same clock with its own name, colors, and logo. One Expo codebase ships to iPhone, iPad, Apple TV, a sideloadable Android APK, and Amazon Fire TV. Android is not published on Google Play.
 
 The default brand is CrossFit Inversion. A gym can replace the name, work/rest colors, and logo on the device. Nothing is uploaded.
 
-Store-name availability for “Americana” was not checked. This repository does not make a trademark claim. Search App Store Connect and Google Play before you lock the display name.
+Store-name availability for “Americana” was not checked. This repository does not make a trademark claim. Search App Store Connect and the Amazon Appstore before you lock the display name.
 
 The older timer at `https://github.com/scalesjg-ship-it/wod-chrono-beast` was not readable from this environment (GitHub returned 404). The clock in this repo is new.
 
@@ -75,100 +75,102 @@ eas build --profile development --platform ios
 
 The iOS development profile builds a simulator binary. A physical iPhone needs a preview or production build, or a development profile edited to `"simulator": false`.
 
+## Television
+
+Phone and tablet builds leave `EXPO_TV` unset. Apple TV and Fire TV builds set `EXPO_TV=1`, which `@react-native-tvos/config-tv` reads during EAS prebuild. The app uses `react-native-tvos@0.88-stable`, the TV fork that matches Expo SDK 58 (React Native 0.88).
+
+On the running timer:
+
+| Remote | Action |
+| --- | --- |
+| Select, or Play/Pause | Start or pause |
+| Long-press select | Reset, after a confirm |
+| Left, Rewind, or swipe left | Back 10 seconds, or the previous round for Rounds, Intervals, and Tabata |
+| Right, Fast Forward, or swipe right | Forward 10 seconds, or the next round for those modes |
+| Up or swipe up | Show Back and Reset |
+| Down or swipe down | Hide those controls |
+| Back or Menu | Leave the timer for the mode list |
+
+D-pad and select cover every action. Home and the microphone button stay with the TV. Logo upload stays on the phone. A TV shows branding saved on that device, or a note to set the logo on a phone.
+
 ## What you need before the stores
 
-- An [Apple Developer Program](https://developer.apple.com/programs/) membership for the account that will own the app (Garrett Scales / CrossFit Inversion).
-- A [Google Play Console](https://play.google.com/console) account (one-time registration fee).
-- A final bundle id. The placeholder is `com.scales.americana` for both `ios.bundleIdentifier` and `android.package` in `app.json`. Change it before the first store build if you want a different id. It cannot be changed after the first upload for that platform.
-- A decision on the public name. Display name is **Americana** (`expo.name`). Whether that name is free on either store is unknown.
-- Final art. Replace the generated placeholders:
-  - `assets/images/icon.png` — 1024×1024, no transparency, for the store icon
-  - `assets/images/android-icon-foreground.png`, `android-icon-background.png`, `android-icon-monochrome.png`
-  - `assets/images/splash-icon.png` — the splash mark; the splash background is `#07080A` and the word on the image is AMERICANA
-  - `assets/images/favicon.png`
-  - `assets/images/notification-icon.png` — white glyph on transparency, about 96×96
-- A privacy policy URL and a support URL. The app has no account and does not upload logos, but both stores ask for a privacy policy.
-- Store screenshots at the sizes App Store Connect and Play Console currently require. Capture them from a preview build.
+Proposed bundle id, still a placeholder until you register it: `com.garrettscales.americana` for iOS, tvOS, the sideload APK, and Fire TV. Change it in `app.json` before the first upload for each store. It cannot be changed after that upload.
 
-`extra.eas.projectId` in `app.json` is a placeholder. `eas init` replaces it. Do not ship with the placeholder.
+- Apple Developer Program, individual account, already Garrett's.
+- An Amazon Appstore developer account. There is no Google Play listing and no Play submit profile.
+- Display name **Americana**. Whether it is free on App Store Connect or Amazon was not checked.
+- A privacy policy URL and a support URL.
+- `extra.eas.projectId` is a placeholder. `eas init` replaces it.
+
+Placeholder art, every file named `placeholder-` or called out here, must be replaced before review:
+
+- `assets/images/icon.png` — 1024×1024 iOS icon
+- Android adaptive icons and `assets/images/splash-icon.png`, `favicon.png`, `notification-icon.png`
+- `assets/tv/placeholder-tvos-icon-*-1280x768.png` — tvOS layered icon, front and back, 1280×768
+- `assets/tv/placeholder-tvos-icon-*-400x240.png` and `*-800x480.png` — small tvOS icon layers
+- `assets/tv/placeholder-topshelf-1920x720.png` and `placeholder-topshelf-3840x1440.png` — Top Shelf
+- `assets/tv/placeholder-topshelf-wide-2320x720.png` and `placeholder-topshelf-wide-4640x1440.png` — wide Top Shelf
+- `assets/tv/placeholder-android-tv-banner.png` (320×180) and `placeholder-android-tv-icon.png` — Android TV launcher art. Amazon's Fire TV listing icons are uploaded in the Amazon console, not only in this binary.
 
 ## Build with EAS
 
-Profiles in `eas.json`:
-
 | Profile | Use |
 | --- | --- |
-| `development` | Dev client. iOS simulator build. Android APK. |
-| `preview` | Internal install. Android APK. iOS device build (ad hoc / internal). |
-| `production` | Store binaries. Android App Bundle (`.aab`). iOS archive. Version auto-increment is remote. |
+| `development` | Phone dev client. iOS simulator. Android APK. `EXPO_TV` unset. |
+| `preview` | Phone internal install. `EXPO_TV` unset. |
+| `production-ios` | iOS App Store binary. `EXPO_TV` unset. |
+| `production-tvos` | Apple TV binary. `EXPO_TV=1`. |
+| `production-android-apk` | Sideloadable phone APK. Not for Google Play. |
+| `production-firetv` | Fire TV APK for the Amazon Appstore. `EXPO_TV=1`. |
 
 ```bash
 eas login
 eas init
-eas build --profile production --platform ios
-eas build --profile production --platform android
+eas build --profile production-ios --platform ios
+eas build --profile production-tvos --platform ios
+eas build --profile production-android-apk --platform android
+eas build --profile production-firetv --platform android
 ```
 
-`eas init` creates the Expo project and writes the real project id. Production iOS credentials (distribution certificate and provisioning profile) can be created by EAS when it asks. Android uses an upload keystore that EAS can create and store.
+`eas.json` submit has an iOS profile only. There is no Google Play submit config.
 
-This repo does not submit to either store. No store credentials are included.
+tvOS uses the same distribution certificate as iOS and a separate tvOS provisioning profile. EAS creates iOS profiles. For `production-tvos`, create the tvOS profile in the Apple developer site, download it, and supply it as a local credential. See the Expo TV guide.
 
-## App Store Connect
+## App Store (iPhone and Apple TV)
 
-1. Enroll in the Apple Developer Program and accept the latest license.
-2. In [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources), register an explicit App ID with bundle id `com.scales.americana` (or whatever you put in `app.json`). Enable Push Notifications only if you later turn remote notifications back on. This app ships with `enableRemoteNotifications: false` and uses local notifications only.
-3. In App Store Connect, choose **My Apps → + → New App**.
-   - Platform: iOS
-   - Name: Americana, if the name is available. If it is taken, pick another display name and set `expo.name` to match before you submit.
-   - Primary language
-   - Bundle ID: the identifier from step 2
-   - SKU: `americana` (any unique string; it is not shown on the store)
-   - User access: full
-4. Wait until `eas build --profile production --platform ios` finishes. Download the `.ipa` from the Expo build page if you want a local copy.
-5. Submit the binary:
+1. Register the App ID `com.garrettscales.americana` on the existing individual Apple Developer account.
+2. Create the iOS app in App Store Connect. Name Americana if it is available. SKU `americana`.
+3. Add the tvOS version to that app (same bundle id) or create a separate tvOS app if you want a different listing. Same id is the proposal.
+4. Build with `production-ios` and `production-tvos`. Submit the iOS build with `eas submit --profile production-ios --platform ios`, or Transporter. Upload the tvOS build with Transporter after the tvOS profile is in place.
+5. Still required before review, all still open:
+   - iPhone screenshots at the sizes App Store Connect asks for
+   - Apple TV screenshots, 1920×1080
+   - Final iOS 1024 icon and the tvOS layered icon plus Top Shelf images listed above
+   - Description, keywords, support URL, privacy policy URL
+   - Age rating and App Privacy (photos stay on device, notifications are local, no tracking)
+   - Export compliance: `ITSAppUsesNonExemptEncryption` is already false
+   - Reviewer note: on-device timer, no account. On Apple TV, use the remote: select starts and pauses, menu leaves the timer.
 
-   ```bash
-   eas submit --profile production --platform ios
-   ```
+## Amazon Appstore (Fire TV) and sideload
 
-   The first run asks for an Apple ID and can create an App Store Connect API key. You can also pass `--asc-app-id` once the numeric Apple ID of the app exists (App Store Connect → App Information → Apple ID). To upload without EAS, download the `.ipa` and use Apple’s Transporter app.
-6. On the App Store version page, fill in:
-   - Screenshots for the required device sizes
-   - Promotional text, description, keywords, support URL, marketing URL if you have one
-   - Copyright: Garrett Scales
-   - Age rating questionnaire
-   - App Privacy: photos are selected by the user and stored only on device (not collected). Notifications are local. No account, no tracking, no third-party analytics.
-7. Export compliance: `ITSAppUsesNonExemptEncryption` is already `false` (standard HTTPS only). Answer the compliance prompt to match that.
-8. Reviewer notes: “Americana is an on-device interval timer. No account. Open the WOD tab or the Rounds tab and press Start. The Brand tab changes the local gym logo.”
-9. Add the build to the version, then **Submit for Review**.
+Do not create a Google Play app.
 
-## Google Play
-
-1. Create the Play Console account and pay the registration fee. Complete identity verification if Google asks.
-2. **Create app**. App name Americana if it is available. Default language. App or Game: App. Free.
-3. The package name must be `com.scales.americana` and must match `android.package`. Play will not let you change it later.
-4. Finish the dashboard tasks before production:
-   - Store listing: short description, full description, 512×512 icon, 1024×500 feature graphic, phone screenshots
-   - Content rating questionnaire
-   - Target audience. This is a fitness timer, not a children’s app.
-   - News apps / ads declarations: no ads, no news
-   - Data safety: data is not collected or shared. If you declare photos, say they are processed on device only and are not transmitted.
-   - App access: no login
-5. **Policy → App content → Exact alarms** (wording may be under “Alarms & reminders”): declare that Americana is a timer and schedules exact alarms so round bells fire while the screen is locked. The manifest requests `SCHEDULE_EXACT_ALARM`. Do not request `USE_EXACT_ALARM`.
-6. Build and submit the Android App Bundle:
-
-   ```bash
-   eas build --profile production --platform android
-   eas submit --profile production --platform android
-   ```
-
-   `eas submit` asks for a Google service account JSON linked to Play Console (Setup → API access, grant the service account release permissions). Alternatively, download the `.aab` from the Expo build page and upload it in Play Console under **Test and release → Internal testing**. Promote internal → closed → production when you are ready.
-7. Roll out the release. The first production release can take longer while Play reviews the new account.
+1. Open an Amazon developer account and create the app in the Appstore console.
+2. Upload the APK from `eas build --profile production-firetv --platform android`.
+3. Package name placeholder: `com.garrettscales.americana`.
+4. Still required before the Amazon listing can go live:
+   - 512×512 icon and the other icon sizes the console asks for
+   - Fire TV screenshots, 1920×1080
+   - Short and long description, content rating, privacy policy URL
+   - Target the Fire TV device family
+5. The phone sideload file is the `production-android-apk` build. Install it with `adb install`. It is not a store upload.
 
 ## Not in this version
 
-- No accounts, cloud sync, or shared gym profiles. Branding is per device.
-- No Apple or Google submission is performed from this repo.
-- Locked-screen sound depends on notification permission and the OS. The in-app horn is the cue while the app is open.
-- Expo Go is enough to try the clock. It is not enough to prove background audio.
-- Placeholder icon and splash art are in the repo so the project builds. Replace them before review.
+- No accounts, cloud sync, or shared gym profiles. Branding is per device, including each TV.
+- No store submission is performed from this repo.
+- Logo picking is phone-only.
+- Locked-screen sound on phones depends on notification permission. TVs keep the screen on.
+- Expo Go can try the phone clock. It cannot run the TV build.
+- Placeholder icons, splash, tvOS layers, and Top Shelf art must be replaced before review.
