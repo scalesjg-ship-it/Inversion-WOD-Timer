@@ -13,7 +13,9 @@ import {
   project,
   reconcile,
   reset,
+  seekBy,
   start,
+  stepRound,
 } from './engine';
 import type { EngineState, TimerConfig, TimerSnapshot } from './types';
 
@@ -99,6 +101,23 @@ export function useTimer(config: TimerConfig, options: UseTimerOptions) {
     void clearScheduledCues();
   }, [publish]);
 
+  const moveClock = useCallback((next: EngineState, wall: number) => {
+    lastElapsedRef.current = elapsedMs(next, wall);
+    publish(next, wall);
+    if (next.status === 'running') void syncScheduledCues(next, wall, gymNameRef.current);
+    else void clearScheduledCues();
+  }, [publish]);
+
+  const seekTimer = useCallback((seconds: number) => {
+    const wall = Date.now();
+    moveClock(seekBy(stateRef.current, seconds * 1000, wall), wall);
+  }, [moveClock]);
+
+  const stepRoundTimer = useCallback((direction: -1 | 1) => {
+    const wall = Date.now();
+    moveClock(stepRound(stateRef.current, direction, wall), wall);
+  }, [moveClock]);
+
   const toggle = useCallback(() => {
     if (stateRef.current.status === 'running') pauseTimer();
     else startTimer();
@@ -113,5 +132,15 @@ export function useTimer(config: TimerConfig, options: UseTimerOptions) {
   }, [options.autoStart, startTimer]);
 
   const snapshot: TimerSnapshot = project(state, now);
-  return { snapshot, startTimer, pauseTimer, resetTimer, completeTimer, toggle, config: state.config };
+  return {
+    snapshot,
+    startTimer,
+    pauseTimer,
+    resetTimer,
+    completeTimer,
+    toggle,
+    seekTimer,
+    stepRoundTimer,
+    config: state.config,
+  };
 }

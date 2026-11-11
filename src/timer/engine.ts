@@ -376,6 +376,59 @@ export function reset(state: EngineState): EngineState {
   return createInitial(state.config);
 }
 
+function workSegmentStarts(state: EngineState): number[] {
+  const starts: number[] = [];
+  let cursor = 0;
+  for (const segment of state.segments) {
+    if (segment.phase === 'work') starts.push(cursor);
+    if (!Number.isFinite(segment.durationMs)) break;
+    cursor += segment.durationMs;
+  }
+  return starts;
+}
+
+/** Move the clock to an absolute timer time. A running clock keeps running. */
+export function jumpToElapsed(state: EngineState, elapsed: number, nowMs: number): EngineState {
+  if (state.status === 'idle') return state;
+  const total = totalDurationMs(state.segments);
+  const clamped = Math.max(0, Number.isFinite(total) ? Math.min(elapsed, total) : elapsed);
+  if (Number.isFinite(total) && clamped >= total) return markFinished(state, total, false);
+  const running = state.status === 'running';
+  return {
+    ...state,
+    status: running ? 'running' : 'paused',
+    elapsedBeforeRunMs: clamped,
+    runStartedAtMs: running ? nowMs : null,
+    completedElapsedMs: null,
+  };
+}
+
+export function seekBy(state: EngineState, deltaMs: number, nowMs: number): EngineState {
+  if (state.status === 'idle') return state;
+  const elapsed = state.status === 'finished'
+    ? (state.completedElapsedMs ?? state.elapsedBeforeRunMs)
+    : elapsedMs(state, nowMs);
+  return jumpToElapsed(state, elapsed + deltaMs, nowMs);
+}
+
+export function stepRound(state: EngineState, direction: -1 | 1, nowMs: number): EngineState {
+  if (state.status === 'idle') return state;
+  const starts = workSegmentStarts(state);
+  if (starts.length === 0) return state;
+  const elapsed = state.status === 'finished'
+    ? (state.completedElapsedMs ?? state.elapsedBeforeRunMs)
+    : elapsedMs(state, nowMs);
+  let index = 0;
+  for (let i = 0; i < starts.length; i += 1) {
+    const at = starts[i];
+    if (at != null && at <= elapsed + 40) index = i;
+  }
+  const nextIndex = Math.min(starts.length - 1, Math.max(0, index + direction));
+  const target = starts[nextIndex];
+  if (target == null) return state;
+  return jumpToElapsed(state, target, nowMs);
+}
+
 export function reconcile(state: EngineState, nowMs: number): EngineState {
   if (state.status !== 'running') return state;
   const elapsed = elapsedMs(state, nowMs);
