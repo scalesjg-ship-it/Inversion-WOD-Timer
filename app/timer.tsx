@@ -43,6 +43,8 @@ export default function TimerScreen() {
     if (timer.snapshot.running || timer.snapshot.paused) timer.toggle();
   };
 
+  const phaseText = readableDigitColor(phaseColor, branding.backgroundColor);
+
   return (
     <View
       style={[styles.root, { backgroundColor: branding.backgroundColor }]}
@@ -55,35 +57,26 @@ export default function TimerScreen() {
       <View style={[styles.edge, { backgroundColor: phaseColor }]} />
       <LogoBackdrop branding={branding} width={frame.width} height={frame.height} />
       <View pointerEvents="none" style={[styles.wash, { backgroundColor: phaseColor }]} />
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-        <View style={styles.top}>
-          <Pressable accessibilityRole="button" testID="timer-back" onPress={() => router.back()} hitSlop={12}>
-            <Text style={styles.back}>Back</Text>
-          </Pressable>
-          <Text style={styles.gym} numberOfLines={1} adjustsFontSizeToFit>
-            {branding.gymName}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${phaseLabel(timer.snapshot.phase, config.mode)}, ${formatSnapshot(timer.snapshot, config)}`}
+        testID="timer-face"
+        onPress={onClock}
+        style={styles.face}
+      >
+        <View style={styles.clockAnchor}>
+          <Text style={[styles.phase, { color: phaseText }]} testID="timer-phase">
+            {phaseLabel(timer.snapshot.phase, config.mode)}
           </Text>
-          <CornerLogo branding={branding} />
-        </View>
-        <View style={[styles.stage, landscape && styles.stageLandscape]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${phaseLabel(timer.snapshot.phase, config.mode)}, ${formatSnapshot(timer.snapshot, config)}`}
-            testID="timer-face"
-            onPress={onClock}
-            style={styles.face}
+          <Text
+            style={[styles.clock, { color: digits, fontSize: clockSize, lineHeight: Math.round(clockSize * 1.02) }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            testID="timer-clock"
           >
-            <Text style={[styles.phase, { color: readableDigitColor(phaseColor, branding.backgroundColor) }]} testID="timer-phase">
-              {phaseLabel(timer.snapshot.phase, config.mode)}
-            </Text>
-            <Text
-              style={[styles.clock, { color: digits, fontSize: clockSize, lineHeight: Math.round(clockSize * 1.02) }]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              testID="timer-clock"
-            >
-              {formatSnapshot(timer.snapshot, config)}
-            </Text>
+            {formatSnapshot(timer.snapshot, config)}
+          </Text>
+          <View pointerEvents="none" style={styles.meta}>
             <Text style={styles.round} testID="timer-round">
               {roundLabel(timer.snapshot, config)}
             </Text>
@@ -99,23 +92,34 @@ export default function TimerScreen() {
               </Text>
             ) : null}
             {timer.snapshot.running ? <Text style={styles.hint}>Tap the clock to pause</Text> : null}
-          </Pressable>
-          <View style={[styles.controls, landscape && styles.controlsLandscape]}>
-            {timer.snapshot.phase === 'idle' || timer.snapshot.phase === 'finished' ? (
-              <BigButton
-                label={timer.snapshot.phase === 'finished' ? 'Go again' : 'Start'}
-                color={digits}
-                onPress={timer.startTimer}
-                testID="timer-start"
-              />
-            ) : null}
-            {timer.snapshot.running && config.mode === 'forTime' && timer.snapshot.phase === 'work' ? (
-              <BigButton label="Stop" color={digits} variant="ghost" onPress={timer.completeTimer} testID="timer-stop" />
-            ) : null}
-            {timer.snapshot.phase !== 'idle' ? (
-              <BigButton label="Reset" color={digits} variant="ghost" onPress={timer.resetTimer} testID="timer-reset" />
-            ) : null}
           </View>
+        </View>
+      </Pressable>
+      <SafeAreaView pointerEvents="box-none" style={styles.overlay} edges={['top', 'bottom']}>
+        <View style={styles.top} pointerEvents="box-none">
+          <Pressable accessibilityRole="button" testID="timer-back" onPress={() => router.back()} hitSlop={12}>
+            <Text style={styles.back}>Back</Text>
+          </Pressable>
+          <Text style={styles.gym} numberOfLines={1} adjustsFontSizeToFit>
+            {branding.gymName}
+          </Text>
+          <CornerLogo branding={branding} />
+        </View>
+        <View pointerEvents="box-none" style={landscape ? styles.controlsLandscape : styles.controls}>
+          {timer.snapshot.phase === 'idle' || timer.snapshot.phase === 'finished' ? (
+            <BigButton
+              label={timer.snapshot.phase === 'finished' ? 'Go again' : 'Start'}
+              color={digits}
+              onPress={timer.startTimer}
+              testID="timer-start"
+            />
+          ) : null}
+          {timer.snapshot.running && config.mode === 'forTime' && timer.snapshot.phase === 'work' ? (
+            <BigButton label="Stop" color={digits} variant="ghost" onPress={timer.completeTimer} testID="timer-stop" />
+          ) : null}
+          {timer.snapshot.phase !== 'idle' ? (
+            <BigButton label="Reset" color={digits} variant="ghost" onPress={timer.resetTimer} testID="timer-reset" />
+          ) : null}
         </View>
       </SafeAreaView>
     </View>
@@ -153,8 +157,17 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     opacity: 0.14,
   },
-  safe: {
-    flex: 1,
+  face: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clockAnchor: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFill,
   },
   top: {
     flexDirection: 'row',
@@ -177,24 +190,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     letterSpacing: 0.4,
   },
-  stage: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingBottom: 12,
-  },
-  stageLandscape: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  face: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
   phase: {
+    position: 'absolute',
+    bottom: '100%',
+    marginBottom: 8,
+    width: 520,
+    marginLeft: -260,
+    left: '50%',
+    textAlign: 'center',
     fontFamily: 'OswaldMedium',
     fontSize: 22,
     letterSpacing: 4,
@@ -206,6 +209,15 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.85)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 18,
+  },
+  meta: {
+    position: 'absolute',
+    top: '100%',
+    marginTop: 8,
+    width: 520,
+    marginLeft: -260,
+    left: '50%',
+    alignItems: 'center',
   },
   round: {
     color: chrome.text,
@@ -240,9 +252,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   controls: {
+    position: 'absolute',
+    left: 18,
+    right: 18,
+    bottom: 8,
     gap: 10,
   },
   controlsLandscape: {
+    position: 'absolute',
+    right: 18,
+    bottom: 12,
     width: 220,
+    gap: 10,
   },
 });
