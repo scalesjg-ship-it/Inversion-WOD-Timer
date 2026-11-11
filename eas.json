@@ -60,7 +60,16 @@
   },
   "submit": {
     "production-ios": {
-      "ios": {}
+      "ios": {
+        "ascAppId": "6833266123",
+        "appleTeamId": "BNP9QFC679"
+      }
+    },
+    "production-tvos": {
+      "ios": {
+        "ascAppId": "6833266123",
+        "appleTeamId": "BNP9QFC679"
+      }
     }
   }
 }
