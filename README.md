@@ -1,10 +1,10 @@
-# Americana
+# Anthem Gym Timer
 
-Americana is a gym timer for CrossFit Inversion and any gym that wants the same clock with its own name, colors, and logo. One Expo codebase ships to iPhone, iPad, Apple TV, a sideloadable Android APK, and Amazon Fire TV. Android is not published on Google Play.
+Anthem Gym Timer is a gym timer for CrossFit Inversion and any gym that wants the same clock with its own name, colors, and logo. One Expo codebase ships to iPhone, iPad, Apple TV, a sideloadable Android APK, and Amazon Fire TV. Android is not published on Google Play.
 
 The default brand is CrossFit Inversion. A gym can replace the name, work/rest colors, and logo on the device. Nothing is uploaded.
 
-Store-name availability for “Americana” was not checked. This repository does not make a trademark claim. Search App Store Connect and the Amazon Appstore before you lock the display name.
+Store-name availability for “Anthem Gym Timer” was not checked. This repository does not make a trademark claim. Search App Store Connect and the Amazon Appstore before you lock the display name.
 
 The older timer at `https://github.com/scalesjg-ship-it/wod-chrono-beast` was not readable from this environment (GitHub returned 404). The clock in this repo is new.
 
@@ -33,7 +33,7 @@ The running clock is sized for the room, in portrait and landscape. Work and res
 
 ## Audio, haptics, and the lock screen
 
-While Americana is on screen it plays a tick for the lead-in, a horn for the start and for the end of rest, a warning, and a bell at the end of a round. Those cues also trigger haptic feedback on a phone. Playback is configured to play in silent mode and to duck other audio.
+While Anthem Gym Timer is on screen it plays a tick for the lead-in, a horn for the start and for the end of rest, a warning, and a bell at the end of a round. Those cues also trigger haptic feedback on a phone. Playback is configured to play in silent mode and to duck other audio.
 
 When a timer starts, upcoming cues are scheduled as local notifications (up to 60, the practical iOS pending-notification cap). The app is in the foreground, those notifications stay quiet and the in-app horn plays. When the phone is locked or the app is backgrounded, the notification sound is what rings. On Android the trigger uses alarm-clock delivery so the bell is less likely to be deferred. That needs the exact-alarm permission and a Play Console declaration (see below).
 
@@ -46,7 +46,7 @@ Custom notification sounds and background audio are not fully available in Expo 
 The Brand tab stores, on this device only:
 
 - Gym name
-- Colors for work, rest, lead-in, warning, the clock digits, the background, and the accent. Each one has swatches, a hue strip, and a hex field. Preset themes are Inversion, Dark, High-contrast, Neon, and Fight (red/blue). If a digit color cannot be read on the background, Americana swaps in black or white.
+- Colors for work, rest, lead-in, warning, the clock digits, the background, and the accent. Each one has swatches, a hue strip, and a hex field. Preset themes are Inversion, Dark, High-contrast, Neon, and Fight (red/blue). If a digit color cannot be read on the background, Anthem Gym Timer swaps in black or white.
 - A logo from the photo library or from Files on a phone. Any image is accepted. It is resized and kept locally. The default placement is a large faded watermark, about 88% of the shorter screen edge, centered. Full bleed (optional blur) and a corner mark are the other placements.
 - On Apple TV and Fire TV, Brand shows a QR code. Scan it with a phone on the same Wi-Fi, pick a logo, and optionally set the gym name, colors, and placement. The TV saves that logo with the same resize step as a photo picked on the device. The page is served by the TV. The image is not sent to a server on the internet. The listener stops when you leave Brand, or after 10 minutes.
 - Reset to Inversion, which restores the CrossFit Inversion name and colors and clears the logo.
@@ -110,7 +110,7 @@ Bundle id, set in `app.json` for iOS, tvOS, the sideload APK, and Fire TV: `com.
 
 - Apple Developer Program, individual account, already Garrett's.
 - An Amazon Appstore developer account. There is no Google Play listing and no Play submit profile.
-- Display name **Americana**. Whether it is free on App Store Connect or Amazon was not checked.
+- Display name **Anthem Gym Timer**. Whether it is free on App Store Connect or Amazon was not checked.
 - Privacy and support pages live in `site/`. Deploy that folder to Vercel as a static site (root directory `site`, no build command). Use the deployed `/privacy` and `/support` URLs in both stores.
 - Listing copy is in `store/listing.md`. Store screenshots are in `store/screenshots/`.
 - The Expo project is `scalesgym/americana` (`extra.eas.projectId` in `app.json`). Do not run `eas init` again unless that project is gone.
@@ -151,7 +151,7 @@ tvOS uses the same distribution certificate as iOS and a separate tvOS provision
 ## App Store (iPhone and Apple TV)
 
 1. Register the App ID `com.garrettscales.americana` on the existing individual Apple Developer account.
-2. Create the iOS app in App Store Connect. Name Americana if it is available. SKU `americana`.
+2. Create the iOS app in App Store Connect. Name Anthem Gym Timer if it is available. SKU `americana`.
 3. Add the tvOS version to that app (same bundle id) or create a separate tvOS app if you want a different listing. Same id is the proposal.
 4. Build with `production-ios` and `production-tvos`. Submit with `eas submit --profile production-ios --platform ios` and `eas submit --profile production-tvos --platform ios`. Both profiles target App Store Connect app `6833266123` on team `BNP9QFC679`. Supply the API key in the environment. Transporter still works if you download the `.ipa`. The tvOS upload needs the tvOS provisioning profile in place first.
 5. Ready in the repo, still yours to upload:

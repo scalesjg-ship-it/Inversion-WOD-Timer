@@ -7,6 +7,7 @@ import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
+import { ProductMark } from '@/src/components/ProductMark';
 import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
@@ -93,7 +94,7 @@ export default function RoundsScreen() {
         contentContainerStyle={[styles.content, tv && styles.contentTv]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={[styles.wordmark, { color: accent }, tv && styles.wordmarkTv]}>Americana</Text>
+        <ProductMark variant="wordmark" color={accent} large={tv} />
         <Text style={[styles.title, tv && styles.titleTv]}>Rounds</Text>
         <Text style={[styles.lede, tv && styles.ledeTv]}>Jiu-jitsu, striking, and sparring. Rest is a different color from work.</Text>
         <View style={[styles.presets, tv && styles.presetsTv]}>
@@ -233,16 +234,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 24,
     gap: 16,
-  },
-  wordmark: {
-    fontFamily: 'OswaldMedium',
-    fontSize: 14,
-    letterSpacing: 4,
-    textTransform: 'uppercase',
-    marginTop: 8,
-  },
-  wordmarkTv: {
-    fontSize: 28,
   },
   title: {
     fontFamily: 'Oswald',

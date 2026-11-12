@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render Americana store art from assets/brand/americana-mark.svg.
+"""Render Anthem Gym Timer store art from assets/brand/americana-mark.svg.
 
 Requires cairosvg, cairo, and Pillow. From the repo root:
 
@@ -23,6 +23,8 @@ STORE = ROOT / "assets" / "store"
 INK = (244, 241, 234, 255)
 RED = (255, 59, 36, 255)
 BG = (12, 13, 16, 255)
+TITLE = "ANTHEM"
+SUBTITLE = "GYM TIMER"
 
 
 def svg_text() -> str:
@@ -62,10 +64,40 @@ def font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(str(FONT), size)
 
 
-def draw_centered(draw: ImageDraw.ImageDraw, text: str, y: int, font: ImageFont.FreeTypeFont, fill, width: int) -> None:
+def draw_centered(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    y: int,
+    font: ImageFont.FreeTypeFont,
+    fill,
+    width: int,
+    height: int,
+) -> None:
     box = draw.textbbox((0, 0), text, font=font)
     x = (width - (box[2] - box[0])) / 2
+    placed = draw.textbbox((x, y), text, font=font)
+    require_inside(placed, width, height, text)
     draw.text((x, y), text, font=font, fill=fill)
+
+
+def draw_left(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    x: int,
+    y: int,
+    font: ImageFont.FreeTypeFont,
+    fill,
+    width: int,
+    height: int,
+) -> None:
+    placed = draw.textbbox((x, y), text, font=font)
+    require_inside(placed, width, height, text)
+    draw.text((x, y), text, font=font, fill=fill)
+
+
+def require_inside(box: tuple[float, float, float, float], width: int, height: int, label: str) -> None:
+    if box[0] < 1 or box[1] < 1 or box[2] > width - 1 or box[3] > height - 1:
+        raise SystemExit(f"{label!r} overflows {width}x{height}: {tuple(round(edge, 1) for edge in box)}")
 
 
 def banner(width: int, height: int, title_size: int, sub_size: int) -> Image.Image:
@@ -77,21 +109,34 @@ def banner(width: int, height: int, title_size: int, sub_size: int) -> Image.Ima
     title = font(title_size)
     sub = font(sub_size)
     text_x = margin + mark_size + int(width * 0.04)
-    title_box = draw.textbbox((0, 0), "AMERICANA", font=title)
-    sub_box = draw.textbbox((0, 0), "ROUND TIMER", font=sub)
-    block = (title_box[3] - title_box[1]) + int(height * 0.04) + (sub_box[3] - sub_box[1])
+    title_box = draw.textbbox((0, 0), TITLE, font=title)
+    sub_box = draw.textbbox((0, 0), SUBTITLE, font=sub)
+    gap = int(height * 0.04)
+    block = (title_box[3] - title_box[1]) + gap + (sub_box[3] - sub_box[1])
     y = (height - block) / 2
-    draw.text((text_x, y), "AMERICANA", font=title, fill=INK)
-    draw.text((text_x, y + (title_box[3] - title_box[1]) + int(height * 0.04)), "ROUND TIMER", font=sub, fill=RED)
+    draw_left(draw, TITLE, text_x, y, title, INK, width, height)
+    draw_left(draw, SUBTITLE, text_x, y + (title_box[3] - title_box[1]) + gap, sub, RED, width, height)
     return image
 
 
 def splash() -> Image.Image:
-    image = Image.new("RGBA", (1024, 1024), BG)
-    paste_mark(image, 720, (152, 48), "front")
+    width = height = 1024
+    image = Image.new("RGBA", (width, height), BG)
+    mark_size = 720
+    mark_y = 48
+    paste_mark(image, mark_size, ((width - mark_size) // 2, mark_y), "front")
     draw = ImageDraw.Draw(image)
     title = font(84)
-    draw_centered(draw, "AMERICANA", 860, title, INK, 1024)
+    sub = font(34)
+    title_box = draw.textbbox((0, 0), TITLE, font=title)
+    sub_box = draw.textbbox((0, 0), SUBTITLE, font=sub)
+    gap = 16
+    block = (title_box[3] - title_box[1]) + gap + (sub_box[3] - sub_box[1])
+    y = height - 40 - block
+    if y < mark_y + mark_size + 12:
+        raise SystemExit(f"splash title overlaps the mark (y={y:.1f})")
+    draw_centered(draw, TITLE, y, title, INK, width, height)
+    draw_centered(draw, SUBTITLE, y + (title_box[3] - title_box[1]) + gap, sub, RED, width, height)
     return image
 
 

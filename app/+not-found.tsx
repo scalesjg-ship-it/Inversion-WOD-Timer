@@ -6,11 +6,11 @@ import { chrome } from '@/src/theme/chrome';
 export default function NotFoundScreen() {
   return (
     <>
-      <Stack.Screen options={{ title: 'Americana', headerShown: true }} />
+      <Stack.Screen options={{ title: 'Anthem Gym Timer', headerShown: true }} />
       <View style={styles.container}>
         <Text style={styles.title}>That screen is not on the clock.</Text>
         <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Back to Americana</Text>
+          <Text style={styles.linkText}>Back to Anthem Gym Timer</Text>
         </Link>
       </View>
     </>

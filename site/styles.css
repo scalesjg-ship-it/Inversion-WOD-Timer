@@ -32,6 +32,7 @@ a {
 
 nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
   margin-bottom: 2.5rem;
   font-size: 0.95rem;
@@ -57,6 +58,13 @@ h1 {
 
 .mark {
   color: var(--red);
+}
+
+h1 .mark {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.58em;
+  letter-spacing: 0.16em;
 }
 
 h2 {

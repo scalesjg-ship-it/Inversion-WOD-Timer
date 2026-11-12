@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
+import { ProductMark } from '@/src/components/ProductMark';
 import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvToggle } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
@@ -145,7 +146,7 @@ function SetupForm({
     >
       <View style={styles.header}>
         <HeaderBack onPress={() => router.back()} color={accent} />
-        <Text style={[styles.kicker, tv && styles.kickerTv]}>Americana</Text>
+        <ProductMark variant="kicker" />
       </View>
       <ScrollView
         style={tv ? styles.scrollTv : undefined}
@@ -298,16 +299,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 8,
-  },
-  kicker: {
-    color: chrome.muted,
-    fontFamily: 'OswaldMedium',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    fontSize: 13,
-  },
-  kickerTv: {
-    fontSize: TV_SECTION_FONT,
   },
   // The scroll view reaches the screen edge so a focused control's 1.08 scale is not clipped;
   // the content pads back in to the safe margin.
