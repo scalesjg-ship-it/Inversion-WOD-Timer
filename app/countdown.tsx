@@ -1,15 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
-import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
+import { BigButton, Chip, HeaderBack, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
+import { TV_BODY_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
 import {
   WARNING_MARK_CHOICES,
   addCountdownSeconds,
@@ -34,6 +35,8 @@ export default function CountdownScreen() {
   const { branding } = useBranding();
   const { setSession } = useTimerSession();
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
+  const tv = Platform.isTV === true;
+  const box = tvSafeBox(tv);
   const initial = defaultConfig('countdown');
   const initialParts = splitDuration(initial.workSeconds);
   const [hours, setHours] = useState(initialParts.hours);
@@ -94,16 +97,22 @@ export default function CountdownScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.safe, tv && { paddingHorizontal: box.horizontal, paddingTop: box.vertical, paddingBottom: box.vertical }]}
+      edges={tv ? [] : ['top', 'bottom']}
+    >
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" testID="countdown-back" onPress={() => router.back()} hitSlop={12}>
-          <Text style={[styles.back, { color: accent }]}>Back</Text>
-        </Pressable>
-        <Text style={styles.kicker}>Americana</Text>
+        <HeaderBack testID="countdown-back" onPress={() => router.back()} color={accent} />
+        <Text style={[styles.kicker, tv && styles.kickerTv]}>Americana</Text>
       </View>
-      <ScrollView testID="screen-countdown" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Countdown</Text>
-        <Text style={styles.summary}>
+      <ScrollView
+        testID="screen-countdown"
+        style={tv ? styles.scrollTv : undefined}
+        contentContainerStyle={[styles.content, tv && styles.contentTv]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={[styles.title, tv && styles.titleTv]}>Countdown</Text>
+        <Text style={[styles.summary, tv && styles.summaryTv]}>
           {formatSeconds(config.workSeconds)}
           {config.leadInSeconds > 0 ? ` · ${config.leadInSeconds}s lead-in` : ' · no lead-in'}
         </Text>
@@ -122,7 +131,7 @@ export default function CountdownScreen() {
         />
 
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Duration</Text>
+          <Text style={[styles.fieldLabel, Platform.isTV && styles.fieldLabelTv]}>Duration</Text>
           <NumberStepper value={hours} min={0} max={23} suffix="hr" testID="countdown-hours" accent={accent} onChange={(value) => applyDuration(joinDuration(value, minutes, seconds))} />
           <NumberStepper value={minutes} min={0} max={59} suffix="min" testID="countdown-minutes" accent={accent} onChange={(value) => applyDuration(joinDuration(hours, value, seconds))} />
           <NumberStepper value={seconds} min={0} max={59} suffix="sec" testID="countdown-seconds" accent={accent} onChange={(value) => applyDuration(joinDuration(hours, minutes, value))} />
@@ -136,7 +145,7 @@ export default function CountdownScreen() {
         <TimeField label="Lead-in" seconds={leadInSeconds} onChange={(value) => setLeadInSeconds(Math.min(600, value))} testID="lead-in" accent={accent} />
 
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Warning beeps</Text>
+          <Text style={[styles.fieldLabel, Platform.isTV && styles.fieldLabelTv]}>Warning beeps</Text>
           <View style={styles.chips}>
             {WARNING_MARK_CHOICES.map((choice) => (
               <Chip
@@ -174,13 +183,18 @@ export default function CountdownScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: chrome.bg, paddingHorizontal: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 },
-  back: { fontFamily: 'OswaldMedium', fontSize: 18 },
   kicker: { color: chrome.muted, fontFamily: 'OswaldMedium', letterSpacing: 2, textTransform: 'uppercase', fontSize: 13 },
+  kickerTv: { fontSize: TV_SECTION_FONT },
+  scrollTv: { flex: 1, width: '100%' },
   content: { gap: 16, paddingTop: 12, paddingBottom: 24 },
+  contentTv: { flexGrow: 1, gap: 32, paddingTop: 8 },
   title: { fontFamily: 'Oswald', fontSize: 48, color: chrome.text, lineHeight: 52 },
+  titleTv: { fontSize: TV_TITLE_FONT, lineHeight: TV_TITLE_FONT + 8 },
   summary: { color: chrome.muted, fontSize: 16, marginTop: -8 },
+  summaryTv: { fontSize: TV_BODY_FONT, lineHeight: TV_BODY_FONT + 8 },
   field: { gap: 10 },
   fieldLabel: { color: chrome.muted, fontFamily: 'OswaldMedium', fontSize: 13, letterSpacing: 1.4, textTransform: 'uppercase' },
+  fieldLabelTv: { fontSize: TV_SECTION_FONT, letterSpacing: 2 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   footer: { paddingVertical: 12 },
 });

@@ -21,8 +21,11 @@ import { prepareLogo } from '@/src/branding/logo';
 import { THEME_PRESETS, type BrandColors, type LogoPlacement, type ThemePreset } from '@/src/branding/types';
 import { ColorPicker } from '@/src/components/ColorPicker';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
-import { Chip } from '@/src/components/ui';
+import { Chip, TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
+import { TV_BODY_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
+import { focusChrome } from '@/src/tv/controls';
+import { tvParallaxProps } from '@/src/tv/pressable';
 
 const PLACEMENTS: { id: LogoPlacement; label: string }[] = [
   { id: 'watermark', label: 'Watermark' },
@@ -35,6 +38,9 @@ export default function BrandScreen() {
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
   const digits = readableDigitColor(branding.digitColor, branding.backgroundColor);
   const [frame, setFrame] = useState({ width: 0, height: 0 });
+  const tv = Platform.isTV === true;
+  const box = tvSafeBox(tv);
+  const labelStyle = [styles.fieldLabel, tv && styles.fieldLabelTv];
 
   const storeLogo = async (uri: string) => {
     try {
@@ -89,11 +95,16 @@ export default function BrandScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView testID="screen-brand" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.wordmark, { color: accent }]}>Americana</Text>
-        <Text style={styles.title}>Brand</Text>
-        <Text style={styles.lede}>
+    <SafeAreaView style={[styles.safe, tv && { paddingHorizontal: box.horizontal, paddingTop: box.vertical }]} edges={tv ? [] : ['top']}>
+      <ScrollView
+        testID="screen-brand"
+        style={tv ? styles.scrollTv : undefined}
+        contentContainerStyle={[styles.content, tv && styles.contentTv]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={[styles.wordmark, { color: accent }, tv && styles.wordmarkTv]}>Americana</Text>
+        <Text style={[styles.title, tv && styles.titleTv]}>Brand</Text>
+        <Text style={[styles.lede, tv && styles.ledeTv]}>
           Your gym name, colors, and logo stay on this device. The timer reads them on every screen.
         </Text>
 
@@ -101,7 +112,7 @@ export default function BrandScreen() {
 
         <View
           testID="brand-preview"
-          style={[styles.preview, { backgroundColor: branding.backgroundColor }]}
+          style={[styles.preview, tv && styles.previewTv, { backgroundColor: branding.backgroundColor }]}
           onLayout={(event) => {
             const { width, height } = event.nativeEvent.layout;
             setFrame({ width, height });
@@ -114,17 +125,17 @@ export default function BrandScreen() {
             </Text>
             <CornerLogo branding={branding} size={42} />
           </View>
-          <Text style={[styles.previewClock, { color: digits }]}>05:00</Text>
+          <Text style={[styles.previewClock, tv && styles.previewClockTv, { color: digits }]}>05:00</Text>
           <Text style={[styles.previewPhase, { color: readableDigitColor(branding.workColor, branding.backgroundColor) }]}>Work</Text>
         </View>
 
-        <Text style={styles.fieldLabel}>Gym name</Text>
+        <Text style={labelStyle}>Gym name</Text>
         <GymNameField
           value={branding.gymName}
           onCommit={(gymName) => void update({ gymName })}
         />
 
-        <Text style={styles.fieldLabel}>Themes</Text>
+        <Text style={labelStyle}>Themes</Text>
         <View style={styles.chips}>
           {THEME_PRESETS.map((theme) => (
             <Chip
@@ -145,7 +156,7 @@ export default function BrandScreen() {
         <ColorPicker label="Background" testID="color-background" value={branding.backgroundColor} onChange={(backgroundColor) => void update({ backgroundColor })} />
         <ColorPicker label="Accent" testID="color-ui" value={branding.uiColor} onChange={(uiColor) => void update({ uiColor })} />
 
-        <Text style={styles.fieldLabel}>Logo</Text>
+        <Text style={labelStyle}>Logo</Text>
         {Platform.isTV ? null : (
           <View style={styles.row}>
             <Pressable accessibilityRole="button" testID="pick-logo" onPress={() => void pickLibrary()} style={styles.secondary}>
@@ -157,11 +168,21 @@ export default function BrandScreen() {
           </View>
         )}
         {branding.logoUri ? (
-          <Pressable accessibilityRole="button" testID="remove-logo" onPress={() => void update({ logoUri: null })}>
-            <Text style={[styles.link, { color: accent }]}>Remove logo</Text>
+          <Pressable
+            accessibilityRole="button"
+            testID="remove-logo"
+            onPress={() => void update({ logoUri: null })}
+            {...tvParallaxProps()}
+            style={({ pressed, focused }) => [
+              tv && styles.linkHitTv,
+              tv && pressed ? { opacity: 0.75 } : null,
+              tv ? focusChrome(true, Boolean(focused), accent) : null,
+            ]}
+          >
+            <Text style={[styles.link, tv && styles.linkTv, { color: accent }]}>Remove logo</Text>
           </Pressable>
         ) : Platform.isTV ? (
-          <Text style={styles.help}>The logo is saved on this TV after the phone sends it.</Text>
+          <Text style={[styles.help, styles.helpTv]}>The logo is saved on this TV after the phone sends it.</Text>
         ) : (
           <Text style={styles.help}>Any gym logo works. Pick it from your photo library or Files. It stays on this device.</Text>
         )}
@@ -177,23 +198,45 @@ export default function BrandScreen() {
             />
           ))}
         </View>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Blur the full-bleed logo</Text>
-          <Switch
-            testID="logo-blur"
+        {tv ? (
+          <TvToggle
+            label="Blur the full-bleed logo"
             value={branding.logoBlur}
             onValueChange={(logoBlur) => void update({ logoBlur })}
             disabled={branding.logoPlacement !== 'fullBleed'}
-            trackColor={{ false: '#2A3140', true: accent }}
-            thumbColor={chrome.text}
+            testID="logo-blur"
+            accent={accent}
           />
-        </View>
+        ) : (
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Blur the full-bleed logo</Text>
+            <Switch
+              testID="logo-blur"
+              value={branding.logoBlur}
+              onValueChange={(logoBlur) => void update({ logoBlur })}
+              disabled={branding.logoPlacement !== 'fullBleed'}
+              trackColor={{ false: '#2A3140', true: accent }}
+              thumbColor={chrome.text}
+            />
+          </View>
+        )}
         <Text style={styles.help}>
           Watermark sits faded behind the digits. Full bleed is darkened so the clock stays readable. Corner keeps the mark out of the numbers.
         </Text>
 
-        <Pressable accessibilityRole="button" testID="reset-brand" onPress={confirmReset} style={styles.reset}>
-          <Text style={styles.resetLabel}>Reset to Inversion</Text>
+        <Pressable
+          accessibilityRole="button"
+          testID="reset-brand"
+          onPress={confirmReset}
+          {...tvParallaxProps()}
+          style={({ pressed, focused }) => [
+            styles.reset,
+            tv && styles.resetTv,
+            tv && pressed ? { opacity: 0.75 } : null,
+            tv ? focusChrome(true, Boolean(focused), '#FF8A7A', false) : null,
+          ]}
+        >
+          <Text style={[styles.resetLabel, tv && styles.resetLabelTv]}>Reset to Inversion</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -238,7 +281,7 @@ function GymNameField({ value, onCommit }: { value: string; onCommit: (name: str
         }
         onCommit(next);
       }}
-      style={styles.input}
+      style={[styles.input, Platform.isTV && styles.inputTv]}
       maxLength={48}
     />
   );
@@ -249,10 +292,41 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: chrome.bg,
   },
+  scrollTv: {
+    flex: 1,
+    width: '100%',
+  },
   content: {
     paddingHorizontal: 20,
     paddingBottom: 40,
     gap: 12,
+  },
+  contentTv: {
+    width: '100%',
+    flexGrow: 1,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    gap: 28,
+    paddingBottom: 48,
+  },
+  wordmarkTv: {
+    fontSize: 32,
+  },
+  titleTv: {
+    fontSize: TV_TITLE_FONT,
+    lineHeight: TV_TITLE_FONT + 8,
+  },
+  ledeTv: {
+    fontSize: TV_BODY_FONT,
+    lineHeight: TV_BODY_FONT + 8,
+  },
+  previewTv: {
+    height: 420,
+    borderRadius: 28,
+  },
+  previewClockTv: {
+    fontSize: 180,
+    lineHeight: 200,
   },
   wordmark: {
     fontFamily: 'OswaldMedium',
@@ -317,6 +391,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     fontFamily: 'OswaldMedium',
   },
+  fieldLabelTv: {
+    fontSize: TV_SECTION_FONT,
+    letterSpacing: 2,
+  },
   input: {
     minHeight: 52,
     borderRadius: 14,
@@ -327,6 +405,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 18,
     fontFamily: 'Oswald',
+  },
+  inputTv: {
+    minHeight: 84,
+    fontSize: 36,
+    borderRadius: 18,
   },
   chips: {
     flexDirection: 'row',
@@ -382,10 +465,24 @@ const styles = StyleSheet.create({
     fontFamily: 'OswaldMedium',
     fontSize: 16,
   },
+  linkTv: {
+    fontSize: 32,
+  },
+  linkHitTv: {
+    alignSelf: 'flex-start',
+    minHeight: 76,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    justifyContent: 'center',
+  },
   help: {
     color: chrome.muted,
     fontSize: 14,
     lineHeight: 20,
+  },
+  helpTv: {
+    fontSize: TV_BODY_FONT,
+    lineHeight: TV_BODY_FONT + 8,
   },
   switchRow: {
     flexDirection: 'row',
@@ -403,9 +500,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  resetTv: {
+    minHeight: 88,
+  },
   resetLabel: {
     color: '#FF8A7A',
     fontFamily: 'Oswald',
     fontSize: 20,
+  },
+  resetLabelTv: {
+    fontSize: 36,
   },
 });

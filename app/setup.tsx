@@ -1,15 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
-import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
+import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvToggle } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
 import { chrome } from '@/src/theme/chrome';
+import { TV_BODY_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
 import { normalizeConfig } from '@/src/timer/engine';
 import { modeTitle } from '@/src/timer/labels';
 import { defaultConfig } from '@/src/timer/presets';
@@ -77,6 +78,8 @@ function SetupForm({
   presetId: string;
   onStart: (config: TimerConfig, label: string) => void;
 }) {
+  const tv = Platform.isTV === true;
+  const box = tvSafeBox(tv);
   const initial = defaultConfig(mode);
   const [leadInSeconds, setLeadInSeconds] = useState(initial.leadInSeconds);
   const [workSeconds, setWorkSeconds] = useState(mode === 'forTime' ? 12 * 60 : initial.workSeconds);
@@ -129,16 +132,28 @@ function SetupForm({
   const summary = presetSummary(config);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[
+        styles.safe,
+        tv && {
+          paddingHorizontal: box.horizontal,
+          paddingTop: box.vertical,
+          paddingBottom: 36,
+        },
+      ]}
+      edges={tv ? [] : ['top', 'bottom']}
+    >
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
-          <Text style={[styles.back, { color: accent }]}>Back</Text>
-        </Pressable>
-        <Text style={styles.kicker}>Americana</Text>
+        <HeaderBack onPress={() => router.back()} color={accent} />
+        <Text style={[styles.kicker, tv && styles.kickerTv]}>Americana</Text>
       </View>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>{modeTitle(mode)}</Text>
-        <Text style={styles.summary}>{summary}</Text>
+      <ScrollView
+        style={tv ? styles.scrollTv : undefined}
+        contentContainerStyle={[styles.content, tv && styles.contentTv]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={[styles.title, tv && styles.titleTv]}>{modeTitle(mode)}</Text>
+        <Text style={[styles.summary, tv && styles.summaryTv]}>{summary}</Text>
         <PresetShelf
           mode={mode}
           accent={accent}
@@ -152,19 +167,30 @@ function SetupForm({
           }}
         />
         {mode === 'forTime' ? (
-          <View style={styles.switchRow}>
-            <View>
-              <Text style={styles.fieldLabel}>Time cap</Text>
-              <Text style={styles.switchHelp}>Stop the clock when the cap hits.</Text>
-            </View>
-            <Switch
-              testID="for-time-cap"
+          Platform.isTV ? (
+            <TvToggle
+              label="Time cap"
+              help="Stop the clock when the cap hits."
               value={capOn}
               onValueChange={setCapOn}
-              trackColor={{ false: '#2A3140', true: accent }}
-              thumbColor={chrome.text}
+              testID="for-time-cap"
+              accent={accent}
             />
-          </View>
+          ) : (
+            <View style={styles.switchRow}>
+              <View>
+                <Text style={styles.fieldLabel}>Time cap</Text>
+                <Text style={styles.switchHelp}>Stop the clock when the cap hits.</Text>
+              </View>
+              <Switch
+                testID="for-time-cap"
+                value={capOn}
+                onValueChange={setCapOn}
+                trackColor={{ false: '#2A3140', true: accent }}
+                thumbColor={chrome.text}
+              />
+            </View>
+          )
         ) : null}
         {mode === 'forTime' && capOn ? (
           <TimeField label="Cap" seconds={workSeconds} onChange={setWorkSeconds} testID="cap" accent={accent} />
@@ -211,7 +237,7 @@ function SetupForm({
         ) : null}
         {mode !== 'forTime' && mode !== 'amrap' ? (
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Rounds</Text>
+            <Text style={[styles.fieldLabel, Platform.isTV && styles.fieldLabelTv]}>Rounds</Text>
             <NumberStepper
               value={rounds}
               min={1}
@@ -273,10 +299,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 8,
   },
-  back: {
-    fontFamily: 'OswaldMedium',
-    fontSize: 18,
-  },
   kicker: {
     color: chrome.muted,
     fontFamily: 'OswaldMedium',
@@ -284,10 +306,22 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     fontSize: 13,
   },
+  kickerTv: {
+    fontSize: TV_SECTION_FONT,
+  },
+  scrollTv: {
+    flex: 1,
+    width: '100%',
+  },
   content: {
     gap: 18,
     paddingTop: 12,
     paddingBottom: 24,
+  },
+  contentTv: {
+    gap: 22,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
   title: {
     fontFamily: 'Oswald',
@@ -295,10 +329,18 @@ const styles = StyleSheet.create({
     color: chrome.text,
     lineHeight: 52,
   },
+  titleTv: {
+    fontSize: TV_TITLE_FONT,
+    lineHeight: TV_TITLE_FONT + 8,
+  },
   summary: {
     color: chrome.muted,
     fontSize: 16,
     marginTop: -8,
+  },
+  summaryTv: {
+    fontSize: TV_BODY_FONT,
+    lineHeight: TV_BODY_FONT + 8,
   },
   field: {
     gap: 10,
@@ -309,6 +351,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     fontFamily: 'OswaldMedium',
+  },
+  fieldLabelTv: {
+    fontSize: TV_SECTION_FONT,
+    letterSpacing: 2,
   },
   switchRow: {
     flexDirection: 'row',
@@ -327,5 +373,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingVertical: 12,
+    width: '100%',
   },
 });

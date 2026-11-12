@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { unlockAudio } from '@/src/audio/sounds';
@@ -10,6 +10,10 @@ import { PresetShelf } from '@/src/components/PresetShelf';
 import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
+import { focusChrome } from '@/src/tv/controls';
+import { TV_BODY_FONT, TV_MENU_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
+import { tvParallaxProps } from '@/src/tv/pressable';
+import { usePointerFocus } from '@/src/tv/usePointerFocus';
 import { formatSeconds } from '@/src/timer/format';
 import { BUILTIN_PRESETS, configFromPreset, type RoundPreset } from '@/src/timer/presets';
 import { listPresets, type SavedPreset } from '@/src/timer/presetStorage';
@@ -39,6 +43,8 @@ export default function RoundsScreen() {
   const { branding } = useBranding();
   const { setSession } = useTimerSession();
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
+  const tv = Platform.isTV === true;
+  const box = tvSafeBox(tv);
   const restColor = readableDigitColor(branding.restColor, branding.backgroundColor);
   const [draft, setDraft] = useState<RoundPreset>(BUILTIN_PRESETS[0]);
   const [selectedId, setSelectedId] = useState(BUILTIN_PRESETS[0].id);
@@ -80,16 +86,17 @@ export default function RoundsScreen() {
   const builtInSelected = BUILTIN_PRESETS.some((preset) => preset.id === selectedId);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, tv && { paddingHorizontal: box.horizontal, paddingTop: box.vertical }]} edges={tv ? [] : ['top']}>
       <ScrollView
         testID="screen-rounds"
-        contentContainerStyle={styles.content}
+        style={tv ? styles.scrollTv : undefined}
+        contentContainerStyle={[styles.content, tv && styles.contentTv]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={[styles.wordmark, { color: accent }]}>Americana</Text>
-        <Text style={styles.title}>Rounds</Text>
-        <Text style={styles.lede}>Jiu-jitsu, striking, and sparring. Rest is a different color from work.</Text>
-        <View style={styles.presets}>
+        <Text style={[styles.wordmark, { color: accent }, tv && styles.wordmarkTv]}>Americana</Text>
+        <Text style={[styles.title, tv && styles.titleTv]}>Rounds</Text>
+        <Text style={[styles.lede, tv && styles.ledeTv]}>Jiu-jitsu, striking, and sparring. Rest is a different color from work.</Text>
+        <View style={[styles.presets, tv && styles.presetsTv]}>
           {BUILTIN_PRESETS.map((preset) => (
             <StandardCard
               key={preset.id}
@@ -97,6 +104,7 @@ export default function RoundsScreen() {
               accent={accent}
               selected={selectedId === preset.id}
               onPress={() => apply(preset)}
+              tv={tv}
             />
           ))}
         </View>
@@ -127,7 +135,7 @@ export default function RoundsScreen() {
           accent={restColor}
         />
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Rounds</Text>
+          <Text style={[styles.fieldLabel, tv && styles.fieldLabelTv]}>Rounds</Text>
           <NumberStepper
             value={draft.rounds}
             min={1}
@@ -139,7 +147,7 @@ export default function RoundsScreen() {
           />
         </View>
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Warning before the round ends</Text>
+          <Text style={[styles.fieldLabel, tv && styles.fieldLabelTv]}>Warning before the round ends</Text>
           <View style={styles.chips}>
             {WARNING_CHOICES.map((seconds) => (
               <Chip
@@ -182,28 +190,32 @@ function StandardCard({
   accent,
   selected,
   onPress,
+  tv,
 }: {
   preset: RoundPreset;
   accent: string;
   selected: boolean;
   onPress: () => void;
+  tv: boolean;
 }) {
-  const [webFocused, setWebFocused] = useState(false);
+  const pointer = usePointerFocus();
   return (
     <Pressable
       testID={`preset-${preset.id}`}
       accessibilityRole="button"
       onPress={onPress}
-      onFocus={() => setWebFocused(true)}
-      onBlur={() => setWebFocused(false)}
+      onFocus={pointer.onFocus}
+      onBlur={pointer.onBlur}
+      {...tvParallaxProps()}
       style={({ focused }) => [
         styles.preset,
+        tv && styles.presetTv,
         { borderColor: selected ? accent : chrome.line },
-        focused || webFocused ? { borderWidth: 6, borderColor: accent } : null,
+        focusChrome(tv, Boolean(focused) || pointer.focused, accent),
       ]}
     >
-      <Text style={styles.presetName}>{preset.name}</Text>
-      <Text style={styles.presetMeta}>{presetMeta(preset)}</Text>
+      <Text style={[styles.presetName, tv && styles.presetNameTv]}>{preset.name}</Text>
+      <Text style={[styles.presetMeta, tv && styles.presetMetaTv]}>{presetMeta(preset)}</Text>
     </Pressable>
   );
 }
@@ -229,11 +241,18 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 8,
   },
+  wordmarkTv: {
+    fontSize: 28,
+  },
   title: {
     fontFamily: 'Oswald',
     fontSize: 40,
     lineHeight: 44,
     color: chrome.text,
+  },
+  titleTv: {
+    fontSize: TV_TITLE_FONT,
+    lineHeight: TV_TITLE_FONT + 8,
   },
   lede: {
     color: chrome.muted,
@@ -241,10 +260,27 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginTop: -6,
   },
+  ledeTv: {
+    fontSize: TV_BODY_FONT,
+    lineHeight: TV_BODY_FONT + 8,
+  },
+  scrollTv: {
+    flex: 1,
+    width: '100%',
+  },
+  contentTv: {
+    flexGrow: 1,
+    gap: 28,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+  },
   presets: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+  },
+  presetsTv: {
+    gap: 24,
   },
   preset: {
     width: '48%',
@@ -256,14 +292,29 @@ const styles = StyleSheet.create({
     gap: 4,
     minHeight: 84,
   },
+  presetTv: {
+    minHeight: 180,
+    padding: 24,
+    borderRadius: 24,
+    flexBasis: '46%',
+    flexGrow: 1,
+    width: '46%',
+  },
   presetName: {
     fontFamily: 'Oswald',
     fontSize: 22,
     color: chrome.text,
   },
+  presetNameTv: {
+    fontSize: TV_MENU_FONT,
+    lineHeight: TV_MENU_FONT + 4,
+  },
   presetMeta: {
     color: chrome.muted,
     fontSize: 13,
+  },
+  presetMetaTv: {
+    fontSize: TV_BODY_FONT,
   },
   field: {
     gap: 10,
@@ -274,6 +325,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     fontFamily: 'OswaldMedium',
+  },
+  fieldLabelTv: {
+    fontSize: TV_SECTION_FONT,
+    letterSpacing: 2,
   },
   chips: {
     flexDirection: 'row',

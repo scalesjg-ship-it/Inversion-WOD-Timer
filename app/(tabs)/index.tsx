@@ -8,7 +8,10 @@ import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
-import { isTenFootLayout, tvSafeInset } from '@/src/tv/layout';
+import { focusChrome } from '@/src/tv/controls';
+import { TV_BODY_FONT, TV_MENU_FONT, TV_SECTION_FONT, isTenFootLayout, tvSafeBox, tvSafeInset } from '@/src/tv/layout';
+import { tvParallaxProps } from '@/src/tv/pressable';
+import { usePointerFocus } from '@/src/tv/usePointerFocus';
 import { modeTitle } from '@/src/timer/labels';
 import { loadPresets, presetSummary, type SavedPreset } from '@/src/timer/presetStorage';
 import type { TimerMode } from '@/src/timer/types';
@@ -44,8 +47,10 @@ export default function WodScreen() {
   const { branding } = useBranding();
   const { setSession } = useTimerSession();
   const { width, height } = useWindowDimensions();
-  const tenFoot = isTenFootLayout(width, height, Platform.isTV === true);
+  const tv = Platform.isTV === true;
+  const tenFoot = isTenFootLayout(width, height, tv);
   const inset = tvSafeInset(tenFoot);
+  const box = tvSafeBox(tv);
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
   const [presets, setPresets] = useState<SavedPreset[] | null>(null);
 
@@ -68,17 +73,28 @@ export default function WodScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={tv ? [] : ['top']}>
       <ScrollView
-        contentContainerStyle={[styles.content, tenFoot && { paddingHorizontal: inset, paddingBottom: inset }]}
+        contentContainerStyle={[
+          styles.content,
+          tenFoot && !tv && { paddingHorizontal: inset, paddingBottom: inset },
+          tv && {
+            width: '100%',
+            flexGrow: 1,
+            paddingHorizontal: box.horizontal,
+            paddingTop: box.vertical,
+            paddingBottom: 28,
+            gap: 14,
+          },
+        ]}
         testID="screen-wod"
       >
-        <Text style={[styles.wordmark, { color: accent }, tenFoot && styles.wordmarkTv]}>Americana</Text>
-        <Text style={[styles.gym, tenFoot && styles.gymTv]} numberOfLines={2} adjustsFontSizeToFit>
+        <Text style={[styles.wordmark, { color: accent }, tenFoot && styles.wordmarkTv, tv && styles.wordmarkFrame]}>Americana</Text>
+        <Text style={[styles.gym, tenFoot && styles.gymTv, tv && styles.gymFrame]} numberOfLines={2} adjustsFontSizeToFit>
           {branding.gymName}
         </Text>
-        <Text style={styles.section}>Conditioning</Text>
-        <View style={styles.list}>
+        <Text style={[styles.section, tv && styles.sectionFrame]}>Conditioning</Text>
+        <View style={[styles.list, tv && styles.listFrame]}>
           {MODES.map((item, index) => (
             <ModeCard key={item.mode} item={item} accent={accent} preferred={index === 0} tenFoot={tenFoot} />
           ))}
@@ -100,7 +116,7 @@ export default function WodScreen() {
             </View>
           </>
         ) : null}
-        <Text style={styles.hint}>Jiu-jitsu, boxing, and sparring rounds are on the Rounds tab.</Text>
+        <Text style={[styles.hint, tv && styles.hintFrame]}>Jiu-jitsu, boxing, and sparring rounds are on the Rounds tab.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -141,10 +157,11 @@ function SavedPresetCard({
   onOpen: () => void;
   onStart: () => void;
 }) {
-  const [webFocused, setWebFocused] = useState(false);
-  const [startFocused, setStartFocused] = useState(false);
+  const bodyPointer = usePointerFocus();
+  const startPointer = usePointerFocus();
+  const tv = Platform.isTV === true;
   return (
-    <View style={[styles.card, tenFoot && styles.cardTv]}>
+    <View style={[styles.card, tenFoot && styles.cardTv, tv && styles.cardFrame]}>
       <View style={[styles.bar, { backgroundColor: accent }]} />
       <Pressable
         testID={`my-preset-${preset.id}`}
@@ -152,18 +169,20 @@ function SavedPresetCard({
         accessibilityLabel={`${preset.name}, ${modeTitle(preset.mode)}`}
         accessibilityHint="Opens this preset in its setup"
         onPress={onOpen}
-        onFocus={() => setWebFocused(true)}
-        onBlur={() => setWebFocused(false)}
+        onFocus={bodyPointer.onFocus}
+        onBlur={bodyPointer.onBlur}
+        {...tvParallaxProps()}
         style={({ pressed, focused }) => [
           styles.cardBody,
+          tv && styles.cardBodyFrame,
           { opacity: pressed ? 0.78 : 1 },
-          focused || webFocused ? { borderWidth: 6, borderColor: accent } : null,
+          focusChrome(tv, Boolean(focused) || bodyPointer.focused, accent),
         ]}
       >
-        <Text style={[styles.cardTitle, tenFoot && styles.cardTitleTv]} numberOfLines={2}>
+        <Text style={[styles.cardTitle, tenFoot && styles.cardTitleTv, tv && styles.cardTitleFrame]} numberOfLines={2}>
           {preset.name}
         </Text>
-        <Text style={[styles.cardDetail, tenFoot && styles.cardDetailTv]}>
+        <Text style={[styles.cardDetail, tenFoot && styles.cardDetailTv, tv && styles.cardDetailFrame]}>
           {modeTitle(preset.mode)} · {presetSummary(preset.config)}
         </Text>
       </Pressable>
@@ -172,13 +191,14 @@ function SavedPresetCard({
         accessibilityRole="button"
         accessibilityLabel={`Start ${preset.name}`}
         onPress={onStart}
-        onFocus={() => setStartFocused(true)}
-        onBlur={() => setStartFocused(false)}
+        onFocus={startPointer.onFocus}
+        onBlur={startPointer.onBlur}
+        {...tvParallaxProps()}
         style={({ pressed, focused }) => [
           styles.start,
           tenFoot && styles.startTv,
           { opacity: pressed ? 0.78 : 1 },
-          focused || startFocused ? { borderWidth: 6, borderColor: accent } : null,
+          focusChrome(tv, Boolean(focused) || startPointer.focused, accent),
         ]}
       >
         <Text style={[styles.startLabel, { color: accent }, tenFoot && styles.startLabelTv]}>Start</Text>
@@ -198,15 +218,17 @@ function ModeCard({
   preferred: boolean;
   tenFoot: boolean;
 }) {
-  const [webFocused, setWebFocused] = useState(false);
+  const pointer = usePointerFocus();
+  const tv = Platform.isTV === true;
   return (
             <Pressable
               testID={`mode-${item.mode}`}
               accessibilityRole="button"
               accessibilityLabel={modeTitle(item.mode)}
               hasTVPreferredFocus={preferred}
-              onFocus={() => setWebFocused(true)}
-              onBlur={() => setWebFocused(false)}
+              onFocus={pointer.onFocus}
+              onBlur={pointer.onBlur}
+              {...tvParallaxProps()}
               onPress={() => {
                 if (item.mode === 'countdown') {
                   router.push('/countdown');
@@ -217,16 +239,19 @@ function ModeCard({
               style={({ pressed, focused }) => [
                 styles.card,
                 tenFoot && styles.cardTv,
+                tv && styles.cardFrame,
                 { opacity: pressed ? 0.78 : 1 },
-                focused || webFocused ? { borderWidth: 6, borderColor: accent } : null,
+                focusChrome(tv, Boolean(focused) || pointer.focused, accent),
               ]}
             >
               <View style={[styles.bar, { backgroundColor: accent }]} />
-              <View style={styles.cardBody}>
-                <Text style={[styles.cardTitle, tenFoot && styles.cardTitleTv]}>{modeTitle(item.mode)}</Text>
-                <Text style={[styles.cardDetail, tenFoot && styles.cardDetailTv]}>{item.detail}</Text>
+              <View style={[styles.cardBody, tv && styles.cardBodyFrame]}>
+                <Text style={[styles.cardTitle, tenFoot && styles.cardTitleTv, tv && styles.cardTitleFrame]}>{modeTitle(item.mode)}</Text>
+                <Text style={[styles.cardDetail, tenFoot && styles.cardDetailTv, tv && styles.cardDetailFrame]} numberOfLines={2}>
+                  {item.detail}
+                </Text>
               </View>
-              <Text style={[styles.chevron, { color: accent }]}>›</Text>
+              <Text style={[styles.chevron, tv && styles.chevronFrame, { color: accent }]}>›</Text>
             </Pressable>
   );
 }
@@ -305,6 +330,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     gap: 4,
   },
+  cardBodyFrame: {
+    paddingVertical: 22,
+    paddingHorizontal: 24,
+    gap: 10,
+  },
   cardTitle: {
     fontFamily: 'Oswald',
     fontSize: 26,
@@ -345,5 +375,44 @@ const styles = StyleSheet.create({
     color: chrome.muted,
     fontSize: 14,
     lineHeight: 20,
+  },
+  wordmarkFrame: {
+    fontSize: 32,
+  },
+  gymFrame: {
+    fontSize: 72,
+    lineHeight: 80,
+  },
+  sectionFrame: {
+    fontSize: TV_SECTION_FONT,
+    marginTop: 8,
+  },
+  listFrame: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  cardFrame: {
+    flexBasis: '46%',
+    flexGrow: 1,
+    minHeight: 156,
+    borderRadius: 28,
+  },
+  cardTitleFrame: {
+    fontSize: TV_MENU_FONT,
+    lineHeight: TV_MENU_FONT + 6,
+  },
+  cardDetailFrame: {
+    fontSize: TV_BODY_FONT,
+    lineHeight: TV_BODY_FONT + 8,
+  },
+  chevronFrame: {
+    fontSize: 64,
+    paddingRight: 28,
+  },
+  hintFrame: {
+    fontSize: TV_BODY_FONT,
+    lineHeight: TV_BODY_FONT + 8,
+    marginTop: 4,
   },
 });

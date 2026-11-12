@@ -1,13 +1,11 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { inkOn } from '@/src/branding/color';
 import { chrome } from '@/src/theme/chrome';
-
-function ring(focused: boolean, color: string) {
-  if (!focused) return null;
-  return { borderWidth: 6, borderColor: color };
-}
+import { focusChrome, stepperControlSize } from '@/src/tv/controls';
+import { tvParallaxProps } from '@/src/tv/pressable';
+import { usePointerFocus } from '@/src/tv/usePointerFocus';
 
 export function BigButton({
   label,
@@ -23,24 +21,28 @@ export function BigButton({
   variant?: 'solid' | 'ghost';
 }) {
   const solid = variant === 'solid';
-  const [webFocused, setWebFocused] = useState(false);
+  const tv = Platform.isTV === true;
+  const pointer = usePointerFocus();
+  const ink = solid ? inkOn(color) : color;
   return (
     <Pressable
       accessibilityRole="button"
       testID={testID}
       onPress={onPress}
-      onFocus={() => setWebFocused(true)}
-      onBlur={() => setWebFocused(false)}
+      onFocus={pointer.onFocus}
+      onBlur={pointer.onBlur}
+      {...tvParallaxProps()}
       style={({ pressed, focused }) => [
         styles.big,
+        tv && styles.bigTv,
         solid
           ? { backgroundColor: color }
           : { backgroundColor: 'transparent', borderWidth: 1, borderColor: color },
         { opacity: pressed ? 0.72 : 1 },
-        ring(Boolean(focused) || webFocused, solid ? inkOn(color) : color),
+        focusChrome(tv, Boolean(focused) || pointer.focused, ink, !solid),
       ]}
     >
-      <Text style={[styles.bigLabel, { color: solid ? inkOn(color) : color }]}>{label}</Text>
+      <Text style={[styles.bigLabel, tv && styles.bigLabelTv, { color: ink }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -62,6 +64,10 @@ export function NumberStepper({
   testID: string;
   accent: string;
 }) {
+  const tv = Platform.isTV === true;
+  const size = stepperControlSize(tv);
+  const decPointer = usePointerFocus();
+  const incPointer = usePointerFocus();
   const [text, setText] = useState(String(value));
   const [tracked, setTracked] = useState(value);
   if (value !== tracked) {
@@ -75,57 +81,75 @@ export function NumberStepper({
     setText(String(clamped));
   };
 
-  const [decFocused, setDecFocused] = useState(false);
-  const [incFocused, setIncFocused] = useState(false);
+  const stepFace = (pressed: boolean, focused: boolean, pointerFocused: boolean) => [
+    styles.step,
+    {
+      width: size.button,
+      height: size.button,
+      borderRadius: size.radius,
+      borderWidth: tv ? 4 : 1,
+      opacity: pressed ? 0.6 : 1,
+      borderColor: accent,
+    },
+    focusChrome(tv, Boolean(focused) || pointerFocused, accent),
+  ];
+
   return (
-    <View style={styles.stepper}>
+    <View style={[styles.stepper, { gap: size.gap }]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Decrease ${suffix}`}
         testID={`${testID}-dec`}
         onPress={() => commit(value - 1)}
-        onFocus={() => setDecFocused(true)}
-        onBlur={() => setDecFocused(false)}
-        style={({ pressed, focused }) => [
-          styles.step,
-          { opacity: pressed ? 0.6 : 1, borderColor: accent },
-          ring(Boolean(focused) || decFocused, accent),
-        ]}
+        onFocus={decPointer.onFocus}
+        onBlur={decPointer.onBlur}
+        {...tvParallaxProps()}
+        style={({ pressed, focused }) => stepFace(pressed, focused, decPointer.focused)}
       >
-        <Text style={[styles.stepGlyph, { color: accent }]}>−</Text>
+        <Text style={[styles.stepGlyph, { color: accent, fontSize: size.glyph, lineHeight: size.glyph + 4 }]}>−</Text>
       </Pressable>
-      <View style={styles.stepValue}>
-        <TextInput
-          testID={testID}
-          accessibilityLabel={suffix}
-          value={text}
-          onChangeText={(raw) => {
-            const digits = raw.replace(/[^0-9]/g, '');
-            setText(digits);
-            if (digits === '') return;
-            commit(Number(digits));
-          }}
-          onBlur={() => commit(text === '' ? min : Number(text))}
-          keyboardType="number-pad"
-          inputMode="numeric"
-          style={styles.stepInput}
-        />
-        <Text style={styles.suffix}>{suffix}</Text>
+      <View style={styles.stepValue} focusable={tv ? false : undefined}>
+        {tv ? (
+          // number-pad is a phone keyboard. Reconciling that field during a TV focus move quits the app.
+          <Text
+            testID={testID}
+            accessibilityLabel={suffix}
+            accessible={false}
+            importantForAccessibility="no"
+            style={[styles.stepInput, { fontSize: size.value, minWidth: size.valueMinWidth }]}
+          >
+            {text}
+          </Text>
+        ) : (
+          <TextInput
+            testID={testID}
+            accessibilityLabel={suffix}
+            value={text}
+            onChangeText={(raw) => {
+              const digits = raw.replace(/[^0-9]/g, '');
+              setText(digits);
+              if (digits === '') return;
+              commit(Number(digits));
+            }}
+            onBlur={() => commit(text === '' ? min : Number(text))}
+            keyboardType="number-pad"
+            inputMode="numeric"
+            style={[styles.stepInput, { fontSize: size.value, minWidth: size.valueMinWidth }]}
+          />
+        )}
+        <Text style={[styles.suffix, { fontSize: size.suffix }]}>{suffix}</Text>
       </View>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Increase ${suffix}`}
         testID={`${testID}-inc`}
         onPress={() => commit(value + 1)}
-        onFocus={() => setIncFocused(true)}
-        onBlur={() => setIncFocused(false)}
-        style={({ pressed, focused }) => [
-          styles.step,
-          { opacity: pressed ? 0.6 : 1, borderColor: accent },
-          ring(Boolean(focused) || incFocused, accent),
-        ]}
+        onFocus={incPointer.onFocus}
+        onBlur={incPointer.onBlur}
+        {...tvParallaxProps()}
+        style={({ pressed, focused }) => stepFace(pressed, focused, incPointer.focused)}
       >
-        <Text style={[styles.stepGlyph, { color: accent }]}>+</Text>
+        <Text style={[styles.stepGlyph, { color: accent, fontSize: size.glyph, lineHeight: size.glyph + 4 }]}>+</Text>
       </Pressable>
     </View>
   );
@@ -144,12 +168,13 @@ export function TimeField({
   testID: string;
   accent: string;
 }) {
+  const tv = Platform.isTV === true;
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.fieldRow}>
+      <Text style={[styles.fieldLabel, tv && styles.fieldLabelTv]}>{label}</Text>
+      <View style={[styles.fieldRow, tv && styles.fieldRowTv]}>
         <NumberStepper
           value={minutes}
           min={0}
@@ -186,25 +211,103 @@ export function Chip({
   color: string;
   testID?: string;
 }) {
-  const [webFocused, setWebFocused] = useState(false);
+  const tv = Platform.isTV === true;
+  const pointer = usePointerFocus();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       testID={testID}
       onPress={onPress}
-      onFocus={() => setWebFocused(true)}
-      onBlur={() => setWebFocused(false)}
+      onFocus={pointer.onFocus}
+      onBlur={pointer.onBlur}
+      {...tvParallaxProps()}
       style={({ focused }) => [
         styles.chip,
+        tv && styles.chipTv,
         {
           borderColor: selected ? color : chrome.line,
           backgroundColor: selected ? `${color}22` : chrome.surface,
         },
-        ring(Boolean(focused) || webFocused, color),
+        focusChrome(tv, Boolean(focused) || pointer.focused, color),
       ]}
     >
-      <Text style={[styles.chipLabel, { color: selected ? chrome.text : chrome.muted }]}>{label}</Text>
+      <Text style={[styles.chipLabel, tv && styles.chipLabelTv, { color: selected ? chrome.text : chrome.muted }]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+export function HeaderBack({
+  onPress,
+  color,
+  testID,
+  label = 'Back',
+}: {
+  onPress: () => void;
+  color: string;
+  testID?: string;
+  label?: string;
+}) {
+  const tv = Platform.isTV === true;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      testID={testID}
+      onPress={onPress}
+      hitSlop={tv ? undefined : 12}
+      {...tvParallaxProps()}
+      style={({ pressed, focused }) =>
+        tv
+          ? [styles.backHitTv, { opacity: pressed ? 0.75 : 1 }, focusChrome(true, Boolean(focused), color)]
+          : undefined
+      }
+    >
+      <Text style={[styles.back, tv && styles.backTv, { color }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+export function TvToggle({
+  label,
+  help,
+  value,
+  onValueChange,
+  testID,
+  accent,
+  disabled = false,
+}: {
+  label: string;
+  help?: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  testID?: string;
+  accent: string;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled }}
+      disabled={disabled}
+      testID={testID}
+      onPress={() => onValueChange(!value)}
+      {...tvParallaxProps()}
+      style={({ pressed, focused }) => [
+        styles.tvToggle,
+        {
+          opacity: disabled ? 0.4 : pressed ? 0.8 : 1,
+          borderColor: value ? accent : chrome.line,
+        },
+        focusChrome(true, Boolean(focused), accent),
+      ]}
+    >
+      <View style={styles.tvToggleCopy}>
+        <Text style={styles.fieldLabelTv}>{label}</Text>
+        {help ? <Text style={styles.tvToggleHelp}>{help}</Text> : null}
+      </View>
+      <Text style={[styles.tvToggleValue, { color: value ? accent : chrome.muted }]}>{value ? 'On' : 'Off'}</Text>
     </Pressable>
   );
 }
@@ -217,22 +320,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
+  bigTv: {
+    minHeight: 128,
+    borderRadius: 28,
+    paddingHorizontal: 28,
+  },
   bigLabel: {
     fontFamily: 'Oswald',
     fontSize: 26,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
+  bigLabelTv: {
+    fontSize: 48,
+    letterSpacing: 2,
+  },
   stepper: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
   step: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -240,8 +348,6 @@ const styles = StyleSheet.create({
   },
   stepGlyph: {
     fontFamily: 'Oswald',
-    fontSize: 32,
-    lineHeight: 36,
   },
   stepValue: {
     flex: 1,
@@ -249,15 +355,12 @@ const styles = StyleSheet.create({
   },
   stepInput: {
     fontFamily: 'Oswald',
-    fontSize: 32,
     color: chrome.text,
     textAlign: 'center',
-    minWidth: 56,
     paddingVertical: 0,
   },
   suffix: {
     color: chrome.muted,
-    fontSize: 12,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
@@ -271,9 +374,16 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     fontFamily: 'OswaldMedium',
   },
+  fieldLabelTv: {
+    fontSize: 32,
+    letterSpacing: 2,
+  },
   fieldRow: {
     flexDirection: 'row',
     gap: 12,
+  },
+  fieldRowTv: {
+    gap: 24,
   },
   chip: {
     borderWidth: 1,
@@ -284,9 +394,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  chipTv: {
+    minHeight: 88,
+    paddingHorizontal: 28,
+    paddingVertical: 18,
+    borderWidth: 4,
+  },
   chipLabel: {
     fontFamily: 'OswaldMedium',
     fontSize: 16,
     letterSpacing: 0.4,
+  },
+  chipLabelTv: {
+    fontSize: 32,
+  },
+  back: {
+    fontFamily: 'OswaldMedium',
+    fontSize: 18,
+  },
+  backTv: {
+    fontSize: 40,
+  },
+  backHitTv: {
+    minHeight: 96,
+    paddingHorizontal: 28,
+    borderRadius: 20,
+    borderWidth: 4,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: chrome.surface,
+  },
+  tvToggle: {
+    minHeight: 116,
+    borderRadius: 22,
+    borderWidth: 4,
+    backgroundColor: chrome.surface,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  tvToggleCopy: {
+    flex: 1,
+    gap: 6,
+  },
+  tvToggleHelp: {
+    color: chrome.text,
+    fontSize: 28,
+    lineHeight: 36,
+  },
+  tvToggleValue: {
+    fontFamily: 'Oswald',
+    fontSize: 48,
+    letterSpacing: 0.6,
   },
 });

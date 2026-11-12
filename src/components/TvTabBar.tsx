@@ -1,0 +1,105 @@
+import { Tabs } from 'expo-router';
+import type { ComponentProps } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { chrome } from '@/src/theme/chrome';
+import { focusChrome, tabBarControlSize, tintHex } from '@/src/tv/controls';
+import { tvParallaxProps } from '@/src/tv/pressable';
+
+type TvTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
+
+export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }: TvTabBarProps) {
+  const metrics = tabBarControlSize(true);
+  const focusedRoute = state.routes[state.index];
+  const focusedOptions = focusedRoute ? descriptors[focusedRoute.key]?.options : undefined;
+  const active = colorString(focusedOptions?.tabBarActiveTintColor, chrome.text);
+  const inactive = colorString(focusedOptions?.tabBarInactiveTintColor, chrome.muted);
+  const bottomInset = Math.max(insets.bottom, 16);
+
+  return (
+    <View
+      accessibilityRole="tablist"
+      style={[
+        styles.bar,
+        {
+          gap: metrics.gap,
+          paddingHorizontal: metrics.paddingHorizontal,
+          paddingBottom: bottomInset,
+          minHeight: metrics.barContentHeight + bottomInset,
+        },
+      ]}
+    >
+      {state.routes.map((route, index) => {
+        const selected = index === state.index;
+        const options = descriptors[route.key]?.options;
+        const title = options?.title ?? route.name;
+        const label = typeof title === 'string' ? title : route.name;
+        const color = selected ? active : inactive;
+        const onPress = () => {
+          const event = emitter.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!selected && !event.defaultPrevented) navigateToTab(route.key);
+        };
+        return (
+          <Pressable
+            key={route.key}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            accessibilityLabel={label}
+            testID={options?.tabBarButtonTestID}
+            onPress={onPress}
+            {...tvParallaxProps()}
+            style={({ pressed, focused }) => [
+              styles.item,
+              {
+                minHeight: metrics.itemMinHeight,
+                opacity: pressed ? 0.82 : 1,
+                borderColor: focused ? active : 'transparent',
+                backgroundColor: focused ? tintHex(active, 0.28) : 'transparent',
+              },
+              focusChrome(true, Boolean(focused), active, false),
+            ]}
+          >
+            <Text style={[styles.icon, { color, fontSize: metrics.icon, lineHeight: metrics.icon + 6 }]}>
+              {label.slice(0, 1).toUpperCase()}
+            </Text>
+            <Text style={[styles.label, { color, fontSize: metrics.label }]}>{label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function colorString(color: unknown, fallback: string): string {
+  return typeof color === 'string' ? color : fallback;
+}
+
+const styles = StyleSheet.create({
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    backgroundColor: chrome.bg,
+    borderTopColor: chrome.line,
+    borderTopWidth: 2,
+    paddingTop: 18,
+  },
+  item: {
+    flex: 1,
+    borderRadius: 24,
+    borderWidth: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  icon: {
+    fontFamily: 'Oswald',
+  },
+  label: {
+    fontFamily: 'OswaldMedium',
+    letterSpacing: 1,
+  },
+});

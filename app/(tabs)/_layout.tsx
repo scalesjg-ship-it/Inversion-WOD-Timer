@@ -1,16 +1,20 @@
 import { Tabs } from 'expo-router';
-import { Text, type TextStyle } from 'react-native';
+import { Platform, Text, type TextStyle } from 'react-native';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
+import { TvTabBar } from '@/src/components/TvTabBar';
 import { chrome } from '@/src/theme/chrome';
 
 export default function TabLayout() {
   const { branding } = useBranding();
   const tint = readableDigitColor(branding.uiColor, branding.backgroundColor);
 
+  const tv = Platform.isTV === true;
+
   return (
     <Tabs
+      {...(tv ? { tabBar: (props) => <TvTabBar {...props} /> } : {})}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: tint,

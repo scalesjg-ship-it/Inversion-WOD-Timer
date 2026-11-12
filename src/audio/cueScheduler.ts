@@ -13,6 +13,7 @@ import { AppState, Platform } from 'react-native';
 
 import { notificationPlan, selectUpcoming } from '@/src/timer/notificationPlan';
 import type { EngineState, SoundName } from '@/src/timer/types';
+import { allowsSystemNotifications } from '@/src/tv/controls';
 
 const SOUND_FILE: Record<SoundName, string> = {
   tick: 'tick.wav',
@@ -31,7 +32,7 @@ function channelId(sound: SoundName): string {
 }
 
 async function ensureNotifications(): Promise<boolean> {
-  if (Platform.OS === 'web') return false;
+  if (!allowsSystemNotifications(Platform.isTV === true, Platform.OS)) return false;
   if (!ready) {
     setNotificationHandler({
       handleNotification: async () => {
@@ -67,7 +68,7 @@ async function ensureNotifications(): Promise<boolean> {
 
 export async function clearScheduledCues(): Promise<void> {
   generation += 1;
-  if (Platform.OS === 'web') return;
+  if (!allowsSystemNotifications(Platform.isTV === true, Platform.OS)) return;
   try {
     await cancelAllScheduledNotificationsAsync();
   } catch {

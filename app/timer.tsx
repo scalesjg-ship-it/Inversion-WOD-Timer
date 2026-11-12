@@ -14,7 +14,9 @@ import { chrome } from '@/src/theme/chrome';
 import { formatSnapshot, phaseLabel, roundLabel } from '@/src/timer/labels';
 import { useTimer } from '@/src/timer/useTimer';
 import type { Phase } from '@/src/timer/types';
-import { fitClock, isTenFootLayout, tvSafeInset } from '@/src/tv/layout';
+import { focusChrome } from '@/src/tv/controls';
+import { fitClock, isTenFootLayout, tvSafeBox, tvSafeInset } from '@/src/tv/layout';
+import { tvParallaxProps } from '@/src/tv/pressable';
 import type { RemoteCommand } from '@/src/tv/remoteMap';
 import { useRemoteCommands } from '@/src/tv/useRemoteCommands';
 
@@ -30,14 +32,23 @@ export default function TimerScreen() {
   const insets = useSafeAreaInsets();
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   const landscape = width > height;
-  const tenFoot = isTenFootLayout(width, height, Platform.isTV === true);
+  const tv = Platform.isTV === true;
+  const tenFoot = isTenFootLayout(width, height, tv);
   const overscan = tvSafeInset(tenFoot);
-  const safe = {
-    top: Math.max(insets.top, overscan),
-    right: Math.max(insets.right, overscan),
-    bottom: Math.max(insets.bottom, overscan),
-    left: Math.max(insets.left, overscan),
-  };
+  const box = tvSafeBox(tv);
+  const safe = tv
+    ? {
+        top: Math.max(insets.top, box.vertical),
+        right: Math.max(insets.right, box.horizontal),
+        bottom: Math.max(insets.bottom, box.vertical),
+        left: Math.max(insets.left, box.horizontal),
+      }
+    : {
+        top: Math.max(insets.top, overscan),
+        right: Math.max(insets.right, overscan),
+        bottom: Math.max(insets.bottom, overscan),
+        left: Math.max(insets.left, overscan),
+      };
   const [controlsHeld, setControlsHeld] = useState(false);
   const controlsVisible = tenFoot ? controlsHeld : true;
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -51,16 +62,13 @@ export default function TimerScreen() {
     screenWidth: width,
     screenHeight: height,
     tenFoot,
+    fillFrame: tv,
     horizontalInset: side * 2,
-    verticalInset:
-      safe.top +
-      safe.bottom +
-      58 +
-      36 +
-      96 +
-      (landscape ? 16 : 80),
+    verticalInset: tv
+      ? safe.top + safe.bottom + 280
+      : safe.top + safe.bottom + 58 + 36 + 96 + (landscape ? 16 : 80),
   });
-  const labelGap = 10 - Math.round(clock.fontSize * 0.22);
+  const labelGap = tv ? 8 : 10 - Math.round(clock.fontSize * 0.22);
 
   useEffect(() => {
     if (!timer.snapshot.running) return undefined;
@@ -143,7 +151,7 @@ export default function TimerScreen() {
       >
         <View style={styles.clockBlock}>
           <Text
-            style={[styles.phase, { color: phaseText, marginBottom: labelGap }]}
+            style={[styles.phase, tv && styles.phaseTv, { color: phaseText, marginBottom: labelGap }]}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}
@@ -169,10 +177,10 @@ export default function TimerScreen() {
             {clockText}
           </Text>
           <View pointerEvents="none" style={[styles.meta, { marginTop: labelGap }]}>
-            <Text style={[styles.round, { color: palette.text }]} testID="timer-round">
+            <Text style={[styles.round, tv && styles.roundTv, { color: palette.text }]} testID="timer-round">
               {roundLabel(timer.snapshot, config)}
             </Text>
-            <Text style={[styles.label, { color: palette.muted }]}>{label}</Text>
+            <Text style={[styles.label, tv && styles.labelTv, { color: palette.muted }]}>{label}</Text>
             {timer.snapshot.warningActive ? (
               <Text style={[styles.warning, { color: attention }]} testID="timer-warning">
                 Last {config.warningSeconds} seconds
@@ -184,15 +192,15 @@ export default function TimerScreen() {
               </Text>
             ) : null}
             {timer.snapshot.running ? (
-              <Text style={[styles.hint, { color: palette.muted }]}>Tap the clock to pause</Text>
+              <Text style={[styles.hint, tv && styles.hintTv, { color: palette.muted }]}>Tap the clock to pause</Text>
             ) : null}
           </View>
         </View>
       </Pressable>
       <View pointerEvents="box-none" style={[styles.overlay, { paddingTop: safe.top }]}>
-        <View style={styles.top} pointerEvents="box-none">
+        <View style={[styles.top, tv && styles.topTv]} pointerEvents="box-none">
           <Text
-            style={[styles.gym, { color: palette.text, paddingHorizontal: headerSlot }]}
+            style={[styles.gym, tv && styles.gymTv, { color: palette.text, paddingHorizontal: headerSlot }]}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.45}
@@ -204,10 +212,17 @@ export default function TimerScreen() {
             accessibilityRole="button"
             testID="timer-back"
             onPress={() => router.back()}
-            hitSlop={12}
-            style={[styles.backButton, { left: Math.max(18, safe.left) }]}
+            hitSlop={tv ? undefined : 12}
+            {...tvParallaxProps()}
+            style={({ pressed, focused }) => [
+              styles.backButton,
+              { left: Math.max(18, safe.left) },
+              tv && styles.backButtonTv,
+              tv && pressed ? { opacity: 0.75 } : null,
+              tv ? focusChrome(true, Boolean(focused), palette.text, false) : null,
+            ]}
           >
-            <Text style={[styles.back, { color: palette.text }]}>Back</Text>
+            <Text style={[styles.back, tv && styles.backTv, { color: palette.text }]}>Back</Text>
           </Pressable>
           <View style={[styles.cornerSlot, { right: Math.max(18, safe.right) }]}>
             <CornerLogo branding={branding} />
@@ -224,11 +239,11 @@ export default function TimerScreen() {
         <View
           pointerEvents="box-none"
           style={[
-            landscape ? styles.controlsLandscape : styles.controls,
+            tv ? styles.controlsTv : landscape ? styles.controlsLandscape : styles.controls,
             {
               bottom: safe.bottom + 8,
               right: Math.max(18, safe.right),
-              left: landscape ? undefined : Math.max(18, safe.left),
+              left: tv || !landscape ? Math.max(18, safe.left) : undefined,
             },
           ]}
         >
@@ -301,6 +316,9 @@ const styles = StyleSheet.create({
     height: 64,
     justifyContent: 'center',
   },
+  topTv: {
+    height: 96,
+  },
   backButton: {
     position: 'absolute',
     left: 18,
@@ -309,9 +327,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 1,
   },
+  backButtonTv: {
+    minHeight: 76,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
   back: {
     fontFamily: 'OswaldMedium',
     fontSize: 18,
+  },
+  backTv: {
+    fontSize: 40,
   },
   cornerSlot: {
     position: 'absolute',
@@ -328,6 +354,26 @@ const styles = StyleSheet.create({
     fontFamily: 'OswaldMedium',
     fontSize: 18,
     letterSpacing: 0.4,
+  },
+  gymTv: {
+    fontSize: 40,
+  },
+  phaseTv: {
+    fontSize: 48,
+    lineHeight: 60,
+    letterSpacing: 6,
+  },
+  roundTv: {
+    fontSize: 52,
+    lineHeight: 64,
+  },
+  labelTv: {
+    fontSize: 32,
+    lineHeight: 40,
+  },
+  hintTv: {
+    fontSize: 26,
+    lineHeight: 34,
   },
   phase: {
     position: 'absolute',
@@ -429,6 +475,11 @@ const styles = StyleSheet.create({
     right: 18,
     bottom: 8,
     gap: 10,
+  },
+  controlsTv: {
+    position: 'absolute',
+    flexDirection: 'row',
+    gap: 24,
   },
   controlsLandscape: {
     position: 'absolute',
