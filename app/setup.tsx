@@ -10,7 +10,7 @@ import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvToggle } from 
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
+import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
 import { normalizeConfig } from '@/src/timer/engine';
 import { modeTitle } from '@/src/timer/labels';
 import { defaultConfig } from '@/src/timer/presets';
@@ -309,9 +309,12 @@ const styles = StyleSheet.create({
   kickerTv: {
     fontSize: TV_SECTION_FONT,
   },
+  // The scroll view reaches the screen edge so a focused control's 1.08 scale is not clipped;
+  // the content pads back in to the safe margin.
   scrollTv: {
     flex: 1,
-    width: '100%',
+    alignSelf: 'stretch',
+    marginHorizontal: -TV_SAFE_HORIZONTAL,
   },
   content: {
     gap: 18,
@@ -319,6 +322,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   contentTv: {
+    paddingHorizontal: TV_SAFE_HORIZONTAL,
     gap: 22,
     paddingTop: 4,
     paddingBottom: 8,

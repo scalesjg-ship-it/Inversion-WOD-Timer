@@ -175,11 +175,18 @@ export function PresetShelf({
       <View style={styles.heading}>
         <Text style={[styles.fieldLabel, tenFoot && styles.fieldLabelTv, tv && styles.fieldLabelFrame]}>Presets</Text>
         {editor ? null : (
-          <View style={styles.headingActions}>
+          <View style={[styles.headingActions, tv && styles.headingActionsApple]}>
             {selected ? (
-              <TextButton testID="update-preset" label="Update" color={accent} tenFoot={tenFoot} onPress={() => void updateSelected()} />
+              <TextButton
+                testID="update-preset"
+                label="Update"
+                color={accent}
+                tenFoot={tenFoot}
+                prominent
+                onPress={() => void updateSelected()}
+              />
             ) : null}
-            <TextButton testID="save-preset" label="Save preset" color={accent} tenFoot={tenFoot} onPress={openCreate} />
+            <TextButton testID="save-preset" label="Save preset" color={accent} tenFoot={tenFoot} prominent onPress={openCreate} />
           </View>
         )}
       </View>
@@ -347,6 +354,7 @@ function TextButton({
   testID,
   tenFoot,
   accessibilityLabel,
+  prominent = false,
 }: {
   label: string;
   onPress: () => void;
@@ -354,9 +362,12 @@ function TextButton({
   testID?: string;
   tenFoot: boolean;
   accessibilityLabel?: string;
+  /** Apple TV only: draw a boxed button instead of a text link. Phones keep the text link. */
+  prominent?: boolean;
 }) {
   const pointer = usePointerFocus();
   const tv = Platform.isTV === true;
+  const boxed = tv && prominent;
   return (
     <Pressable
       accessibilityRole="button"
@@ -370,11 +381,12 @@ function TextButton({
         styles.textButton,
         tenFoot && styles.textButtonTv,
         tv && styles.textButtonApple,
+        boxed && [styles.textButtonBoxedApple, { borderColor: color }],
         { opacity: pressed ? 0.72 : 1 },
         focusChrome(tv, Boolean(focused) || pointer.focused, color),
       ]}
     >
-      <Text style={[styles.textButtonLabel, tenFoot && styles.textButtonLabelTv, tv && styles.textButtonLabelApple, { color }]}>
+      <Text style={[styles.textButtonLabel, tenFoot && styles.textButtonLabelTv, tv && styles.textButtonLabelApple, boxed && styles.textButtonLabelBoxedApple, { color }]}>
         {label}
       </Text>
     </Pressable>
@@ -536,6 +548,21 @@ const styles = StyleSheet.create({
   },
   textButtonLabelApple: {
     fontSize: 36,
+  },
+  /** Border width stays fixed; focus only tints and scales, so tvOS focus does not resize the frame. */
+  textButtonBoxedApple: {
+    minHeight: 112,
+    paddingHorizontal: 40,
+    borderRadius: 24,
+    borderWidth: 4,
+    backgroundColor: chrome.surface,
+  },
+  textButtonLabelBoxedApple: {
+    fontSize: 44,
+    letterSpacing: 0.6,
+  },
+  headingActionsApple: {
+    gap: 20,
   },
   fieldLabelFrame: {
     fontSize: 32,
