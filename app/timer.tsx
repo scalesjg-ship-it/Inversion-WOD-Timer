@@ -14,7 +14,9 @@ import { chrome } from '@/src/theme/chrome';
 import { formatSnapshot, phaseLabel, roundLabel } from '@/src/timer/labels';
 import { useTimer } from '@/src/timer/useTimer';
 import type { Phase } from '@/src/timer/types';
+import { focusChrome } from '@/src/tv/controls';
 import { fitClock, isTenFootLayout, tvSafeInset } from '@/src/tv/layout';
+import { tvParallaxProps } from '@/src/tv/pressable';
 import type { RemoteCommand } from '@/src/tv/remoteMap';
 import { useRemoteCommands } from '@/src/tv/useRemoteCommands';
 
@@ -204,10 +206,17 @@ export default function TimerScreen() {
             accessibilityRole="button"
             testID="timer-back"
             onPress={() => router.back()}
-            hitSlop={12}
-            style={[styles.backButton, { left: Math.max(18, safe.left) }]}
+            hitSlop={Platform.isTV ? undefined : 12}
+            {...tvParallaxProps()}
+            style={({ pressed, focused }) => [
+              styles.backButton,
+              { left: Math.max(18, safe.left) },
+              Platform.isTV && styles.backButtonTv,
+              Platform.isTV && pressed ? { opacity: 0.75 } : null,
+              Platform.isTV ? focusChrome(true, Boolean(focused), palette.text, false) : null,
+            ]}
           >
-            <Text style={[styles.back, { color: palette.text }]}>Back</Text>
+            <Text style={[styles.back, Platform.isTV && styles.backTv, { color: palette.text }]}>Back</Text>
           </Pressable>
           <View style={[styles.cornerSlot, { right: Math.max(18, safe.right) }]}>
             <CornerLogo branding={branding} />
@@ -309,9 +318,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 1,
   },
+  backButtonTv: {
+    minHeight: 76,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
   back: {
     fontFamily: 'OswaldMedium',
     fontSize: 18,
+  },
+  backTv: {
+    fontSize: 32,
   },
   cornerSlot: {
     position: 'absolute',

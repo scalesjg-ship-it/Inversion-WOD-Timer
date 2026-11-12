@@ -1,7 +1,9 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
+import { Platform } from 'react-native';
 
 import { soundsForCues, type Cue, type SoundName } from '@/src/timer/engine';
+import { allowsDeviceHaptics } from '@/src/tv/controls';
 
 const sources: Record<SoundName, number> = {
   tick: require('../../assets/sounds/tick.wav'),
@@ -56,6 +58,7 @@ export async function playSound(name: SoundName): Promise<void> {
     // A missing speaker should not stop the clock.
   }
 
+  if (!allowsDeviceHaptics(Platform.isTV === true)) return;
   try {
     if (name === 'warning') {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -65,7 +68,7 @@ export async function playSound(name: SoundName): Promise<void> {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     }
   } catch {
-    // Haptics are unavailable on desktop browsers and some devices.
+    // Haptics are unavailable on TV, desktop browsers, and some devices.
   }
 }
 

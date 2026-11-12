@@ -8,7 +8,10 @@ import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
+import { focusChrome } from '@/src/tv/controls';
 import { isTenFootLayout, tvSafeInset } from '@/src/tv/layout';
+import { tvParallaxProps } from '@/src/tv/pressable';
+import { usePointerFocus } from '@/src/tv/usePointerFocus';
 import { modeTitle } from '@/src/timer/labels';
 import { loadPresets, presetSummary, type SavedPreset } from '@/src/timer/presetStorage';
 import type { TimerMode } from '@/src/timer/types';
@@ -141,8 +144,9 @@ function SavedPresetCard({
   onOpen: () => void;
   onStart: () => void;
 }) {
-  const [webFocused, setWebFocused] = useState(false);
-  const [startFocused, setStartFocused] = useState(false);
+  const bodyPointer = usePointerFocus();
+  const startPointer = usePointerFocus();
+  const tv = Platform.isTV === true;
   return (
     <View style={[styles.card, tenFoot && styles.cardTv]}>
       <View style={[styles.bar, { backgroundColor: accent }]} />
@@ -152,12 +156,13 @@ function SavedPresetCard({
         accessibilityLabel={`${preset.name}, ${modeTitle(preset.mode)}`}
         accessibilityHint="Opens this preset in its setup"
         onPress={onOpen}
-        onFocus={() => setWebFocused(true)}
-        onBlur={() => setWebFocused(false)}
+        onFocus={bodyPointer.onFocus}
+        onBlur={bodyPointer.onBlur}
+        {...tvParallaxProps()}
         style={({ pressed, focused }) => [
           styles.cardBody,
           { opacity: pressed ? 0.78 : 1 },
-          focused || webFocused ? { borderWidth: 6, borderColor: accent } : null,
+          focusChrome(tv, Boolean(focused) || bodyPointer.focused, accent),
         ]}
       >
         <Text style={[styles.cardTitle, tenFoot && styles.cardTitleTv]} numberOfLines={2}>
@@ -172,13 +177,14 @@ function SavedPresetCard({
         accessibilityRole="button"
         accessibilityLabel={`Start ${preset.name}`}
         onPress={onStart}
-        onFocus={() => setStartFocused(true)}
-        onBlur={() => setStartFocused(false)}
+        onFocus={startPointer.onFocus}
+        onBlur={startPointer.onBlur}
+        {...tvParallaxProps()}
         style={({ pressed, focused }) => [
           styles.start,
           tenFoot && styles.startTv,
           { opacity: pressed ? 0.78 : 1 },
-          focused || startFocused ? { borderWidth: 6, borderColor: accent } : null,
+          focusChrome(tv, Boolean(focused) || startPointer.focused, accent),
         ]}
       >
         <Text style={[styles.startLabel, { color: accent }, tenFoot && styles.startLabelTv]}>Start</Text>
@@ -198,15 +204,17 @@ function ModeCard({
   preferred: boolean;
   tenFoot: boolean;
 }) {
-  const [webFocused, setWebFocused] = useState(false);
+  const pointer = usePointerFocus();
+  const tv = Platform.isTV === true;
   return (
             <Pressable
               testID={`mode-${item.mode}`}
               accessibilityRole="button"
               accessibilityLabel={modeTitle(item.mode)}
               hasTVPreferredFocus={preferred}
-              onFocus={() => setWebFocused(true)}
-              onBlur={() => setWebFocused(false)}
+              onFocus={pointer.onFocus}
+              onBlur={pointer.onBlur}
+              {...tvParallaxProps()}
               onPress={() => {
                 if (item.mode === 'countdown') {
                   router.push('/countdown');
@@ -218,7 +226,7 @@ function ModeCard({
                 styles.card,
                 tenFoot && styles.cardTv,
                 { opacity: pressed ? 0.78 : 1 },
-                focused || webFocused ? { borderWidth: 6, borderColor: accent } : null,
+                focusChrome(tv, Boolean(focused) || pointer.focused, accent),
               ]}
             >
               <View style={[styles.bar, { backgroundColor: accent }]} />

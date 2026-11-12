@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { hexToHue, hsvToHex, normalizeHex } from '@/src/branding/color';
 import { chrome } from '@/src/theme/chrome';
+import { focusChrome } from '@/src/tv/controls';
+import { tvParallaxProps } from '@/src/tv/pressable';
 
 const HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
 const VALUES = [1, 0.78, 0.55, 0.32];
@@ -26,6 +28,7 @@ export function ColorPicker({
     setText(value);
   }
   const hue = hexToHue(value);
+  const tv = Platform.isTV === true;
 
   const commit = (next: string) => {
     const parsed = normalizeHex(next);
@@ -42,7 +45,7 @@ export function ColorPicker({
       <View style={styles.head}>
         <View style={[styles.sample, { backgroundColor: value }]} />
         <View style={styles.copy}>
-          <Text style={styles.label}>{label}</Text>
+          <Text style={[styles.label, tv && styles.labelTv]}>{label}</Text>
           <TextInput
             testID={`${testID}-hex`}
             value={text}
@@ -50,7 +53,7 @@ export function ColorPicker({
             autoCorrect={false}
             onChangeText={setText}
             onEndEditing={() => commit(text)}
-            style={styles.hex}
+            style={[styles.hex, tv && styles.hexTv]}
           />
         </View>
       </View>
@@ -62,7 +65,17 @@ export function ColorPicker({
             accessibilityLabel={`${label} ${swatch}`}
             testID={`${testID}-swatch-${swatch.slice(1)}`}
             onPress={() => commit(swatch)}
-            style={[styles.chip, { backgroundColor: swatch }, value.toUpperCase() === swatch ? styles.chipOn : null]}
+            {...tvParallaxProps()}
+            style={({ focused }) => [
+              styles.chip,
+              tv && styles.chipTv,
+              { backgroundColor: swatch },
+              !tv && value.toUpperCase() === swatch ? styles.chipOn : null,
+              tv
+                ? { borderWidth: 4, borderColor: value.toUpperCase() === swatch ? '#F4F7FB' : 'transparent' }
+                : null,
+              tv ? focusChrome(true, Boolean(focused), '#F4F7FB', false) : null,
+            ]}
           />
         ))}
       </View>
@@ -76,7 +89,17 @@ export function ColorPicker({
               accessibilityLabel={`${label} hue ${item}`}
               testID={`${testID}-hue-${item}`}
               onPress={() => commit(next)}
-              style={[styles.hue, { backgroundColor: next }, Math.abs(hue - item) < 15 ? styles.chipOn : null]}
+              {...tvParallaxProps()}
+              style={({ focused }) => [
+                styles.hue,
+                tv && styles.hueTv,
+                { backgroundColor: next },
+                !tv && Math.abs(hue - item) < 15 ? styles.chipOn : null,
+                tv
+                  ? { borderWidth: 4, borderColor: Math.abs(hue - item) < 15 ? '#F4F7FB' : 'transparent' }
+                  : null,
+                tv ? focusChrome(true, Boolean(focused), '#F4F7FB', false) : null,
+              ]}
             />
           );
         })}
@@ -88,8 +111,16 @@ export function ColorPicker({
             <Pressable
               key={amount}
               accessibilityRole="button"
+              accessibilityLabel={`${label} value ${amount}`}
               onPress={() => commit(next)}
-              style={[styles.value, { backgroundColor: next }]}
+              {...tvParallaxProps()}
+              style={({ focused }) => [
+                styles.value,
+                tv && styles.valueTv,
+                { backgroundColor: next },
+                tv ? { borderWidth: 4, borderColor: 'transparent' } : null,
+                tv ? focusChrome(true, Boolean(focused), '#F4F7FB', false) : null,
+              ]}
             />
           );
         })}
@@ -125,11 +156,18 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
+  labelTv: {
+    fontSize: 22,
+  },
   hex: {
     color: chrome.text,
     fontFamily: 'Oswald',
     fontSize: 22,
     paddingVertical: 0,
+  },
+  hexTv: {
+    fontSize: 36,
+    minHeight: 56,
   },
   row: {
     flexDirection: 'row',
@@ -141,16 +179,31 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
   },
+  chipTv: {
+    width: 78,
+    height: 78,
+    borderRadius: 16,
+  },
   hue: {
     width: 22,
     height: 28,
     borderRadius: 6,
+  },
+  hueTv: {
+    width: 78,
+    height: 88,
+    borderRadius: 16,
   },
   value: {
     flex: 1,
     height: 22,
     borderRadius: 6,
     minWidth: 36,
+  },
+  valueTv: {
+    height: 72,
+    minWidth: 88,
+    borderRadius: 16,
   },
   chipOn: {
     borderWidth: 2,

@@ -1,12 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
-import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
+import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvToggle } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
 import { chrome } from '@/src/theme/chrome';
@@ -131,9 +131,7 @@ function SetupForm({
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
-          <Text style={[styles.back, { color: accent }]}>Back</Text>
-        </Pressable>
+        <HeaderBack onPress={() => router.back()} color={accent} />
         <Text style={styles.kicker}>Americana</Text>
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -152,19 +150,30 @@ function SetupForm({
           }}
         />
         {mode === 'forTime' ? (
-          <View style={styles.switchRow}>
-            <View>
-              <Text style={styles.fieldLabel}>Time cap</Text>
-              <Text style={styles.switchHelp}>Stop the clock when the cap hits.</Text>
-            </View>
-            <Switch
-              testID="for-time-cap"
+          Platform.isTV ? (
+            <TvToggle
+              label="Time cap"
+              help="Stop the clock when the cap hits."
               value={capOn}
               onValueChange={setCapOn}
-              trackColor={{ false: '#2A3140', true: accent }}
-              thumbColor={chrome.text}
+              testID="for-time-cap"
+              accent={accent}
             />
-          </View>
+          ) : (
+            <View style={styles.switchRow}>
+              <View>
+                <Text style={styles.fieldLabel}>Time cap</Text>
+                <Text style={styles.switchHelp}>Stop the clock when the cap hits.</Text>
+              </View>
+              <Switch
+                testID="for-time-cap"
+                value={capOn}
+                onValueChange={setCapOn}
+                trackColor={{ false: '#2A3140', true: accent }}
+                thumbColor={chrome.text}
+              />
+            </View>
+          )
         ) : null}
         {mode === 'forTime' && capOn ? (
           <TimeField label="Cap" seconds={workSeconds} onChange={setWorkSeconds} testID="cap" accent={accent} />
@@ -211,7 +220,7 @@ function SetupForm({
         ) : null}
         {mode !== 'forTime' && mode !== 'amrap' ? (
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Rounds</Text>
+            <Text style={[styles.fieldLabel, Platform.isTV && styles.fieldLabelTv]}>Rounds</Text>
             <NumberStepper
               value={rounds}
               min={1}
@@ -273,10 +282,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 8,
   },
-  back: {
-    fontFamily: 'OswaldMedium',
-    fontSize: 18,
-  },
   kicker: {
     color: chrome.muted,
     fontFamily: 'OswaldMedium',
@@ -309,6 +314,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     textTransform: 'uppercase',
     fontFamily: 'OswaldMedium',
+  },
+  fieldLabelTv: {
+    fontSize: 28,
+    letterSpacing: 2,
   },
   switchRow: {
     flexDirection: 'row',

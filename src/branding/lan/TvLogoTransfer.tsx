@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { chrome } from '@/src/theme/chrome';
+import { focusChrome } from '@/src/tv/controls';
+import { tvParallaxProps } from '@/src/tv/pressable';
 import type { Branding } from '../types';
 import { QrMark } from './QrMark';
 import type { ReceiverPhase } from './receiverPhase';
@@ -84,10 +86,11 @@ function RestartButton({ accent, label, onPress }: { accent: string; label: stri
       hasTVPreferredFocus
       testID="tv-logo-restart"
       onPress={onPress}
+      {...tvParallaxProps()}
       style={({ pressed, focused }) => [
         styles.button,
         { borderColor: accent, opacity: pressed ? 0.72 : 1 },
-        focused ? { borderWidth: 6, borderColor: accent } : null,
+        focusChrome(true, Boolean(focused), accent),
       ]}
     >
       <Text style={styles.buttonLabel}>{label}</Text>
@@ -128,11 +131,11 @@ const styles = StyleSheet.create({
   },
   button: {
     alignSelf: 'center',
-    minWidth: 220,
-    minHeight: 52,
-    paddingHorizontal: 22,
-    borderRadius: 14,
-    borderWidth: 1,
+    minWidth: 280,
+    minHeight: 88,
+    paddingHorizontal: 28,
+    borderRadius: 18,
+    borderWidth: 4,
     backgroundColor: chrome.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -140,6 +143,6 @@ const styles = StyleSheet.create({
   buttonLabel: {
     color: chrome.text,
     fontFamily: 'OswaldMedium',
-    fontSize: 18,
+    fontSize: 32,
   },
 });

@@ -3,7 +3,10 @@ import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { chrome } from '@/src/theme/chrome';
+import { focusChrome } from '@/src/tv/controls';
 import { isTenFootLayout } from '@/src/tv/layout';
+import { tvParallaxProps } from '@/src/tv/pressable';
+import { usePointerFocus } from '@/src/tv/usePointerFocus';
 import {
   deletePreset,
   listPresets,
@@ -15,11 +18,6 @@ import {
   type SavedPreset,
 } from '@/src/timer/presetStorage';
 import type { TimerConfig, TimerMode } from '@/src/timer/types';
-
-function ring(focused: boolean, color: string) {
-  if (!focused) return null;
-  return { borderWidth: 6, borderColor: color };
-}
 
 export function PresetShelf({
   mode,
@@ -280,7 +278,8 @@ function PresetCard({
   onRename: () => void;
   onDelete: () => void;
 }) {
-  const [webFocused, setWebFocused] = useState(false);
+  const pointer = usePointerFocus();
+  const tv = Platform.isTV === true;
   return (
     <View style={[styles.card, tenFoot && styles.cardTv, { borderColor: selected ? accent : chrome.line }]}>
       <Pressable
@@ -289,8 +288,9 @@ function PresetCard({
         accessibilityHint="Loads this preset into the setup"
         testID={`preset-${preset.id}`}
         onPress={onLoad}
-        onFocus={() => setWebFocused(true)}
-        onBlur={() => setWebFocused(false)}
+        onFocus={pointer.onFocus}
+        onBlur={pointer.onBlur}
+        {...tvParallaxProps()}
         onLongPress={() => {
           Alert.alert(preset.name, 'Rename or delete this preset.', [
             { text: 'Rename', onPress: onRename },
@@ -301,7 +301,7 @@ function PresetCard({
         style={({ pressed, focused }) => [
           styles.cardMain,
           pressed ? styles.pressed : null,
-          ring(Boolean(focused) || webFocused, accent),
+          focusChrome(tv, Boolean(focused) || pointer.focused, accent),
         ]}
       >
         <Text style={[styles.presetName, tenFoot && styles.presetNameTv]} numberOfLines={2}>
@@ -354,23 +354,28 @@ function TextButton({
   tenFoot: boolean;
   accessibilityLabel?: string;
 }) {
-  const [webFocused, setWebFocused] = useState(false);
+  const pointer = usePointerFocus();
+  const tv = Platform.isTV === true;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       testID={testID}
       onPress={onPress}
-      onFocus={() => setWebFocused(true)}
-      onBlur={() => setWebFocused(false)}
+      onFocus={pointer.onFocus}
+      onBlur={pointer.onBlur}
+      {...tvParallaxProps()}
       style={({ focused, pressed }) => [
         styles.textButton,
         tenFoot && styles.textButtonTv,
+        tv && styles.textButtonApple,
         { opacity: pressed ? 0.72 : 1 },
-        ring(Boolean(focused) || webFocused, color),
+        focusChrome(tv, Boolean(focused) || pointer.focused, color),
       ]}
     >
-      <Text style={[styles.textButtonLabel, tenFoot && styles.textButtonLabelTv, { color }]}>{label}</Text>
+      <Text style={[styles.textButtonLabel, tenFoot && styles.textButtonLabelTv, tv && styles.textButtonLabelApple, { color }]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -520,5 +525,12 @@ const styles = StyleSheet.create({
   },
   textButtonLabelTv: {
     fontSize: 26,
+  },
+  textButtonApple: {
+    minHeight: 84,
+    paddingHorizontal: 20,
+  },
+  textButtonLabelApple: {
+    fontSize: 32,
   },
 });
