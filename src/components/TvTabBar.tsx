@@ -1,15 +1,16 @@
 import { Tabs } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
+import { TvFocusPressable } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
-import { focusChrome, tabBarControlSize, tintHex } from '@/src/tv/controls';
-import { tvParallaxProps } from '@/src/tv/pressable';
+import { tabBarControlSize } from '@/src/tv/controls';
 
 type TvTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
 export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }: TvTabBarProps) {
-  const metrics = tabBarControlSize(true);
+  const { height } = useWindowDimensions();
+  const metrics = tabBarControlSize(true, height);
   const focusedRoute = state.routes[state.index];
   const focusedOptions = focusedRoute ? descriptors[focusedRoute.key]?.options : undefined;
   const active = colorString(focusedOptions?.tabBarActiveTintColor, chrome.text);
@@ -44,30 +45,27 @@ export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }:
           if (!selected && !event.defaultPrevented) navigateToTab(route.key);
         };
         return (
-          <Pressable
+          <TvFocusPressable
             key={route.key}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={label}
             testID={options?.tabBarButtonTestID}
             onPress={onPress}
-            {...tvParallaxProps()}
-            style={({ pressed, focused }) => [
+            style={({ pressed }) => [
               styles.item,
               {
                 minHeight: metrics.itemMinHeight,
                 opacity: pressed ? 0.82 : 1,
-                borderColor: focused ? active : 'transparent',
-                backgroundColor: focused ? tintHex(active, 0.28) : 'transparent',
+                borderColor: 'transparent',
               },
-              focusChrome(true, Boolean(focused), active, false),
             ]}
           >
             <Text style={[styles.icon, { color, fontSize: metrics.icon, lineHeight: metrics.icon + 6 }]}>
               {label.slice(0, 1).toUpperCase()}
             </Text>
             <Text style={[styles.label, { color, fontSize: metrics.label }]}>{label}</Text>
-          </Pressable>
+          </TvFocusPressable>
         );
       })}
     </View>

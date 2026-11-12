@@ -1,19 +1,17 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
+import { TvFocusPressable } from '@/src/components/TvFocus';
 import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
-import { focusChrome } from '@/src/tv/controls';
 import { TV_BODY_FONT, TV_MENU_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
-import { tvParallaxProps } from '@/src/tv/pressable';
-import { usePointerFocus } from '@/src/tv/usePointerFocus';
 import { formatSeconds } from '@/src/timer/format';
 import { BUILTIN_PRESETS, configFromPreset, type RoundPreset } from '@/src/timer/presets';
 import { listPresets, type SavedPreset } from '@/src/timer/presetStorage';
@@ -198,25 +196,17 @@ function StandardCard({
   onPress: () => void;
   tv: boolean;
 }) {
-  const pointer = usePointerFocus();
   return (
-    <Pressable
+    <TvFocusPressable
+      accent={accent}
       testID={`preset-${preset.id}`}
       accessibilityRole="button"
       onPress={onPress}
-      onFocus={pointer.onFocus}
-      onBlur={pointer.onBlur}
-      {...tvParallaxProps()}
-      style={({ focused }) => [
-        styles.preset,
-        tv && styles.presetTv,
-        { borderColor: selected ? accent : chrome.line },
-        focusChrome(tv, Boolean(focused) || pointer.focused, accent),
-      ]}
+      style={() => [styles.preset, tv && styles.presetTv, { borderColor: selected ? accent : chrome.line }]}
     >
       <Text style={[styles.presetName, tv && styles.presetNameTv]}>{preset.name}</Text>
       <Text style={[styles.presetMeta, tv && styles.presetMetaTv]}>{presetMeta(preset)}</Text>
-    </Pressable>
+    </TvFocusPressable>
   );
 }
 

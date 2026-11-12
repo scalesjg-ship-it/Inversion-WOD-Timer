@@ -11,6 +11,8 @@ import {
   clockFontSize,
   fitClock,
   isTenFootLayout,
+  tvClockChrome,
+  tvHomeLayout,
   tvSafeBox,
   tvSafeInset,
 } from './layout';
@@ -78,5 +80,31 @@ describe('TV layout', () => {
         expect(clock.fontSize).toBeLessThanOrEqual(clockFontSize(screen.width, screen.height, screen.tenFoot));
       }
     }
+  });
+
+  it('fits every conditioning card on a 1080p and a 720p television', () => {
+    for (const screen of [
+      { width: 1920, height: 1080 },
+      { width: 1280, height: 720 },
+    ]) {
+      const layout = tvHomeLayout(screen.width, screen.height, 6);
+      expect(layout.columns).toBe(2);
+      expect(layout.rows).toBe(3);
+      expect(layout.contentHeight).toBeLessThanOrEqual(layout.viewportHeight);
+      expect(layout.cardHeight).toBeGreaterThanOrEqual(96);
+      const textBlock = layout.titleSize + 4 + (layout.detailSize + 4) * 2 + 16;
+      expect(textBlock).toBeLessThanOrEqual(layout.cardHeight);
+    }
+  });
+
+  it('gives the TV clock a readable gym name and a real logo', () => {
+    const full = tvClockChrome(1080, true);
+    const bare = tvClockChrome(1080, false);
+    expect(full.logo).toBeGreaterThanOrEqual(96);
+    expect(full.name).toBeGreaterThanOrEqual(48);
+    expect(full.phase).toBeGreaterThanOrEqual(32);
+    expect(bare.logo).toBe(0);
+    expect(tvClockChrome(720, true).logo).toBeGreaterThanOrEqual(96);
+    expect(tvClockChrome(720, true).name).toBeGreaterThanOrEqual(32);
   });
 });

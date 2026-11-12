@@ -1,3 +1,5 @@
+import { tabBarControlSize } from './controls';
+
 /** 1080p and larger, or a real TV runtime. iPad widths stay on the phone layout. */
 export function isTenFootLayout(width: number, height: number, tvRuntime: boolean): boolean {
   if (tvRuntime) return true;
@@ -71,5 +73,88 @@ export function fitClock(options: {
     fontSize,
     lineHeight: Math.ceil(fontSize * CLOCK_LINE_HEIGHT_RATIO),
     width,
+  };
+}
+
+export interface TvHomeLayout {
+  columns: number;
+  rows: number;
+  cardHeight: number;
+  titleSize: number;
+  detailSize: number;
+  gymSize: number;
+  wordmarkSize: number;
+  sectionSize: number;
+  hintSize: number;
+  stackGap: number;
+  gridGap: number;
+  padTop: number;
+  padBottom: number;
+  tabBlock: number;
+  contentHeight: number;
+  viewportHeight: number;
+}
+
+/**
+ * Sizes the WOD mode list so every built-in timer fits on one 720p or 1080p TV.
+ * The tab bar is outside this viewport. Card text is sized to the card, not the other way around.
+ */
+export function tvHomeLayout(screenWidth: number, screenHeight: number, optionCount: number): TvHomeLayout {
+  const columns = screenWidth >= 900 ? 2 : 1;
+  const rows = Math.max(1, Math.ceil(Math.max(0, optionCount) / columns));
+  const tab = tabBarControlSize(true, screenHeight);
+  const tabBlock = tab.barContentHeight + 16;
+  const viewportHeight = Math.max(0, screenHeight - tabBlock);
+  const compact = screenHeight < 1000;
+  const padTop = compact ? 20 : 36;
+  const padBottom = 8;
+  const stackGap = compact ? 6 : 8;
+  const gridGap = compact ? 8 : 12;
+  const wordmarkSize = compact ? 16 : 22;
+  const gymSize = compact ? 28 : 44;
+  const sectionSize = compact ? 16 : 22;
+  const hintSize = compact ? 16 : 20;
+  const header = padTop + wordmarkSize + stackGap + gymSize + stackGap + sectionSize + stackGap;
+  const footer = stackGap + hintSize + padBottom;
+  const gridExtra = rows * gridGap;
+  const available = viewportHeight - header - footer - gridExtra;
+  const cardHeight = Math.max(64, Math.floor(available / rows));
+  const contentHeight = header + footer + rows * cardHeight + gridExtra;
+  const titleSize = Math.min(compact ? 26 : 32, Math.max(18, Math.floor(cardHeight * 0.28)));
+  const detailSize = Math.min(compact ? 16 : 18, Math.max(13, Math.floor(cardHeight * 0.16)));
+  return {
+    columns,
+    rows,
+    cardHeight,
+    titleSize,
+    detailSize,
+    gymSize,
+    wordmarkSize,
+    sectionSize,
+    hintSize,
+    stackGap,
+    gridGap,
+    padTop,
+    padBottom,
+    tabBlock,
+    contentHeight,
+    viewportHeight,
+  };
+}
+
+export interface TvClockChrome {
+  logo: number;
+  name: number;
+  phase: number;
+}
+
+/** Header sizes for the running clock. The digits then take whatever height is left. */
+export function tvClockChrome(screenHeight: number, hasLogo: boolean): TvClockChrome {
+  const compact = screenHeight < 1000;
+  const logoCap = compact ? 112 : 168;
+  return {
+    logo: hasLogo ? Math.round(Math.min(logoCap, Math.max(96, screenHeight * 0.15))) : 0,
+    name: compact ? 36 : 56,
+    phase: compact ? 28 : 44,
   };
 }

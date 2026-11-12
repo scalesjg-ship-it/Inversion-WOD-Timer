@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
-import { hexToHue, hsvToHex, normalizeHex } from '@/src/branding/color';
+import { hexToHue, hsvToHex, inkOn, normalizeHex } from '@/src/branding/color';
+import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
-import { focusChrome } from '@/src/tv/controls';
-import { tvParallaxProps } from '@/src/tv/pressable';
 
 const HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
 const VALUES = [1, 0.78, 0.55, 0.32];
@@ -23,6 +22,7 @@ export function ColorPicker({
 }) {
   const [text, setText] = useState(value);
   const [tracked, setTracked] = useState(value);
+  const [open, setOpen] = useState(false);
   if (value !== tracked) {
     setTracked(value);
     setText(value);
@@ -42,11 +42,24 @@ export function ColorPicker({
 
   return (
     <View style={styles.block} testID={testID}>
-      <View style={styles.head}>
-        <View style={[styles.sample, { backgroundColor: value }]} />
+      <TvFocusPressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`${label}, ${value}. ${open ? 'Close colors' : 'Change color'}`}
+        testID={`${testID}-toggle`}
+        onPress={() => setOpen((current) => !current)}
+        style={({ pressed }) => [styles.head, tv && styles.headTv, { opacity: pressed ? 0.8 : 1 }]}
+      >
+        <View style={[styles.sample, tv && styles.sampleTv, { backgroundColor: value }]} />
         <View style={styles.copy}>
           <Text style={[styles.label, tv && styles.labelTv]}>{label}</Text>
-          <TextInput
+          <Text style={[styles.current, tv && styles.currentTv]}>{value}</Text>
+        </View>
+        <Text style={[styles.action, tv && styles.actionTv]}>{open ? 'Close' : 'Change'}</Text>
+      </TvFocusPressable>
+      {open ? (
+        <View style={styles.editor}>
+          <TvTextField
             testID={`${testID}-hex`}
             value={text}
             autoCapitalize="characters"
@@ -55,77 +68,97 @@ export function ColorPicker({
             onEndEditing={() => commit(text)}
             style={[styles.hex, tv && styles.hexTv]}
           />
+          <View style={styles.row}>
+            {SWATCHES.map((swatch) => (
+              <Swatch
+                key={swatch}
+                color={swatch}
+                selected={value.toUpperCase() === swatch}
+                label={`${label} ${swatch}`}
+                testID={`${testID}-swatch-${swatch.slice(1)}`}
+                wide={false}
+                onPress={() => commit(swatch)}
+              />
+            ))}
+          </View>
+          <View style={styles.row}>
+            {HUES.map((item) => {
+              const next = hsvToHex(item, 1, 1);
+              return (
+                <Swatch
+                  key={item}
+                  color={next}
+                  selected={Math.abs(hue - item) < 15}
+                  label={`${label} hue ${item}`}
+                  testID={`${testID}-hue-${item}`}
+                  wide={false}
+                  tall
+                  onPress={() => commit(next)}
+                />
+              );
+            })}
+          </View>
+          <View style={styles.row}>
+            {VALUES.map((amount) => {
+              const next = hsvToHex(hue, 1, amount);
+              return (
+                <Swatch
+                  key={amount}
+                  color={next}
+                  selected={false}
+                  label={`${label} value ${amount}`}
+                  testID={`${testID}-value-${amount}`}
+                  wide
+                  onPress={() => commit(next)}
+                />
+              );
+            })}
+          </View>
         </View>
-      </View>
-      <View style={styles.row}>
-        {SWATCHES.map((swatch) => (
-          <Pressable
-            key={swatch}
-            accessibilityRole="button"
-            accessibilityLabel={`${label} ${swatch}`}
-            testID={`${testID}-swatch-${swatch.slice(1)}`}
-            onPress={() => commit(swatch)}
-            {...tvParallaxProps()}
-            style={({ focused }) => [
-              styles.chip,
-              tv && styles.chipTv,
-              { backgroundColor: swatch },
-              !tv && value.toUpperCase() === swatch ? styles.chipOn : null,
-              tv
-                ? { borderWidth: 4, borderColor: value.toUpperCase() === swatch ? '#F4F7FB' : 'transparent' }
-                : null,
-              tv ? focusChrome(true, Boolean(focused), '#F4F7FB', false) : null,
-            ]}
-          />
-        ))}
-      </View>
-      <View style={styles.row}>
-        {HUES.map((item) => {
-          const next = hsvToHex(item, 1, 1);
-          return (
-            <Pressable
-              key={item}
-              accessibilityRole="button"
-              accessibilityLabel={`${label} hue ${item}`}
-              testID={`${testID}-hue-${item}`}
-              onPress={() => commit(next)}
-              {...tvParallaxProps()}
-              style={({ focused }) => [
-                styles.hue,
-                tv && styles.hueTv,
-                { backgroundColor: next },
-                !tv && Math.abs(hue - item) < 15 ? styles.chipOn : null,
-                tv
-                  ? { borderWidth: 4, borderColor: Math.abs(hue - item) < 15 ? '#F4F7FB' : 'transparent' }
-                  : null,
-                tv ? focusChrome(true, Boolean(focused), '#F4F7FB', false) : null,
-              ]}
-            />
-          );
-        })}
-      </View>
-      <View style={styles.row}>
-        {VALUES.map((amount) => {
-          const next = hsvToHex(hue, 1, amount);
-          return (
-            <Pressable
-              key={amount}
-              accessibilityRole="button"
-              accessibilityLabel={`${label} value ${amount}`}
-              onPress={() => commit(next)}
-              {...tvParallaxProps()}
-              style={({ focused }) => [
-                styles.value,
-                tv && styles.valueTv,
-                { backgroundColor: next },
-                tv ? { borderWidth: 4, borderColor: 'transparent' } : null,
-                tv ? focusChrome(true, Boolean(focused), '#F4F7FB', false) : null,
-              ]}
-            />
-          );
-        })}
-      </View>
+      ) : null}
     </View>
+  );
+}
+
+function Swatch({
+  color,
+  selected,
+  label,
+  testID,
+  wide,
+  tall = false,
+  onPress,
+}: {
+  color: string;
+  selected: boolean;
+  label: string;
+  testID: string;
+  wide: boolean;
+  tall?: boolean;
+  onPress: () => void;
+}) {
+  const tv = Platform.isTV === true;
+  return (
+    <TvFocusPressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
+      testID={testID}
+      onPress={onPress}
+      style={() => [
+        wide ? styles.value : tall ? styles.hue : styles.chip,
+        tv && (wide ? styles.valueTv : tall ? styles.hueTv : styles.chipTv),
+        { backgroundColor: color },
+        !tv && selected ? styles.chipOn : null,
+        tv ? { borderWidth: 4, borderColor: selected ? '#F4F7FB' : 'transparent' } : null,
+      ]}
+    >
+      {selected ? (
+        <Text style={[styles.check, tv && styles.checkTv, { color: inkOn(color) }]} accessible={false}>
+          ✓
+        </Text>
+      ) : null}
+    </TvFocusPressable>
   );
 }
 
@@ -134,10 +167,25 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 4,
   },
+  editor: {
+    gap: 8,
+  },
   head: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: chrome.line,
+    backgroundColor: chrome.surface,
+    paddingHorizontal: 12,
+  },
+  headTv: {
+    minHeight: 96,
+    borderRadius: 20,
+    borderWidth: 4,
+    paddingHorizontal: 18,
   },
   sample: {
     width: 42,
@@ -145,6 +193,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: chrome.line,
+  },
+  sampleTv: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
   },
   copy: {
     flex: 1,
@@ -159,15 +212,38 @@ const styles = StyleSheet.create({
   labelTv: {
     fontSize: 28,
   },
+  current: {
+    color: chrome.text,
+    fontFamily: 'Oswald',
+    fontSize: 18,
+  },
+  currentTv: {
+    fontSize: 32,
+  },
+  action: {
+    color: chrome.text,
+    fontFamily: 'OswaldMedium',
+    fontSize: 16,
+  },
+  actionTv: {
+    fontSize: 28,
+  },
   hex: {
     color: chrome.text,
     fontFamily: 'Oswald',
     fontSize: 22,
     paddingVertical: 0,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: chrome.line,
+    backgroundColor: chrome.surface,
+    paddingHorizontal: 12,
   },
   hexTv: {
     fontSize: 36,
-    minHeight: 56,
+    minHeight: 72,
+    borderRadius: 16,
   },
   row: {
     flexDirection: 'row',
@@ -178,35 +254,50 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chipTv: {
-    width: 96,
-    height: 96,
-    borderRadius: 18,
+    width: 72,
+    height: 72,
+    borderRadius: 16,
   },
   hue: {
     width: 22,
     height: 28,
     borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   hueTv: {
-    width: 96,
-    height: 108,
-    borderRadius: 18,
+    width: 72,
+    height: 84,
+    borderRadius: 16,
   },
   value: {
     flex: 1,
     height: 22,
     borderRadius: 6,
     minWidth: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   valueTv: {
-    height: 72,
-    minWidth: 88,
+    height: 64,
+    minWidth: 72,
     borderRadius: 16,
   },
   chipOn: {
     borderWidth: 2,
     borderColor: '#F4F7FB',
+  },
+  check: {
+    fontFamily: 'Oswald',
+    fontSize: 12,
+    lineHeight: 14,
+  },
+  checkTv: {
+    fontSize: 36,
+    lineHeight: 42,
   },
 });

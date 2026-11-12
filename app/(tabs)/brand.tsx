@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,15 +15,17 @@ import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { TvLogoTransfer } from '@/src/branding/lan/TvLogoTransfer';
 import { prepareLogo } from '@/src/branding/logo';
-import { THEME_PRESETS, type BrandColors, type LogoPlacement, type ThemePreset } from '@/src/branding/types';
+import { clockFontFamily } from '@/src/branding/palettes';
+import type { LogoPlacement } from '@/src/branding/types';
+import { BrandChoices } from '@/src/components/BrandChoices';
 import { ColorPicker } from '@/src/components/ColorPicker';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
 import { RouteErrorBoundary } from '@/src/components/RouteErrorBoundary';
+import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
+import { TvLogoUrl } from '@/src/components/TvLogoUrl';
 import { Chip, TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
 import { TV_BODY_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
-import { focusChrome } from '@/src/tv/controls';
-import { tvParallaxProps } from '@/src/tv/pressable';
 
 export function ErrorBoundary(props: { error: Error; retry: () => Promise<void> }) {
   return <RouteErrorBoundary {...props} />;
@@ -132,7 +133,15 @@ export default function BrandScreen() {
             </Text>
             <CornerLogo branding={branding} size={42} />
           </View>
-          <Text style={[styles.previewClock, tv && styles.previewClockTv, { color: digits }]}>05:00</Text>
+          <Text
+            style={[
+              styles.previewClock,
+              tv && styles.previewClockTv,
+              { color: digits, fontFamily: clockFontFamily(branding.clockWeight) },
+            ]}
+          >
+            05:00
+          </Text>
           <Text style={[styles.previewPhase, { color: readableDigitColor(branding.workColor, branding.backgroundColor) }]}>Work</Text>
         </View>
 
@@ -142,19 +151,9 @@ export default function BrandScreen() {
           onCommit={(gymName) => void update({ gymName })}
         />
 
-        <Text style={labelStyle}>Themes</Text>
-        <View style={styles.chips}>
-          {THEME_PRESETS.map((theme) => (
-            <Chip
-              key={theme.id}
-              label={theme.name}
-              color={theme.uiColor}
-              selected={themeMatches(branding, theme)}
-              onPress={() => void update(colorsOf(theme))}
-              testID={`theme-${theme.id}`}
-            />
-          ))}
-        </View>
+        <BrandChoices branding={branding} onChange={(patch) => void update(patch)} />
+
+        <Text style={labelStyle}>Colors</Text>
         <ColorPicker label="Work" testID="color-work" value={branding.workColor} onChange={(workColor) => void update({ workColor })} />
         <ColorPicker label="Rest" testID="color-rest" value={branding.restColor} onChange={(restColor) => void update({ restColor })} />
         <ColorPicker label="Lead-in" testID="color-lead" value={branding.leadInColor} onChange={(leadInColor) => void update({ leadInColor })} />
@@ -164,6 +163,7 @@ export default function BrandScreen() {
         <ColorPicker label="Accent" testID="color-ui" value={branding.uiColor} onChange={(uiColor) => void update({ uiColor })} />
 
         <Text style={labelStyle}>Logo</Text>
+        {Platform.isTV ? <TvLogoUrl onStored={async (logoUri) => update({ logoUri })} /> : null}
         {Platform.isTV ? null : (
           <View style={styles.row}>
             <Pressable accessibilityRole="button" testID="pick-logo" onPress={() => void pickLibrary()} style={styles.secondary}>
@@ -175,21 +175,17 @@ export default function BrandScreen() {
           </View>
         )}
         {branding.logoUri ? (
-          <Pressable
+          <TvFocusPressable
+            accent={accent}
             accessibilityRole="button"
             testID="remove-logo"
             onPress={() => void update({ logoUri: null })}
-            {...tvParallaxProps()}
-            style={({ pressed, focused }) => [
-              tv && styles.linkHitTv,
-              tv && pressed ? { opacity: 0.75 } : null,
-              tv ? focusChrome(true, Boolean(focused), accent) : null,
-            ]}
+            style={({ pressed }) => [tv && styles.linkHitTv, tv && pressed ? { opacity: 0.75 } : null]}
           >
             <Text style={[styles.link, tv && styles.linkTv, { color: accent }]}>Remove logo</Text>
-          </Pressable>
+          </TvFocusPressable>
         ) : Platform.isTV ? (
-          <Text style={[styles.help, styles.helpTv]}>The logo is saved on this TV after the phone sends it.</Text>
+          <Text style={[styles.help, styles.helpTv]}>Or scan the code above and send a logo from a phone on this Wi-Fi.</Text>
         ) : (
           <Text style={styles.help}>Any gym logo works. Pick it from your photo library or Files. It stays on this device.</Text>
         )}
@@ -231,40 +227,17 @@ export default function BrandScreen() {
           Watermark sits faded behind the digits. Full bleed is darkened so the clock stays readable. Corner keeps the mark out of the numbers.
         </Text>
 
-        <Pressable
+        <TvFocusPressable
           accessibilityRole="button"
           testID="reset-brand"
           onPress={confirmReset}
-          {...tvParallaxProps()}
-          style={({ pressed, focused }) => [
-            styles.reset,
-            tv && styles.resetTv,
-            tv && pressed ? { opacity: 0.75 } : null,
-            tv ? focusChrome(true, Boolean(focused), '#FF8A7A', false) : null,
-          ]}
+          style={({ pressed }) => [styles.reset, tv && styles.resetTv, tv && pressed ? { opacity: 0.75 } : null]}
         >
           <Text style={[styles.resetLabel, tv && styles.resetLabelTv]}>Reset to Inversion</Text>
-        </Pressable>
+        </TvFocusPressable>
       </ScrollView>
     </SafeAreaView>
   );
-}
-
-function colorsOf(theme: ThemePreset): BrandColors {
-  return {
-    workColor: theme.workColor,
-    restColor: theme.restColor,
-    leadInColor: theme.leadInColor,
-    warningColor: theme.warningColor,
-    digitColor: theme.digitColor,
-    backgroundColor: theme.backgroundColor,
-    uiColor: theme.uiColor,
-  };
-}
-
-function themeMatches(branding: BrandColors, theme: ThemePreset): boolean {
-  const colors = colorsOf(theme);
-  return (Object.keys(colors) as (keyof BrandColors)[]).every((key) => branding[key].toUpperCase() === colors[key].toUpperCase());
 }
 
 function GymNameField({ value, onCommit }: { value: string; onCommit: (name: string) => void }) {
@@ -276,7 +249,7 @@ function GymNameField({ value, onCommit }: { value: string; onCommit: (name: str
   }
 
   return (
-    <TextInput
+    <TvTextField
       testID="brand-name"
       value={text}
       onChangeText={setText}

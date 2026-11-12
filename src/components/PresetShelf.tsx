@@ -1,12 +1,10 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
+import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
-import { focusChrome } from '@/src/tv/controls';
 import { isTenFootLayout } from '@/src/tv/layout';
-import { tvParallaxProps } from '@/src/tv/pressable';
-import { usePointerFocus } from '@/src/tv/usePointerFocus';
 import {
   deletePreset,
   listPresets,
@@ -197,7 +195,7 @@ export function PresetShelf({
             {editor.intent === 'rename' ? 'Rename preset' : 'Save preset'}
           </Text>
           {editor.showInput ? (
-            <TextInput
+            <TvTextField
               testID="preset-name"
               accessibilityLabel="Preset name"
               value={editor.name}
@@ -286,19 +284,16 @@ function PresetCard({
   onRename: () => void;
   onDelete: () => void;
 }) {
-  const pointer = usePointerFocus();
   const tv = Platform.isTV === true;
   return (
     <View style={[styles.card, tenFoot && styles.cardTv, { borderColor: selected ? accent : chrome.line }]}>
-      <Pressable
+      <TvFocusPressable
+        accent={accent}
         accessibilityRole="button"
         accessibilityLabel={`${preset.name}. ${presetSummary(preset.config)}`}
         accessibilityHint="Loads this preset into the setup"
         testID={`preset-${preset.id}`}
         onPress={onLoad}
-        onFocus={pointer.onFocus}
-        onBlur={pointer.onBlur}
-        {...tvParallaxProps()}
         onLongPress={() => {
           Alert.alert(preset.name, 'Rename or delete this preset.', [
             { text: 'Rename', onPress: onRename },
@@ -306,17 +301,13 @@ function PresetCard({
             { text: 'Cancel', style: 'cancel' },
           ]);
         }}
-        style={({ pressed, focused }) => [
-          styles.cardMain,
-          pressed ? styles.pressed : null,
-          focusChrome(tv, Boolean(focused) || pointer.focused, accent),
-        ]}
+        style={({ pressed }) => [styles.cardMain, pressed ? styles.pressed : null]}
       >
         <Text style={[styles.presetName, tenFoot && styles.presetNameTv, tv && styles.presetNameFrame]} numberOfLines={2}>
           {preset.name}
         </Text>
         <Text style={[styles.presetMeta, tenFoot && styles.presetMetaTv, tv && styles.presetMetaFrame]}>{presetSummary(preset.config)}</Text>
-      </Pressable>
+      </TvFocusPressable>
       <View style={styles.cardActions}>
         <TextButton
           testID={`preset-start-${preset.id}`}
@@ -365,31 +356,27 @@ function TextButton({
   /** Apple TV only: draw a boxed button instead of a text link. Phones keep the text link. */
   prominent?: boolean;
 }) {
-  const pointer = usePointerFocus();
   const tv = Platform.isTV === true;
   const boxed = tv && prominent;
   return (
-    <Pressable
+    <TvFocusPressable
+      accent={color}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       testID={testID}
       onPress={onPress}
-      onFocus={pointer.onFocus}
-      onBlur={pointer.onBlur}
-      {...tvParallaxProps()}
-      style={({ focused, pressed }) => [
+      style={({ pressed }) => [
         styles.textButton,
         tenFoot && styles.textButtonTv,
         tv && styles.textButtonApple,
         boxed && [styles.textButtonBoxedApple, { borderColor: color }],
         { opacity: pressed ? 0.72 : 1 },
-        focusChrome(tv, Boolean(focused) || pointer.focused, color),
       ]}
     >
       <Text style={[styles.textButtonLabel, tenFoot && styles.textButtonLabelTv, tv && styles.textButtonLabelApple, boxed && styles.textButtonLabelBoxedApple, { color }]}>
         {label}
       </Text>
-    </Pressable>
+    </TvFocusPressable>
   );
 }
 
