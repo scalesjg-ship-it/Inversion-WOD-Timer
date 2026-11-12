@@ -7,7 +7,7 @@ import { prepareLogo } from '../logo';
 import type { BrandColors, Branding } from '../types';
 import { isReachableLanIPv4, pairingUrl } from './address';
 import { applyUploadedLogo } from './applyUpload';
-import { startLanServer } from './lanServer';
+import { LanListenerUnavailableError, startLanServer } from './lanServer';
 import { LOGO_LISTEN_MS } from './limits';
 import type { ReceiverPhase } from './receiverPhase';
 import { LogoTransferSession } from './session';
@@ -83,9 +83,15 @@ export function useLogoReceiver(
             closeServer();
             setPhase({ kind: 'expired' });
           }, LOGO_LISTEN_MS);
-        } catch {
+        } catch (error) {
           if (!stopped) {
-            setPhase({ kind: 'error', message: 'This TV could not open a link on the local network.' });
+            setPhase({
+              kind: 'error',
+              message:
+                error instanceof LanListenerUnavailableError
+                  ? error.message
+                  : 'This TV could not open a link on the local network.',
+            });
           }
         }
       })();

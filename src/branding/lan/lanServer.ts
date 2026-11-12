@@ -1,4 +1,4 @@
-import TcpSocket from 'react-native-tcp-socket';
+import { NativeModules } from 'react-native';
 
 import { encodeHtmlResponse, HttpAccumulator } from './http';
 import { messagePage } from './page';
@@ -8,6 +8,41 @@ export type LanServer = {
   port: number;
   close: () => void;
 };
+
+/**
+ * Apple TV's binary has no TcpSockets class: `SecPKCS12Import` is not in the
+ * tvOS SDK, so the pod that claims tvOS support never registers. Importing
+ * `react-native-tcp-socket` anyway runs `new NativeEventEmitter(null)` and
+ * Expo rewrites that into "a native module that doesn't exist", which is the
+ * Brand-tab error boundary. Load it only after the class is actually there.
+ */
+export class LanListenerUnavailableError extends Error {
+  constructor() {
+    super('This TV cannot open a link for a logo. Add the logo from the Americana app on your iPhone.');
+    this.name = 'LanListenerUnavailableError';
+  }
+}
+
+type TcpSocketModule = typeof import('react-native-tcp-socket').default;
+
+async function loadTcpSocket(): Promise<TcpSocketModule> {
+  let sockets: unknown;
+  try {
+    sockets = NativeModules.TcpSockets;
+  } catch {
+    throw new LanListenerUnavailableError();
+  }
+  if (sockets == null) throw new LanListenerUnavailableError();
+  try {
+    const loaded = await import('react-native-tcp-socket');
+    const tcp = loaded.default;
+    if (tcp == null || typeof tcp.createServer !== 'function') throw new LanListenerUnavailableError();
+    return tcp;
+  } catch (error) {
+    if (error instanceof LanListenerUnavailableError) throw error;
+    throw new LanListenerUnavailableError();
+  }
+}
 
 /** Methods used from react-native-tcp-socket. The package types do not re-export the socket class. */
 type ConnectedSocket = {
@@ -20,7 +55,8 @@ type ConnectedSocket = {
   setTimeout(ms: number): void;
 };
 
-export function startLanServer(session: LogoTransferSession): Promise<LanServer> {
+export async function startLanServer(session: LogoTransferSession): Promise<LanServer> {
+  const TcpSocket = await loadTcpSocket();
   const sockets = new Set<ConnectedSocket>();
   const server = TcpSocket.createServer({ noDelay: true }, (socket) => {
     const connected = socket as unknown as ConnectedSocket;

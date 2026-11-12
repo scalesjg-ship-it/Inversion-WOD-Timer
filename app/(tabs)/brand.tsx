@@ -19,11 +19,16 @@ import { prepareLogo } from '@/src/branding/logo';
 import { THEME_PRESETS, type BrandColors, type LogoPlacement, type ThemePreset } from '@/src/branding/types';
 import { ColorPicker } from '@/src/components/ColorPicker';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
+import { RouteErrorBoundary } from '@/src/components/RouteErrorBoundary';
 import { Chip, TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
 import { TV_BODY_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
 import { focusChrome } from '@/src/tv/controls';
 import { tvParallaxProps } from '@/src/tv/pressable';
+
+export function ErrorBoundary(props: { error: Error; retry: () => Promise<void> }) {
+  return <RouteErrorBoundary {...props} />;
+}
 
 const PLACEMENTS: { id: LogoPlacement; label: string }[] = [
   { id: 'watermark', label: 'Watermark' },

@@ -6,10 +6,13 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { BrandingProvider, useBranding } from '@/src/branding/BrandingProvider';
+import { RouteErrorBoundary } from '@/src/components/RouteErrorBoundary';
 import { TimerSessionProvider } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 
-export { ErrorBoundary } from 'expo-router';
+export function ErrorBoundary(props: { error: Error; retry: () => Promise<void> }) {
+  return <RouteErrorBoundary {...props} />;
+}
 
 SplashScreen.preventAutoHideAsync();
 
