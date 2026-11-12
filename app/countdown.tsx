@@ -7,6 +7,7 @@ import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
+import { ProductMark } from '@/src/components/ProductMark';
 import { BigButton, Chip, HeaderBack, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
@@ -103,7 +104,7 @@ export default function CountdownScreen() {
     >
       <View style={styles.header}>
         <HeaderBack testID="countdown-back" onPress={() => router.back()} color={accent} />
-        <Text style={[styles.kicker, tv && styles.kickerTv]}>Americana</Text>
+        <ProductMark variant="kicker" />
       </View>
       <ScrollView
         testID="screen-countdown"
@@ -183,8 +184,6 @@ export default function CountdownScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: chrome.bg, paddingHorizontal: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 },
-  kicker: { color: chrome.muted, fontFamily: 'OswaldMedium', letterSpacing: 2, textTransform: 'uppercase', fontSize: 13 },
-  kickerTv: { fontSize: TV_SECTION_FONT },
   // The scroll view reaches the screen edge so a focused control's 1.08 scale is not clipped;
   // the content pads back in to the safe margin.
   scrollTv: { flex: 1, alignSelf: 'stretch', marginHorizontal: -TV_SAFE_HORIZONTAL },

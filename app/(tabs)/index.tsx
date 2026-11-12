@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
+import { ProductMark } from '@/src/components/ProductMark';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import { focusChrome } from '@/src/tv/controls';
@@ -89,7 +90,7 @@ export default function WodScreen() {
         ]}
         testID="screen-wod"
       >
-        <Text style={[styles.wordmark, { color: accent }, tenFoot && styles.wordmarkTv, tv && styles.wordmarkFrame]}>Americana</Text>
+        <ProductMark variant="wordmark" color={accent} large={tenFoot} />
         <Text style={[styles.gym, tenFoot && styles.gymTv, tv && styles.gymFrame]} numberOfLines={2} adjustsFontSizeToFit>
           {branding.gymName}
         </Text>
@@ -266,22 +267,11 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     gap: 6,
   },
-  wordmark: {
-    fontFamily: 'OswaldMedium',
-    fontSize: 14,
-    letterSpacing: 4,
-    textTransform: 'uppercase',
-    marginTop: 8,
-  },
   gym: {
     fontFamily: 'Oswald',
     fontSize: 36,
     lineHeight: 40,
     color: chrome.text,
-  },
-  wordmarkTv: {
-    fontSize: 28,
-    marginTop: 12,
   },
   gymTv: {
     fontSize: 72,
@@ -375,9 +365,6 @@ const styles = StyleSheet.create({
     color: chrome.muted,
     fontSize: 14,
     lineHeight: 20,
-  },
-  wordmarkFrame: {
-    fontSize: 32,
   },
   gymFrame: {
     fontSize: 72,

@@ -1,6 +1,6 @@
-# Americana store listing
+# Anthem Gym Timer store listing
 
-Copy for App Store Connect and the Amazon Appstore. The name “Americana” was not checked for availability.
+Copy for App Store Connect and the Amazon Appstore. The name “Anthem Gym Timer” was not checked for availability.
 
 Bundle id / package, already set for iOS, tvOS, Android, and Fire TV: `com.garrettscales.americana`.
 
@@ -8,7 +8,7 @@ Bundle id / package, already set for iOS, tvOS, Android, and Fire TV: `com.garre
 
 | Field | Text | Limit |
 | --- | --- | --- |
-| Name | Americana | 30 |
+| Name | Anthem Gym Timer | 30 |
 | Subtitle | Interval and round timer | 30 |
 | Promotional text | A gym clock for any box or fight gym. CrossFit intervals, martial-arts rounds, and a countdown, with your name and colors on the screen. | 170 |
 | Keywords | timer,interval,amrap,emom,tabata,boxing,bjj,mma,rounds,gym,wod,countdown | 100 |
@@ -17,7 +17,7 @@ Bundle id / package, already set for iOS, tvOS, Android, and Fire TV: `com.garre
 
 ### Description
 
-Americana is a gym clock for intervals, rounds, and countdowns. It is built for any gym. The default look is dark and high contrast. Put your own gym name, colors, and logo on the screen. That branding stays on the device. On Apple TV and Fire TV, scan the code on Brand with a phone on the same Wi-Fi to send a logo. That transfer stays on the local network.
+Anthem Gym Timer is a gym clock for intervals, rounds, and countdowns. It is built for any gym. The default look is dark and high contrast. Put your own gym name, colors, and logo on the screen. That branding stays on the device. On Apple TV and Fire TV, scan the code on Brand with a phone on the same Wi-Fi to send a logo. That transfer stays on the local network.
 
 CrossFit-style modes: For Time with an optional cap, AMRAP, EMOM, Tabata, and intervals you set yourself. Every mode can start with a lead-in, including zero.
 
@@ -55,15 +55,15 @@ Data not collected. Photos are used only to pick a logo and are not linked to an
 
 ## Amazon Appstore
 
-**Title:** Americana
+**Title:** Anthem Gym Timer
 
 **Short description:** Gym interval and round timer. CrossFit clocks, fight rounds, and countdown, with your gym’s colors on the screen.
 
 **Long description:**
 
-Americana is a gym clock for any box or fight gym. Run For Time, AMRAP, EMOM, Tabata, and custom intervals. Run BJJ, boxing, MMA, and Muay Thai rounds, or save your own. Start a countdown with warning marks.
+Anthem Gym Timer is a gym clock for any box or fight gym. Run For Time, AMRAP, EMOM, Tabata, and custom intervals. Run BJJ, boxing, MMA, and Muay Thai rounds, or save your own. Start a countdown with warning marks.
 
-The clock is large and high contrast. Work and rest use different colors. Your gym name, colors, and logo stay on the Fire TV or phone you set them on. On Fire TV, scan the code on Brand with a phone on the same Wi-Fi to send a logo. That stays on the local network. Americana has no account, no analytics, and no data upload.
+The clock is large and high contrast. Work and rest use different colors. Your gym name, colors, and logo stay on the Fire TV or phone you set them on. On Fire TV, scan the code on Brand with a phone on the same Wi-Fi to send a logo. That stays on the local network. Anthem Gym Timer has no account, no analytics, and no data upload.
 
 On Fire TV, the remote starts and pauses the clock, moves by ten seconds or by round, and resets after a confirm.
 

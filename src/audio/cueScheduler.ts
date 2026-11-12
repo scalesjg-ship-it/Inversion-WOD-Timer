@@ -49,7 +49,7 @@ async function ensureNotifications(): Promise<NotificationsModule | null> {
     await Promise.all(
       (Object.keys(SOUND_FILE) as SoundName[]).map((sound) =>
         notifications.setNotificationChannelAsync(channelId(sound), {
-          name: `Americana ${sound}`,
+          name: `Anthem Gym Timer ${sound}`,
           importance: notifications.AndroidImportance.MAX,
           sound: SOUND_FILE[sound],
           vibrationPattern: [0, 180, 80, 180],

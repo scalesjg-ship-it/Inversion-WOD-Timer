@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Americana",
+    "name": "Anthem Gym Timer",
     "slug": "americana",
     "owner": "scalesgym",
     "version": "1.0.0",
@@ -13,8 +13,8 @@
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "Americana uses your photo library so your gym logo can appear on the timer.",
-        "NSLocalNetworkUsageDescription": "Americana listens on your Wi-Fi so a phone on the same network can send a gym logo to this TV. The logo is saved on this TV and is not sent to a server.",
+        "NSPhotoLibraryUsageDescription": "Anthem Gym Timer uses your photo library so your gym logo can appear on the timer.",
+        "NSLocalNetworkUsageDescription": "Anthem Gym Timer listens on your Wi-Fi so a phone on the same network can send a gym logo to this TV. The logo is saved on this TV and is not sent to a server.",
         "UIBackgroundModes": ["audio"]
       }
     },
@@ -65,7 +65,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Americana uses your photo library so your gym logo can appear on the timer.",
+          "photosPermission": "Anthem Gym Timer uses your photo library so your gym logo can appear on the timer.",
           "microphonePermission": false,
           "cameraPermission": false
         }
