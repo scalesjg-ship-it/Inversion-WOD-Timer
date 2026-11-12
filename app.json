@@ -46,6 +46,7 @@
     "plugins": [
       "expo-router",
       "./plugins/withTvLogoLan",
+      "./plugins/withTvTcpSocket",
       "expo-image",
       [
         "expo-splash-screen",
