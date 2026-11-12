@@ -1,5 +1,3 @@
-import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import {
   Alert,
@@ -51,8 +49,11 @@ export default function BrandScreen() {
     }
   };
 
+  // The pickers have no tvOS native module and throw when imported there,
+  // so they load only when a phone opens them. TV gets its logo over Wi-Fi.
   const pickLibrary = async () => {
     try {
+      const ImagePicker = await import('expo-image-picker');
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         Alert.alert('Photo library', 'Allow photo access to put your gym logo on the timer.');
@@ -71,6 +72,7 @@ export default function BrandScreen() {
 
   const pickFile = async () => {
     try {
+      const DocumentPicker = await import('expo-document-picker');
       const result = await DocumentPicker.getDocumentAsync({
         type: ['image/*'],
         copyToCacheDirectory: true,
