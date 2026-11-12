@@ -11,7 +11,7 @@ import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import { focusChrome } from '@/src/tv/controls';
-import { TV_BODY_FONT, TV_MENU_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
+import { TV_BODY_FONT, TV_MENU_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
 import { tvParallaxProps } from '@/src/tv/pressable';
 import { usePointerFocus } from '@/src/tv/usePointerFocus';
 import { formatSeconds } from '@/src/timer/format';
@@ -264,14 +264,17 @@ const styles = StyleSheet.create({
     fontSize: TV_BODY_FONT,
     lineHeight: TV_BODY_FONT + 8,
   },
+  // The scroll view reaches the screen edge so a focused control's 1.08 scale is not clipped;
+  // the content pads back in to the safe margin.
   scrollTv: {
     flex: 1,
-    width: '100%',
+    alignSelf: 'stretch',
+    marginHorizontal: -TV_SAFE_HORIZONTAL,
   },
   contentTv: {
     flexGrow: 1,
     gap: 28,
-    paddingHorizontal: 0,
+    paddingHorizontal: TV_SAFE_HORIZONTAL,
     paddingTop: 0,
   },
   presets: {

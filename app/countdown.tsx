@@ -10,7 +10,7 @@ import { PresetShelf } from '@/src/components/PresetShelf';
 import { BigButton, Chip, HeaderBack, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
+import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
 import {
   WARNING_MARK_CHOICES,
   addCountdownSeconds,
@@ -185,9 +185,11 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 },
   kicker: { color: chrome.muted, fontFamily: 'OswaldMedium', letterSpacing: 2, textTransform: 'uppercase', fontSize: 13 },
   kickerTv: { fontSize: TV_SECTION_FONT },
-  scrollTv: { flex: 1, width: '100%' },
+  // The scroll view reaches the screen edge so a focused control's 1.08 scale is not clipped;
+  // the content pads back in to the safe margin.
+  scrollTv: { flex: 1, alignSelf: 'stretch', marginHorizontal: -TV_SAFE_HORIZONTAL },
   content: { gap: 16, paddingTop: 12, paddingBottom: 24 },
-  contentTv: { flexGrow: 1, gap: 32, paddingTop: 8 },
+  contentTv: { flexGrow: 1, gap: 32, paddingTop: 8, paddingHorizontal: TV_SAFE_HORIZONTAL },
   title: { fontFamily: 'Oswald', fontSize: 48, color: chrome.text, lineHeight: 52 },
   titleTv: { fontSize: TV_TITLE_FONT, lineHeight: TV_TITLE_FONT + 8 },
   summary: { color: chrome.muted, fontSize: 16, marginTop: -8 },
