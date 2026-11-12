@@ -11,6 +11,7 @@ import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import { focusChrome } from '@/src/tv/controls';
+import { TV_BODY_FONT, TV_MENU_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
 import { tvParallaxProps } from '@/src/tv/pressable';
 import { usePointerFocus } from '@/src/tv/usePointerFocus';
 import { formatSeconds } from '@/src/timer/format';
@@ -43,6 +44,7 @@ export default function RoundsScreen() {
   const { setSession } = useTimerSession();
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
   const tv = Platform.isTV === true;
+  const box = tvSafeBox(tv);
   const restColor = readableDigitColor(branding.restColor, branding.backgroundColor);
   const [draft, setDraft] = useState<RoundPreset>(BUILTIN_PRESETS[0]);
   const [selectedId, setSelectedId] = useState(BUILTIN_PRESETS[0].id);
@@ -84,16 +86,17 @@ export default function RoundsScreen() {
   const builtInSelected = BUILTIN_PRESETS.some((preset) => preset.id === selectedId);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, tv && { paddingHorizontal: box.horizontal, paddingTop: box.vertical }]} edges={tv ? [] : ['top']}>
       <ScrollView
         testID="screen-rounds"
-        contentContainerStyle={styles.content}
+        style={tv ? styles.scrollTv : undefined}
+        contentContainerStyle={[styles.content, tv && styles.contentTv]}
         keyboardShouldPersistTaps="handled"
       >
         <Text style={[styles.wordmark, { color: accent }, tv && styles.wordmarkTv]}>Americana</Text>
         <Text style={[styles.title, tv && styles.titleTv]}>Rounds</Text>
         <Text style={[styles.lede, tv && styles.ledeTv]}>Jiu-jitsu, striking, and sparring. Rest is a different color from work.</Text>
-        <View style={styles.presets}>
+        <View style={[styles.presets, tv && styles.presetsTv]}>
           {BUILTIN_PRESETS.map((preset) => (
             <StandardCard
               key={preset.id}
@@ -248,8 +251,8 @@ const styles = StyleSheet.create({
     color: chrome.text,
   },
   titleTv: {
-    fontSize: 64,
-    lineHeight: 72,
+    fontSize: TV_TITLE_FONT,
+    lineHeight: TV_TITLE_FONT + 8,
   },
   lede: {
     color: chrome.muted,
@@ -258,13 +261,26 @@ const styles = StyleSheet.create({
     marginTop: -6,
   },
   ledeTv: {
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: TV_BODY_FONT,
+    lineHeight: TV_BODY_FONT + 8,
+  },
+  scrollTv: {
+    flex: 1,
+    width: '100%',
+  },
+  contentTv: {
+    flexGrow: 1,
+    gap: 28,
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
   presets: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+  },
+  presetsTv: {
+    gap: 24,
   },
   preset: {
     width: '48%',
@@ -277,9 +293,12 @@ const styles = StyleSheet.create({
     minHeight: 84,
   },
   presetTv: {
-    minHeight: 150,
-    padding: 20,
-    borderRadius: 22,
+    minHeight: 180,
+    padding: 24,
+    borderRadius: 24,
+    flexBasis: '46%',
+    flexGrow: 1,
+    width: '46%',
   },
   presetName: {
     fontFamily: 'Oswald',
@@ -287,14 +306,15 @@ const styles = StyleSheet.create({
     color: chrome.text,
   },
   presetNameTv: {
-    fontSize: 36,
+    fontSize: TV_MENU_FONT,
+    lineHeight: TV_MENU_FONT + 4,
   },
   presetMeta: {
     color: chrome.muted,
     fontSize: 13,
   },
   presetMetaTv: {
-    fontSize: 22,
+    fontSize: TV_BODY_FONT,
   },
   field: {
     gap: 10,
@@ -307,7 +327,7 @@ const styles = StyleSheet.create({
     fontFamily: 'OswaldMedium',
   },
   fieldLabelTv: {
-    fontSize: 28,
+    fontSize: TV_SECTION_FONT,
     letterSpacing: 2,
   },
   chips: {

@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   labelTv: {
-    fontSize: 22,
+    fontSize: 28,
   },
   hex: {
     color: chrome.text,
@@ -180,9 +180,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   chipTv: {
-    width: 78,
-    height: 78,
-    borderRadius: 16,
+    width: 96,
+    height: 96,
+    borderRadius: 18,
   },
   hue: {
     width: 22,
@@ -190,9 +190,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   hueTv: {
-    width: 78,
-    height: 88,
-    borderRadius: 16,
+    width: 96,
+    height: 108,
+    borderRadius: 18,
   },
   value: {
     flex: 1,

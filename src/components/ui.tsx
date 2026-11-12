@@ -34,6 +34,7 @@ export function BigButton({
       {...tvParallaxProps()}
       style={({ pressed, focused }) => [
         styles.big,
+        tv && styles.bigTv,
         solid
           ? { backgroundColor: color }
           : { backgroundColor: 'transparent', borderWidth: 1, borderColor: color },
@@ -41,7 +42,7 @@ export function BigButton({
         focusChrome(tv, Boolean(focused) || pointer.focused, ink, !solid),
       ]}
     >
-      <Text style={[styles.bigLabel, { color: ink }]}>{label}</Text>
+      <Text style={[styles.bigLabel, tv && styles.bigLabelTv, { color: ink }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -319,11 +320,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
+  bigTv: {
+    minHeight: 128,
+    borderRadius: 28,
+    paddingHorizontal: 28,
+  },
   bigLabel: {
     fontFamily: 'Oswald',
     fontSize: 26,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
+  },
+  bigLabelTv: {
+    fontSize: 48,
+    letterSpacing: 2,
   },
   stepper: {
     flex: 1,
@@ -365,7 +375,7 @@ const styles = StyleSheet.create({
     fontFamily: 'OswaldMedium',
   },
   fieldLabelTv: {
-    fontSize: 28,
+    fontSize: 32,
     letterSpacing: 2,
   },
   fieldRow: {
@@ -385,9 +395,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipTv: {
-    minHeight: 76,
-    paddingHorizontal: 22,
-    paddingVertical: 16,
+    minHeight: 88,
+    paddingHorizontal: 28,
+    paddingVertical: 18,
     borderWidth: 4,
   },
   chipLabel: {
@@ -396,19 +406,19 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   chipLabelTv: {
-    fontSize: 28,
+    fontSize: 32,
   },
   back: {
     fontFamily: 'OswaldMedium',
     fontSize: 18,
   },
   backTv: {
-    fontSize: 32,
+    fontSize: 40,
   },
   backHitTv: {
-    minHeight: 76,
-    paddingHorizontal: 18,
-    borderRadius: 16,
+    minHeight: 96,
+    paddingHorizontal: 28,
+    borderRadius: 20,
     borderWidth: 4,
     borderColor: 'transparent',
     alignItems: 'center',
@@ -416,7 +426,7 @@ const styles = StyleSheet.create({
     backgroundColor: chrome.surface,
   },
   tvToggle: {
-    minHeight: 108,
+    minHeight: 116,
     borderRadius: 22,
     borderWidth: 4,
     backgroundColor: chrome.surface,
@@ -433,12 +443,12 @@ const styles = StyleSheet.create({
   },
   tvToggleHelp: {
     color: chrome.text,
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 28,
+    lineHeight: 36,
   },
   tvToggleValue: {
     fontFamily: 'Oswald',
-    fontSize: 40,
+    fontSize: 48,
     letterSpacing: 0.6,
   },
 });

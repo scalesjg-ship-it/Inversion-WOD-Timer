@@ -10,6 +10,7 @@ import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvToggle } from 
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
 import { chrome } from '@/src/theme/chrome';
+import { TV_BODY_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
 import { normalizeConfig } from '@/src/timer/engine';
 import { modeTitle } from '@/src/timer/labels';
 import { defaultConfig } from '@/src/timer/presets';
@@ -77,6 +78,8 @@ function SetupForm({
   presetId: string;
   onStart: (config: TimerConfig, label: string) => void;
 }) {
+  const tv = Platform.isTV === true;
+  const box = tvSafeBox(tv);
   const initial = defaultConfig(mode);
   const [leadInSeconds, setLeadInSeconds] = useState(initial.leadInSeconds);
   const [workSeconds, setWorkSeconds] = useState(mode === 'forTime' ? 12 * 60 : initial.workSeconds);
@@ -129,14 +132,28 @@ function SetupForm({
   const summary = presetSummary(config);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[
+        styles.safe,
+        tv && {
+          paddingHorizontal: box.horizontal,
+          paddingTop: box.vertical,
+          paddingBottom: 36,
+        },
+      ]}
+      edges={tv ? [] : ['top', 'bottom']}
+    >
       <View style={styles.header}>
         <HeaderBack onPress={() => router.back()} color={accent} />
-        <Text style={styles.kicker}>Americana</Text>
+        <Text style={[styles.kicker, tv && styles.kickerTv]}>Americana</Text>
       </View>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>{modeTitle(mode)}</Text>
-        <Text style={styles.summary}>{summary}</Text>
+      <ScrollView
+        style={tv ? styles.scrollTv : undefined}
+        contentContainerStyle={[styles.content, tv && styles.contentTv]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={[styles.title, tv && styles.titleTv]}>{modeTitle(mode)}</Text>
+        <Text style={[styles.summary, tv && styles.summaryTv]}>{summary}</Text>
         <PresetShelf
           mode={mode}
           accent={accent}
@@ -289,10 +306,22 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     fontSize: 13,
   },
+  kickerTv: {
+    fontSize: TV_SECTION_FONT,
+  },
+  scrollTv: {
+    flex: 1,
+    width: '100%',
+  },
   content: {
     gap: 18,
     paddingTop: 12,
     paddingBottom: 24,
+  },
+  contentTv: {
+    gap: 22,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
   title: {
     fontFamily: 'Oswald',
@@ -300,10 +329,18 @@ const styles = StyleSheet.create({
     color: chrome.text,
     lineHeight: 52,
   },
+  titleTv: {
+    fontSize: TV_TITLE_FONT,
+    lineHeight: TV_TITLE_FONT + 8,
+  },
   summary: {
     color: chrome.muted,
     fontSize: 16,
     marginTop: -8,
+  },
+  summaryTv: {
+    fontSize: TV_BODY_FONT,
+    lineHeight: TV_BODY_FONT + 8,
   },
   field: {
     gap: 10,
@@ -316,7 +353,7 @@ const styles = StyleSheet.create({
     fontFamily: 'OswaldMedium',
   },
   fieldLabelTv: {
-    fontSize: 28,
+    fontSize: TV_SECTION_FONT,
     letterSpacing: 2,
   },
   switchRow: {
@@ -336,5 +373,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingVertical: 12,
+    width: '100%',
   },
 });

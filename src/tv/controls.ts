@@ -60,7 +60,7 @@ export function stepperControlSize(tv: boolean): StepperMetrics {
   if (!tv) {
     return { button: 52, glyph: 32, value: 32, suffix: 12, gap: 8, radius: 14, valueMinWidth: 56 };
   }
-  return { button: 112, glyph: 64, value: 48, suffix: 22, gap: 18, radius: 28, valueMinWidth: 96 };
+  return { button: 120, glyph: 68, value: 60, suffix: 24, gap: 22, radius: 28, valueMinWidth: 108 };
 }
 
 /** Phone tab metrics match the existing iPhone tab bar. TV labels are 10-foot size. */
@@ -68,7 +68,7 @@ export function tabBarControlSize(tv: boolean): TabBarMetrics {
   if (!tv) {
     return { label: 13, icon: 16, itemMinHeight: 49, barContentHeight: 64, gap: 0, paddingHorizontal: 0 };
   }
-  return { label: 40, icon: 52, itemMinHeight: 148, barContentHeight: 196, gap: 28, paddingHorizontal: 36 };
+  return { label: 48, icon: 56, itemMinHeight: 132, barContentHeight: 176, gap: 28, paddingHorizontal: 60 };
 }
 
 /** Apple TV and Android TV have no Taptic Engine or vibration motor for this app. */

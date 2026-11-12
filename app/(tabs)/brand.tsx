@@ -23,6 +23,7 @@ import { ColorPicker } from '@/src/components/ColorPicker';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
 import { Chip, TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
+import { TV_BODY_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
 import { focusChrome } from '@/src/tv/controls';
 import { tvParallaxProps } from '@/src/tv/pressable';
 
@@ -38,6 +39,7 @@ export default function BrandScreen() {
   const digits = readableDigitColor(branding.digitColor, branding.backgroundColor);
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   const tv = Platform.isTV === true;
+  const box = tvSafeBox(tv);
   const labelStyle = [styles.fieldLabel, tv && styles.fieldLabelTv];
 
   const storeLogo = async (uri: string) => {
@@ -93,11 +95,16 @@ export default function BrandScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView testID="screen-brand" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.wordmark, { color: accent }]}>Americana</Text>
-        <Text style={styles.title}>Brand</Text>
-        <Text style={styles.lede}>
+    <SafeAreaView style={[styles.safe, tv && { paddingHorizontal: box.horizontal, paddingTop: box.vertical }]} edges={tv ? [] : ['top']}>
+      <ScrollView
+        testID="screen-brand"
+        style={tv ? styles.scrollTv : undefined}
+        contentContainerStyle={[styles.content, tv && styles.contentTv]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={[styles.wordmark, { color: accent }, tv && styles.wordmarkTv]}>Americana</Text>
+        <Text style={[styles.title, tv && styles.titleTv]}>Brand</Text>
+        <Text style={[styles.lede, tv && styles.ledeTv]}>
           Your gym name, colors, and logo stay on this device. The timer reads them on every screen.
         </Text>
 
@@ -105,7 +112,7 @@ export default function BrandScreen() {
 
         <View
           testID="brand-preview"
-          style={[styles.preview, { backgroundColor: branding.backgroundColor }]}
+          style={[styles.preview, tv && styles.previewTv, { backgroundColor: branding.backgroundColor }]}
           onLayout={(event) => {
             const { width, height } = event.nativeEvent.layout;
             setFrame({ width, height });
@@ -118,7 +125,7 @@ export default function BrandScreen() {
             </Text>
             <CornerLogo branding={branding} size={42} />
           </View>
-          <Text style={[styles.previewClock, { color: digits }]}>05:00</Text>
+          <Text style={[styles.previewClock, tv && styles.previewClockTv, { color: digits }]}>05:00</Text>
           <Text style={[styles.previewPhase, { color: readableDigitColor(branding.workColor, branding.backgroundColor) }]}>Work</Text>
         </View>
 
@@ -175,7 +182,7 @@ export default function BrandScreen() {
             <Text style={[styles.link, tv && styles.linkTv, { color: accent }]}>Remove logo</Text>
           </Pressable>
         ) : Platform.isTV ? (
-          <Text style={styles.help}>The logo is saved on this TV after the phone sends it.</Text>
+          <Text style={[styles.help, styles.helpTv]}>The logo is saved on this TV after the phone sends it.</Text>
         ) : (
           <Text style={styles.help}>Any gym logo works. Pick it from your photo library or Files. It stays on this device.</Text>
         )}
@@ -285,10 +292,41 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: chrome.bg,
   },
+  scrollTv: {
+    flex: 1,
+    width: '100%',
+  },
   content: {
     paddingHorizontal: 20,
     paddingBottom: 40,
     gap: 12,
+  },
+  contentTv: {
+    width: '100%',
+    flexGrow: 1,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    gap: 28,
+    paddingBottom: 48,
+  },
+  wordmarkTv: {
+    fontSize: 32,
+  },
+  titleTv: {
+    fontSize: TV_TITLE_FONT,
+    lineHeight: TV_TITLE_FONT + 8,
+  },
+  ledeTv: {
+    fontSize: TV_BODY_FONT,
+    lineHeight: TV_BODY_FONT + 8,
+  },
+  previewTv: {
+    height: 420,
+    borderRadius: 28,
+  },
+  previewClockTv: {
+    fontSize: 180,
+    lineHeight: 200,
   },
   wordmark: {
     fontFamily: 'OswaldMedium',
@@ -354,7 +392,7 @@ const styles = StyleSheet.create({
     fontFamily: 'OswaldMedium',
   },
   fieldLabelTv: {
-    fontSize: 28,
+    fontSize: TV_SECTION_FONT,
     letterSpacing: 2,
   },
   input: {
@@ -441,6 +479,10 @@ const styles = StyleSheet.create({
     color: chrome.muted,
     fontSize: 14,
     lineHeight: 20,
+  },
+  helpTv: {
+    fontSize: TV_BODY_FONT,
+    lineHeight: TV_BODY_FONT + 8,
   },
   switchRow: {
     flexDirection: 'row',

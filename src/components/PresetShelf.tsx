@@ -39,7 +39,8 @@ export function PresetShelf({
   onClearSelection: () => void;
 }) {
   const { width, height } = useWindowDimensions();
-  const tenFoot = isTenFootLayout(width, height, Platform.isTV === true);
+  const tv = Platform.isTV === true;
+  const tenFoot = isTenFootLayout(width, height, tv);
   const [presets, setPresets] = useState<SavedPreset[]>([]);
   const [editor, setEditor] = useState<{ intent: 'create' | 'rename'; id?: string; name: string; showInput: boolean } | null>(
     null,
@@ -172,7 +173,7 @@ export function PresetShelf({
   return (
     <View style={styles.wrap} testID={`presets-${mode}`}>
       <View style={styles.heading}>
-        <Text style={[styles.fieldLabel, tenFoot && styles.fieldLabelTv]}>Presets</Text>
+        <Text style={[styles.fieldLabel, tenFoot && styles.fieldLabelTv, tv && styles.fieldLabelFrame]}>Presets</Text>
         {editor ? null : (
           <View style={styles.headingActions}>
             {selected ? (
@@ -185,7 +186,7 @@ export function PresetShelf({
 
       {editor ? (
         <View style={styles.editor}>
-          <Text style={[styles.editorTitle, tenFoot && styles.editorTitleTv]}>
+          <Text style={[styles.editorTitle, tenFoot && styles.editorTitleTv, tv && styles.editorTitleFrame]}>
             {editor.intent === 'rename' ? 'Rename preset' : 'Save preset'}
           </Text>
           {editor.showInput ? (
@@ -204,12 +205,12 @@ export function PresetShelf({
               style={[styles.nameInput, tenFoot && styles.nameInputTv]}
             />
           ) : (
-            <Text style={[styles.autoName, tenFoot && styles.autoNameTv]} testID="preset-auto-name">
+            <Text style={[styles.autoName, tenFoot && styles.autoNameTv, tv && styles.autoNameFrame]} testID="preset-auto-name">
               {editor.name}
             </Text>
           )}
           {Platform.isTV === true && !editor.showInput ? (
-            <Text style={[styles.help, tenFoot && styles.helpTv]}>
+            <Text style={[styles.help, tenFoot && styles.helpTv, tv && styles.helpFrame]}>
               The name is filled in. Save it as is, or edit it with the keyboard.
             </Text>
           ) : (
@@ -238,7 +239,7 @@ export function PresetShelf({
       ) : null}
 
       {presets.length === 0 && !editor ? (
-        <Text style={[styles.empty, tenFoot && styles.helpTv]}>No saved presets yet.</Text>
+        <Text style={[styles.empty, tenFoot && styles.helpTv, tv && styles.helpFrame]}>No saved presets yet.</Text>
       ) : null}
       <View style={styles.list}>
         {presets.map((preset) => (
@@ -304,10 +305,10 @@ function PresetCard({
           focusChrome(tv, Boolean(focused) || pointer.focused, accent),
         ]}
       >
-        <Text style={[styles.presetName, tenFoot && styles.presetNameTv]} numberOfLines={2}>
+        <Text style={[styles.presetName, tenFoot && styles.presetNameTv, tv && styles.presetNameFrame]} numberOfLines={2}>
           {preset.name}
         </Text>
-        <Text style={[styles.presetMeta, tenFoot && styles.presetMetaTv]}>{presetSummary(preset.config)}</Text>
+        <Text style={[styles.presetMeta, tenFoot && styles.presetMetaTv, tv && styles.presetMetaFrame]}>{presetSummary(preset.config)}</Text>
       </Pressable>
       <View style={styles.cardActions}>
         <TextButton
@@ -422,6 +423,9 @@ const styles = StyleSheet.create({
   editorTitleTv: {
     fontSize: 36,
   },
+  editorTitleFrame: {
+    fontSize: 48,
+  },
   autoName: {
     fontFamily: 'Oswald',
     fontSize: 28,
@@ -531,6 +535,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   textButtonLabelApple: {
+    fontSize: 36,
+  },
+  fieldLabelFrame: {
     fontSize: 32,
+  },
+  autoNameFrame: {
+    fontSize: 56,
+  },
+  helpFrame: {
+    fontSize: 28,
+    lineHeight: 36,
+  },
+  presetNameFrame: {
+    fontSize: 48,
+    lineHeight: 56,
+  },
+  presetMetaFrame: {
+    fontSize: 28,
+    lineHeight: 36,
   },
 });
