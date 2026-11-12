@@ -1,9 +1,8 @@
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { TvFocusPressable } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
-import { focusChrome } from '@/src/tv/controls';
 import { TV_BODY_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
-import { tvParallaxProps } from '@/src/tv/pressable';
 
 /** Props passed to a route's `ErrorBoundary` export. */
 type RouteErrorProps = {
@@ -31,23 +30,17 @@ export function RouteErrorBoundary({ error, retry }: RouteErrorProps) {
           {detail}
         </Text>
       </ScrollView>
-      <Pressable
+      <TvFocusPressable
         accessibilityRole="button"
         hasTVPreferredFocus
         testID="route-error-retry"
         onPress={() => {
           void retry();
         }}
-        {...tvParallaxProps()}
-        style={({ pressed, focused }) => [
-          styles.retry,
-          tv && styles.retryTv,
-          pressed ? { opacity: 0.75 } : null,
-          tv ? focusChrome(true, Boolean(focused), chrome.text, false) : null,
-        ]}
+        style={({ pressed }) => [styles.retry, tv && styles.retryTv, pressed ? { opacity: 0.75 } : null]}
       >
         <Text style={[styles.retryLabel, tv && styles.retryLabelTv]}>Retry</Text>
-      </Pressable>
+      </TvFocusPressable>
     </View>
   );
 }

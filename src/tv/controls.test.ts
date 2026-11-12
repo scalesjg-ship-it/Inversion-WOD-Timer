@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  TV_FOCUS_BORDER,
+  TV_FOCUS_RING,
   TV_FOCUS_SCALE,
+  TV_UNFOCUSED_OPACITY,
   allowsDeviceHaptics,
   allowsSystemNotifications,
   focusChrome,
@@ -15,15 +18,32 @@ describe('TV focus chrome', () => {
     expect(focusChrome(false, true, '#FF4D2E')).toEqual({ borderWidth: 6, borderColor: '#FF4D2E' });
   });
 
-  it('scales and highlights on TV without changing border width', () => {
+  it('draws a constant thick ring, scales, glows, and dims idle controls on TV', () => {
     const idle = focusChrome(true, false, '#FF4D2E');
     const focused = focusChrome(true, true, '#FF4D2E');
-    expect(idle).toEqual({ transform: [{ scale: 1 }] });
-    expect(focused).not.toHaveProperty('borderWidth');
+    expect(idle?.borderWidth).toBe(TV_FOCUS_BORDER);
+    expect(focused?.borderWidth).toBe(TV_FOCUS_BORDER);
+    expect(idle?.borderWidth).toBe(focused?.borderWidth);
+    expect(idle).not.toHaveProperty('borderColor');
+    expect(focused?.borderColor).toBe(TV_FOCUS_RING);
     expect(focused?.transform).toEqual([{ scale: TV_FOCUS_SCALE }]);
-    expect(focused?.borderColor).toBe('#FF4D2E');
-    expect(focused?.backgroundColor).toBe('rgba(255,77,46,0.3)');
-    expect(TV_FOCUS_SCALE).toBeGreaterThan(1);
+    expect(idle?.transform).toEqual([{ scale: 1 }]);
+    expect(TV_FOCUS_SCALE).toBeGreaterThanOrEqual(1.15);
+    expect(TV_FOCUS_SCALE).toBeLessThanOrEqual(1.2);
+    expect(focused?.shadowOpacity).toBeGreaterThan(0.5);
+    expect(focused?.shadowRadius).toBeGreaterThanOrEqual(12);
+    expect(idle?.opacity).toBe(TV_UNFOCUSED_OPACITY);
+    expect(focused?.opacity).toBe(1);
+    expect(TV_UNFOCUSED_OPACITY).toBeLessThan(0.75);
+    expect(focused).not.toHaveProperty('backgroundColor');
+  });
+
+  it('keeps a text field at scale 1 so the caret does not jump', () => {
+    const idle = focusChrome(true, false, '#F5C518', { scale: false });
+    const focused = focusChrome(true, true, '#F5C518', { scale: false });
+    expect(idle).not.toHaveProperty('transform');
+    expect(focused).not.toHaveProperty('transform');
+    expect(focused?.borderWidth).toBe(idle?.borderWidth);
   });
 });
 

@@ -1,11 +1,35 @@
-/** Focus scale used on TV. Layout props stay constant so the focus engine is not asked to move mid-update. */
-export const TV_FOCUS_SCALE = 1.08;
+/** Focus scale used on TV. The same border width is drawn focused and idle so the frame does not resize mid-update. */
+export const TV_FOCUS_SCALE = 1.15;
+
+/** Bright ring that stays readable on a dark gym background from across the room. */
+export const TV_FOCUS_RING = '#F5C518';
+
+/** Thick enough to read on 720p and 1080p. Kept constant so focus does not change layout. */
+export const TV_FOCUS_BORDER = 5;
+
+/** Idle TV controls step back so the focused one is obvious. */
+export const TV_UNFOCUSED_OPACITY = 0.62;
 
 export interface FocusChrome {
   borderWidth?: number;
   borderColor?: string;
   backgroundColor?: string;
   transform?: { scale: number }[];
+  opacity?: number;
+  shadowColor?: string;
+  shadowOpacity?: number;
+  shadowRadius?: number;
+  shadowOffset?: { width: number; height: number };
+  elevation?: number;
+}
+
+export interface FocusOptions {
+  /** Retained for callers. TV focus uses a ring and glow instead of a fill. */
+  tint?: boolean;
+  /** Dim the control when it is not focused. */
+  dim?: boolean;
+  /** Scale the control up when focused. Off for text fields. */
+  scale?: boolean;
 }
 
 export interface StepperMetrics {
@@ -27,22 +51,48 @@ export interface TabBarMetrics {
   paddingHorizontal: number;
 }
 
+function readFocusOptions(tintOrOptions: boolean | FocusOptions | undefined): { dim: boolean; scale: boolean } {
+  if (typeof tintOrOptions === 'object') {
+    return {
+      dim: tintOrOptions.dim !== false,
+      scale: tintOrOptions.scale !== false,
+    };
+  }
+  return { dim: true, scale: true };
+}
+
 /**
- * Phone focus draws a thicker border. TV focus only scales and tints.
- * `borderWidth` is omitted on TV so the focused view's frame does not change
- * while UIKit is still applying the focus update.
+ * Phone focus draws a thicker border and otherwise leaves the control alone.
+ * TV focus keeps `borderWidth` constant and changes color, scale, opacity, and glow.
+ * Changing border width during a tvOS focus update resizes the frame and quits the app.
  */
-export function focusChrome(tv: boolean, focused: boolean, color: string, tint = true): FocusChrome | null {
+export function focusChrome(
+  tv: boolean,
+  focused: boolean,
+  color: string,
+  tintOrOptions: boolean | FocusOptions = true,
+): FocusChrome | null {
+  const options = readFocusOptions(tintOrOptions);
   if (!tv) {
     if (!focused) return null;
     return { borderWidth: 6, borderColor: color };
   }
-  if (!focused) return { transform: [{ scale: 1 }] };
   const chrome: FocusChrome = {
-    borderColor: color,
-    transform: [{ scale: TV_FOCUS_SCALE }],
+    borderWidth: TV_FOCUS_BORDER,
+    shadowOffset: { width: 0, height: 0 },
   };
-  if (tint) chrome.backgroundColor = tintHex(color, 0.3);
+  if (options.scale) chrome.transform = [{ scale: focused ? TV_FOCUS_SCALE : 1 }];
+  if (options.dim) chrome.opacity = focused ? 1 : TV_UNFOCUSED_OPACITY;
+  if (!focused) {
+    chrome.shadowOpacity = 0;
+    chrome.elevation = 0;
+    return chrome;
+  }
+  chrome.borderColor = TV_FOCUS_RING;
+  chrome.shadowColor = TV_FOCUS_RING;
+  chrome.shadowOpacity = 0.9;
+  chrome.shadowRadius = 16;
+  chrome.elevation = 12;
   return chrome;
 }
 
@@ -63,10 +113,16 @@ export function stepperControlSize(tv: boolean): StepperMetrics {
   return { button: 120, glyph: 68, value: 60, suffix: 24, gap: 22, radius: 28, valueMinWidth: 108 };
 }
 
-/** Phone tab metrics match the existing iPhone tab bar. TV labels are 10-foot size. */
-export function tabBarControlSize(tv: boolean): TabBarMetrics {
+/**
+ * Phone tab metrics match the existing iPhone tab bar.
+ * A 1080p TV keeps 10-foot labels. A 720p TV uses a shorter bar so the WOD list can fit.
+ */
+export function tabBarControlSize(tv: boolean, screenHeight = 1080): TabBarMetrics {
   if (!tv) {
     return { label: 13, icon: 16, itemMinHeight: 49, barContentHeight: 64, gap: 0, paddingHorizontal: 0 };
+  }
+  if (screenHeight < 1000) {
+    return { label: 22, icon: 26, itemMinHeight: 68, barContentHeight: 96, gap: 10, paddingHorizontal: 24 };
   }
   return { label: 48, icon: 56, itemMinHeight: 132, barContentHeight: 176, gap: 28, paddingHorizontal: 60 };
 }

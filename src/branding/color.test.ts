@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { contrastRatio, digitColor, hsvToHex, normalizeHex, phaseLabelInk, readableDigitColor, relativeLuminance } from './color';
-import { THEME_PRESETS } from './types';
+import { COLOR_PALETTES } from './palettes';
 
 describe('brand colors', () => {
   it('accepts six-digit hex with or without a hash', () => {
@@ -40,7 +40,7 @@ describe('brand colors', () => {
     expect(phaseLabelInk('#3DDC97', '#F4F7FB', '#FFFFFF')).toBe('#07080A');
     expect(phaseLabelInk('#FF4D2E', '#F4F7FB', '#FFFFFF')).toBe('#FF4D2E');
 
-    for (const theme of THEME_PRESETS) {
+    for (const theme of COLOR_PALETTES) {
       for (const accent of [theme.workColor, theme.restColor, theme.leadInColor, theme.warningColor, '#07080A', '#FFFFFF']) {
         expect(contrastRatio(phaseLabelInk(accent, theme.digitColor, theme.backgroundColor), theme.backgroundColor)).toBeGreaterThanOrEqual(3);
       }

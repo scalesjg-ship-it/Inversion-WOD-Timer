@@ -1,8 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { TvFocusPressable } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
-import { focusChrome } from '@/src/tv/controls';
-import { tvParallaxProps } from '@/src/tv/pressable';
 import type { Branding } from '../types';
 import { QrMark } from './QrMark';
 import type { ReceiverPhase } from './receiverPhase';
@@ -81,20 +80,16 @@ function TransferBody({
 
 function RestartButton({ accent, label, onPress }: { accent: string; label: string; onPress: () => void }) {
   return (
-    <Pressable
+    <TvFocusPressable
+      accent={accent}
       accessibilityRole="button"
       hasTVPreferredFocus
       testID="tv-logo-restart"
       onPress={onPress}
-      {...tvParallaxProps()}
-      style={({ pressed, focused }) => [
-        styles.button,
-        { borderColor: accent, opacity: pressed ? 0.72 : 1 },
-        focusChrome(true, Boolean(focused), accent),
-      ]}
+      style={({ pressed }) => [styles.button, { borderColor: accent, opacity: pressed ? 0.72 : 1 }]}
     >
       <Text style={styles.buttonLabel}>{label}</Text>
-    </Pressable>
+    </TvFocusPressable>
   );
 }
 

@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -6,17 +7,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { phaseLabelInk, readableDigitColor, screenColors } from '@/src/branding/color';
+import { clockEdgeHeight, clockFontFamily } from '@/src/branding/palettes';
 import type { Branding } from '@/src/branding/types';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
+import { TvFocusPressable } from '@/src/components/TvFocus';
 import { BigButton } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import { formatSnapshot, phaseLabel, roundLabel } from '@/src/timer/labels';
 import { useTimer } from '@/src/timer/useTimer';
 import type { Phase } from '@/src/timer/types';
-import { focusChrome } from '@/src/tv/controls';
-import { fitClock, isTenFootLayout, tvSafeBox, tvSafeInset } from '@/src/tv/layout';
-import { tvParallaxProps } from '@/src/tv/pressable';
+import { clockStatusHint } from '@/src/tv/copy';
+import { fitClock, isTenFootLayout, tvClockChrome, tvSafeBox, tvSafeInset } from '@/src/tv/layout';
 import type { RemoteCommand } from '@/src/tv/remoteMap';
 import { useRemoteCommands } from '@/src/tv/useRemoteCommands';
 
@@ -49,6 +51,7 @@ export default function TimerScreen() {
         bottom: Math.max(insets.bottom, overscan),
         left: Math.max(insets.left, overscan),
       };
+  const [faceBox, setFaceBox] = useState({ width: 0, height: 0 });
   const [controlsHeld, setControlsHeld] = useState(false);
   const controlsVisible = tenFoot ? controlsHeld : true;
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -57,15 +60,21 @@ export default function TimerScreen() {
   const digits = palette.digits;
   const clockText = formatSnapshot(timer.snapshot, config);
   const side = Math.max(safe.left, safe.right, 16);
+  const clockChrome = tvClockChrome(height, Boolean(branding.logoUri));
+  const brandHeight = tv ? clockChrome.logo + (clockChrome.logo > 0 ? 8 : 0) + clockChrome.name + 16 : 0;
+  const headerBlock = tv ? safe.top + brandHeight : 0;
+  const faceReady = tv && faceBox.height > 0 && faceBox.width > 0;
   const clock = fitClock({
     text: clockText,
-    screenWidth: width,
-    screenHeight: height,
+    screenWidth: faceReady ? faceBox.width : width,
+    screenHeight: faceReady ? faceBox.height : height,
     tenFoot,
     fillFrame: tv,
     horizontalInset: side * 2,
     verticalInset: tv
-      ? safe.top + safe.bottom + 280
+      ? faceReady
+        ? clockChrome.phase + 16 + 150
+        : headerBlock + safe.bottom + clockChrome.phase + 170
       : safe.top + safe.bottom + 58 + 36 + 96 + (landscape ? 16 : 80),
   });
   const labelGap = tv ? 8 : 10 - Math.round(clock.fontSize * 0.22);
@@ -138,22 +147,45 @@ export default function TimerScreen() {
         setFrame({ width: next.width, height: next.height });
       }}
     >
-      <View style={[styles.edge, { backgroundColor: phaseColor }]} />
-      <LogoBackdrop branding={branding} width={frame.width} height={frame.height} insets={safe} />
+      <View style={[styles.edge, { height: clockEdgeHeight(branding.backgroundStyle), backgroundColor: phaseColor }]} />
+      {!tv || branding.logoPlacement === 'fullBleed' ? (
+        <LogoBackdrop branding={branding} width={frame.width} height={frame.height} insets={safe} />
+      ) : null}
+      {branding.backgroundStyle === 'vignette' ? <View pointerEvents="none" style={styles.vignette} /> : null}
       <View pointerEvents="none" style={[styles.wash, { backgroundColor: phaseColor }]} />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${phaseLabel(timer.snapshot.phase, config.mode)}, ${clockText}`}
         testID="timer-face"
         onPress={onClock}
-        style={styles.face}
         focusable={false}
+        onLayout={
+          tv
+            ? (event) => {
+                const next = event.nativeEvent.layout;
+                setFaceBox((current) =>
+                  current.width === next.width && current.height === next.height ? current : { width: next.width, height: next.height },
+                );
+              }
+            : undefined
+        }
+        style={[styles.face, tv && { top: headerBlock, bottom: safe.bottom }]}
       >
         <View style={styles.clockBlock}>
           <Text
-            style={[styles.phase, tv && styles.phaseTv, { color: phaseText, marginBottom: labelGap }]}
+            style={[
+              tv ? styles.phaseFlow : styles.phase,
+              tv
+                ? {
+                    fontSize: clockChrome.phase,
+                    lineHeight: clockChrome.phase + 8,
+                    width: clock.width,
+                  }
+                : null,
+              { color: phaseText, marginBottom: labelGap },
+            ]}
             numberOfLines={1}
-            adjustsFontSizeToFit
+            adjustsFontSizeToFit={!tv}
             minimumFontScale={0.7}
             testID="timer-phase"
           >
@@ -164,6 +196,7 @@ export default function TimerScreen() {
               styles.clock,
               {
                 color: digits,
+                fontFamily: clockFontFamily(branding.clockWeight),
                 fontSize: clock.fontSize,
                 lineHeight: clock.lineHeight,
                 width: clock.width,
@@ -176,7 +209,7 @@ export default function TimerScreen() {
           >
             {clockText}
           </Text>
-          <View pointerEvents="none" style={[styles.meta, { marginTop: labelGap }]}>
+          <View pointerEvents="none" style={[tv ? styles.metaFlow : styles.meta, { marginTop: labelGap }]}>
             <Text style={[styles.round, tv && styles.roundTv, { color: palette.text }]} testID="timer-round">
               {roundLabel(timer.snapshot, config)}
             </Text>
@@ -188,45 +221,77 @@ export default function TimerScreen() {
             ) : null}
             {timer.snapshot.paused ? (
               <Text style={[styles.paused, { color: attention }]} testID="timer-paused">
-                Paused · tap to resume
+                {tv && controlsVisible ? 'Paused' : clockStatusHint(tv, 'paused')}
               </Text>
             ) : null}
-            {timer.snapshot.running ? (
-              <Text style={[styles.hint, tv && styles.hintTv, { color: palette.muted }]}>Tap the clock to pause</Text>
+            {timer.snapshot.running && !(tv && controlsVisible) ? (
+              <Text style={[styles.hint, tv && styles.hintTv, { color: palette.muted }]} testID="timer-hint">
+                {clockStatusHint(tv, 'running')}
+              </Text>
             ) : null}
           </View>
         </View>
       </Pressable>
       <View pointerEvents="box-none" style={[styles.overlay, { paddingTop: safe.top }]}>
-        <View style={[styles.top, tv && styles.topTv]} pointerEvents="box-none">
-          <Text
-            style={[styles.gym, tv && styles.gymTv, { color: palette.text, paddingHorizontal: headerSlot }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.45}
-            pointerEvents="none"
-          >
-            {branding.gymName}
-          </Text>
-          <Pressable
+        <View style={[styles.top, tv ? { height: brandHeight } : null]} pointerEvents="box-none">
+          {tv ? (
+            <View pointerEvents="none" style={styles.tvBrand}>
+              {branding.logoUri ? (
+                <Image
+                  source={{ uri: branding.logoUri }}
+                  contentFit="contain"
+                  accessible={false}
+                  testID="timer-logo"
+                  style={{ width: clockChrome.logo, height: clockChrome.logo }}
+                />
+              ) : null}
+              <Text
+                style={[
+                  styles.tvGym,
+                  {
+                    color: palette.text,
+                    fontSize: clockChrome.name,
+                    lineHeight: clockChrome.name + 6,
+                    fontFamily: clockFontFamily(branding.clockWeight),
+                  },
+                ]}
+                numberOfLines={1}
+                testID="timer-gym"
+              >
+                {branding.gymName}
+              </Text>
+            </View>
+          ) : (
+            <Text
+              style={[styles.gym, { color: palette.text, paddingHorizontal: headerSlot }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.45}
+              pointerEvents="none"
+            >
+              {branding.gymName}
+            </Text>
+          )}
+          <TvFocusPressable
+            accent={palette.text}
             accessibilityRole="button"
             testID="timer-back"
             onPress={() => router.back()}
             hitSlop={tv ? undefined : 12}
-            {...tvParallaxProps()}
-            style={({ pressed, focused }) => [
+            style={({ pressed }) => [
               styles.backButton,
               { left: Math.max(18, safe.left) },
               tv && styles.backButtonTv,
               tv && pressed ? { opacity: 0.75 } : null,
-              tv ? focusChrome(true, Boolean(focused), palette.text, false) : null,
             ]}
           >
             <Text style={[styles.back, tv && styles.backTv, { color: palette.text }]}>Back</Text>
-          </Pressable>
-          <View style={[styles.cornerSlot, { right: Math.max(18, safe.right) }]}>
-            <CornerLogo branding={branding} />
-          </View>
+          </TvFocusPressable>
+          {tv ? null : (
+            <View style={[styles.cornerSlot, { right: Math.max(18, safe.right) }]}>
+              <CornerLogo branding={branding} />
+            </View>
+          )}
         </View>
         {confirmOpen ? (
           <View style={styles.confirm} testID="reset-confirm">
@@ -299,6 +364,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     opacity: 0.14,
   },
+  vignette: {
+    ...StyleSheet.absoluteFill,
+    borderWidth: 72,
+    borderColor: 'rgba(0,0,0,0.55)',
+  },
   face: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
@@ -355,8 +425,27 @@ const styles = StyleSheet.create({
     fontSize: 18,
     letterSpacing: 0.4,
   },
-  gymTv: {
-    fontSize: 40,
+  tvBrand: {
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 8,
+  },
+  tvGym: {
+    alignSelf: 'stretch',
+    textAlign: 'center',
+    fontFamily: 'Oswald',
+  },
+  phaseFlow: {
+    alignSelf: 'center',
+    textAlign: 'center',
+    fontFamily: 'OswaldMedium',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  metaFlow: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingHorizontal: 24,
   },
   phaseTv: {
     fontSize: 48,
