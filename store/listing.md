@@ -1,6 +1,6 @@
 # Americana store listing
 
-Copy for App Store Connect and the Amazon Appstore. The name “Americana” was not checked for availability.
+Copy for App Store Connect, Google Play, and the Amazon Appstore. The name “Americana” was not checked for availability.
 
 Bundle id / package, already set for iOS, tvOS, Android, and Fire TV: `com.garrettscales.americana`.
 
@@ -74,3 +74,19 @@ On Fire TV, the remote starts and pauses the clock, moves by ten seconds or by r
 **Privacy policy URL:** the deployed `site/privacy.html` address.
 
 **Support contact:** scalesjg@gmail.com
+
+## Google Play
+
+One app bundle covers phones and Android TV. Play Console for `com.garrettscales.americana` uses the same release track and artifacts as the mobile app, so do not upload a second TV-only bundle.
+
+**Build:** `eas build --profile production-google-play --platform android`
+
+**Title:** Americana
+
+**Short description (80):** Gym interval and round timer for phones and Android TV.
+
+**Full description:** Use the App Store description above. On a phone, tap to pause. On Android TV, the remote starts and pauses, skips time, and resets. There is no account and no tracking.
+
+`production-google-play` sets `EXPO_TV=1` and `EXPO_KEEP_ADAPTIVE_ICON=1`. That prebuild keeps `android.intent.category.LAUNCHER`, adds `android.intent.category.LEANBACK_LAUNCHER`, and sets `android.hardware.touchscreen`, `android.hardware.faketouch`, and `android.software.leanback` to `required="false"`. `androidTVRequired` is left unset, so leanback is not required and phones stay eligible. The TV home row uses `android:banner` (`assets/tv/android-tv-banner.png`, 320×180). The phone launcher stays `@mipmap/ic_launcher`. Without `EXPO_KEEP_ADAPTIVE_ICON`, config-tv would point `android:icon` at the 320×180 TV drawable.
+
+Do not upload `production-android-apk` or `production-firetv` to Play. Those profiles still build APKs, for sideload and the Amazon Appstore. There is no `eas submit` profile for Play.

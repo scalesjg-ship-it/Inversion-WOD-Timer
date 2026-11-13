@@ -44,6 +44,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/withPlayAdaptiveIcon",
       "expo-router",
       "./plugins/withTvLogoLan",
       "./plugins/withTvTcpSocket",

@@ -1,6 +1,6 @@
 # Americana
 
-Americana is a gym timer for CrossFit Inversion and any gym that wants the same clock with its own name, colors, and logo. One Expo codebase ships to iPhone, iPad, Apple TV, a sideloadable Android APK, and Amazon Fire TV. Android is not published on Google Play.
+Americana is a gym timer for CrossFit Inversion and any gym that wants the same clock with its own name, colors, and logo. One Expo codebase ships to iPhone, iPad, Apple TV, Google Play (phones and Android TV from one app bundle), a sideloadable Android APK, and Amazon Fire TV.
 
 The default brand is CrossFit Inversion. A gym can replace the name, work/rest colors, and logo on the device. Nothing is uploaded.
 
@@ -80,7 +80,7 @@ The iOS development profile builds a simulator binary. A physical iPhone needs a
 
 ## Television
 
-Phone and tablet builds leave `EXPO_TV` unset. Apple TV and Fire TV builds set `EXPO_TV=1`, which `@react-native-tvos/config-tv` reads during EAS prebuild. The app uses `react-native-tvos@0.88-stable`, the TV fork that matches Expo SDK 58 (React Native 0.88).
+Apple TV, Fire TV, and the Google Play app bundle set `EXPO_TV=1`, which `@react-native-tvos/config-tv` reads during EAS prebuild. Phone sideload, development, and preview builds leave it unset. On Android, `EXPO_TV=1` adds `LEANBACK_LAUNCHER` and sets `android.hardware.touchscreen` and `android.software.leanback` to `required="false"`. It keeps `LAUNCHER`, so the same binary still installs on phones. `Platform.isTV` is read from the device at runtime (`uiMode === 'tv'`), not from `EXPO_TV`. The Play profile also sets `EXPO_KEEP_ADAPTIVE_ICON=1` so the 320×180 TV drawable is not used as the phone icon. The TV home row still uses `android:banner`. The app uses `react-native-tvos@0.88-stable`, the TV fork that matches Expo SDK 58 (React Native 0.88).
 
 On the running timer:
 
@@ -106,12 +106,13 @@ The phone may send one JPEG, PNG, or HEIC up to 10 MB. The bytes are written to 
 
 ## What you need before the stores
 
-Bundle id, set in `app.json` for iOS, tvOS, the sideload APK, and Fire TV: `com.garrettscales.americana`. Register that id before the first upload. It cannot be changed after that upload.
+Bundle id, set in `app.json` for iOS, tvOS, Google Play, the sideload APK, and Fire TV: `com.garrettscales.americana`. Register that id before the first upload. It cannot be changed after that upload.
 
 - Apple Developer Program, individual account, already Garrett's.
-- An Amazon Appstore developer account. There is no Google Play listing and no Play submit profile.
-- Display name **Americana**. Whether it is free on App Store Connect or Amazon was not checked.
-- Privacy and support pages live in `site/`. Deploy that folder to Vercel as a static site (root directory `site`, no build command). Use the deployed `/privacy` and `/support` URLs in both stores.
+- An Amazon Appstore developer account.
+- A Google Play Console app for `com.garrettscales.americana`, with phones and Android TV on the same release artifact. There is no Play `eas submit` profile. Upload the `.aab` in the console.
+- Display name **Americana**. Whether it is free on App Store Connect, Google Play, or Amazon was not checked.
+- Privacy and support pages live in `site/`. Deploy that folder to Vercel as a static site (root directory `site`, no build command). Use the deployed `/privacy` and `/support` URLs in App Store Connect, Google Play, and Amazon.
 - Listing copy is in `store/listing.md`. Store screenshots are in `store/screenshots/`.
 - The Expo project is `scalesgym/americana` (`extra.eas.projectId` in `app.json`). Do not run `eas init` again unless that project is gone.
 
@@ -122,7 +123,8 @@ Store art is generated from `assets/brand/americana-mark.svg` by `python3 script
 - `assets/images/splash-icon.png`, `favicon.png`, `notification-icon.png`
 - `assets/tv/tvos-icon-front-1280x768.png` and `tvos-icon-back-1280x768.png`, plus 800×480 and 400×240 layers
 - `assets/tv/topshelf-1920x720.png`, `topshelf-3840x1440.png`, `topshelf-wide-2320x720.png`, `topshelf-wide-4640x1440.png`
-- `assets/tv/android-tv-banner.png` (320×180) and `android-tv-icon.png` — Android TV launcher art
+- `assets/tv/android-tv-banner.png` (320×180) — Android TV home-row banner (`android:banner`)
+- `assets/tv/android-tv-icon.png` (320×180) — drawable config-tv assigns to `android:icon` on Fire TV. The Play profile restores the adaptive phone icon instead
 - `assets/store/amazon-icon-512.png`, `amazon-icon-114.png`, `firetv-background-1280x720.png`, `firetv-background-1920x1080.png` — upload these in the Amazon console. They are not the Android TV launcher banner.
 
 ## Build with EAS
@@ -133,7 +135,8 @@ Store art is generated from `assets/brand/americana-mark.svg` by `python3 script
 | `preview` | Phone internal install. `EXPO_TV` unset. |
 | `production-ios` | iOS App Store binary. `EXPO_TV` unset. |
 | `production-tvos` | Apple TV binary. `EXPO_TV=1`. |
-| `production-android-apk` | Sideloadable phone APK. Not for Google Play. |
+| `production-android-apk` | Sideloadable phone APK. Not for Google Play. `EXPO_TV` unset. |
+| `production-google-play` | Google Play app bundle for phones and Android TV. `EXPO_TV=1` and `EXPO_KEEP_ADAPTIVE_ICON=1`. |
 | `production-firetv` | Fire TV APK for the Amazon Appstore. `EXPO_TV=1`. |
 
 ```bash
@@ -141,10 +144,11 @@ eas login
 eas build --profile production-ios --platform ios
 eas build --profile production-tvos --platform ios
 eas build --profile production-android-apk --platform android
+eas build --profile production-google-play --platform android
 eas build --profile production-firetv --platform android
 ```
 
-`eas.json` submit profiles `production-ios` and `production-tvos` set the App Store Connect app id and Apple team id. The App Store Connect API key is not in the repo. `eas submit` prompts for it, or you can set `EXPO_ASC_API_KEY_PATH`, `EXPO_ASC_KEY_ID`, and `EXPO_ASC_ISSUER_ID` in the environment. There is no Google Play submit profile.
+`eas.json` submit profiles `production-ios` and `production-tvos` set the App Store Connect app id and Apple team id. The App Store Connect API key is not in the repo. `eas submit` prompts for it, or you can set `EXPO_ASC_API_KEY_PATH`, `EXPO_ASC_KEY_ID`, and `EXPO_ASC_ISSUER_ID` in the environment. There is no Google Play submit profile. Upload the `production-google-play` `.aab` in Play Console.
 
 tvOS uses the same distribution certificate as iOS and a separate tvOS provisioning profile. EAS creates iOS profiles. For `production-tvos`, create the tvOS profile in the Apple developer site, download it, and supply it as a local credential. See the Expo TV guide.
 
@@ -165,9 +169,16 @@ tvOS uses the same distribution certificate as iOS and a separate tvOS provision
    - Export compliance: `ITSAppUsesNonExemptEncryption` is already false
    - Reviewer note: on-device timer, no account. On Apple TV, use the remote: select starts and pauses, menu leaves the timer.
 
-## Amazon Appstore (Fire TV) and sideload
+## Google Play (phones and Android TV)
 
-Do not create a Google Play app.
+Play Console is set to use the same release track and artifacts as the mobile app. One bundle is the right upload.
+
+1. Build with `eas build --profile production-google-play --platform android`.
+2. Upload that `.aab` to the Play track. Package name: `com.garrettscales.americana`. Display name stays Americana.
+3. The manifest from this profile is the phone-and-TV manifest described in `store/listing.md`. A phone-only bundle (`EXPO_TV` unset) has no `LEANBACK_LAUNCHER` and Play will not offer it on Android TV. A TV-only bundle (`androidTVRequired: true`) would drop phones.
+4. Listing copy is in `store/listing.md`. Phone and Android TV screenshots are already saved in Play Console.
+
+## Amazon Appstore (Fire TV) and sideload
 
 1. Open an Amazon developer account and create the app in the Appstore console.
 2. Upload the APK from `eas build --profile production-firetv --platform android`.
