@@ -5,9 +5,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { prepareLogo } from '../logo';
 import type { BrandColors, Branding } from '../types';
-import { isReachableLanIPv4, pairingUrl } from './address';
+import { chooseLanIPv4, pairingUrl } from './address';
 import { applyUploadedLogo } from './applyUpload';
-import { LanListenerUnavailableError, startLanServer } from './lanServer';
+import { LanListenerUnavailableError, readRouteLanAddress, startLanServer } from './lanServer';
 import { LOGO_LISTEN_MS } from './limits';
 import type { ReceiverPhase } from './receiverPhase';
 import { LogoTransferSession } from './session';
@@ -60,9 +60,17 @@ export function useLogoReceiver(
       setPhase({ kind: 'starting' });
       void (async () => {
         try {
-          const ip = (await Network.getIpAddressAsync()).trim();
+          const reported = (await Network.getIpAddressAsync()).trim();
+          let ip = chooseLanIPv4([reported]);
+          if (!ip) {
+            try {
+              ip = chooseLanIPv4([await readRouteLanAddress()]);
+            } catch {
+              ip = null;
+            }
+          }
           if (stopped) return;
-          if (!isReachableLanIPv4(ip)) {
+          if (!ip) {
             setPhase({
               kind: 'error',
               message: 'Connect this TV to the same Wi-Fi as the phone, then try again.',

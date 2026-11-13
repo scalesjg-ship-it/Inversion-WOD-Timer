@@ -46,9 +46,9 @@ Custom notification sounds and background audio are not fully available in Expo 
 The Brand tab stores, on this device only:
 
 - Gym name
-- Colors for work, rest, lead-in, warning, the clock digits, the background, and the accent. Each one has swatches, a hue strip, and a hex field. Preset themes are Inversion, Dark, High-contrast, Neon, and Fight (red/blue). If a digit color cannot be read on the background, Americana swaps in black or white.
+- Colors for work, rest, lead-in, warning, the clock digits, the background, and the accent. Each one has swatches, a hue strip, and a hex field, and the open color row shows a ring and a dot on the swatch that is in use. Preset templates are Inversion, Dark, High-contrast, Neon, and Fight (red/blue), plus a few more one-tap looks. If a digit color cannot be read on the background, Americana swaps in black or white.
 - A logo from the photo library or from Files on a phone. Any image is accepted. It is resized and kept locally. The default placement is a large faded watermark, about 88% of the shorter screen edge, centered. Full bleed (optional blur) and a corner mark are the other placements.
-- On Apple TV and Fire TV, Brand shows a QR code. Scan it with a phone on the same Wi-Fi, pick a logo, and optionally set the gym name, colors, and placement. The TV saves that logo with the same resize step as a photo picked on the device. The page is served by the TV. The image is not sent to a server on the internet. The listener stops when you leave Brand, or after 10 minutes.
+- On Apple TV and Fire TV, the Logo section of Brand shows a QR code. Scan it with a phone on the same Wi-Fi, pick a logo, and optionally set the gym name, colors, and placement. The TV saves that logo with the same resize step as a photo picked on the device. The page is served by the TV. The image is not sent to a server on the internet. The listener stops when you leave Brand, or after 10 minutes. If the TV cannot open that link, paste an https image address in the same Logo section.
 - Reset to Inversion, which restores the CrossFit Inversion name and colors and clears the logo.
 
 Every mode has a lead-in length, including zero.
@@ -80,7 +80,7 @@ The iOS development profile builds a simulator binary. A physical iPhone needs a
 
 ## Television
 
-Apple TV, Fire TV, and the Google Play app bundle set `EXPO_TV=1`, which `@react-native-tvos/config-tv` reads during EAS prebuild. Phone sideload, development, and preview builds leave it unset. On Android, `EXPO_TV=1` adds `LEANBACK_LAUNCHER` and sets `android.hardware.touchscreen` and `android.software.leanback` to `required="false"`. It keeps `LAUNCHER`, so the same binary still installs on phones. `Platform.isTV` is read from the device at runtime (`uiMode === 'tv'`), not from `EXPO_TV`. The Play profile also sets `EXPO_KEEP_ADAPTIVE_ICON=1` so the 320×180 TV drawable is not used as the phone icon. The TV home row still uses `android:banner`. The app uses `react-native-tvos@0.88-stable`, the TV fork that matches Expo SDK 58 (React Native 0.88).
+Apple TV, Fire TV, and the Google Play app bundle set `EXPO_TV=1`, which `@react-native-tvos/config-tv` reads during EAS prebuild. Phone sideload, development, and preview builds leave it unset. On Android, `EXPO_TV=1` adds `LEANBACK_LAUNCHER` and sets `android.hardware.touchscreen` and `android.software.leanback` to `required="false"`. It keeps `LAUNCHER`, so the same binary still installs on phones. `Platform.isTV` is read from the device at runtime (`uiMode === 'tv'`), not from `EXPO_TV`. The Play profile also sets `EXPO_KEEP_ADAPTIVE_ICON=1` so the Fire TV launcher drawable is not used as the phone icon. The TV home row still uses `android:banner`. The app uses `react-native-tvos@0.88-stable`, the TV fork that matches Expo SDK 58 (React Native 0.88).
 
 On the running timer:
 
@@ -124,8 +124,10 @@ Store art is generated from `assets/brand/americana-mark.svg` by `python3 script
 - `assets/tv/tvos-icon-front-1280x768.png` and `tvos-icon-back-1280x768.png`, plus 800×480 and 400×240 layers
 - `assets/tv/topshelf-1920x720.png`, `topshelf-3840x1440.png`, `topshelf-wide-2320x720.png`, `topshelf-wide-4640x1440.png`
 - `assets/tv/android-tv-banner.png` (320×180) — Android TV home-row banner (`android:banner`)
-- `assets/tv/android-tv-icon.png` (320×180) — drawable config-tv assigns to `android:icon` on Fire TV. The Play profile restores the adaptive phone icon instead
-- `assets/store/amazon-icon-512.png`, `amazon-icon-114.png`, `firetv-background-1280x720.png`, `firetv-background-1920x1080.png` — upload these in the Amazon console. They are not the Android TV launcher banner.
+- `assets/tv/android-tv-icon.png` (512×512, square) — drawable config-tv assigns to `android:icon` on Fire TV. A wide bitmap is cropped out of the hero circle. The Play profile restores the adaptive phone icon instead
+- `assets/store/amazon-icon-512.png`, `amazon-icon-114.png` — square store icons. Upload these in the Amazon console
+- `assets/store/firetv-background-1280x720.png` — 1280×720 Fire TV app icon, opaque, mark centered so a circular crop still shows it
+- `assets/store/firetv-background-1920x1080.png` — opaque background for the Apps-row mini detail. The mark sits in the right-hand safe zone, which is the circle at the top right. A left-aligned banner leaves that circle blank. Re-upload this file in the Amazon console after a new APK; the console image is what Fire TV draws there
 
 ## Build with EAS
 

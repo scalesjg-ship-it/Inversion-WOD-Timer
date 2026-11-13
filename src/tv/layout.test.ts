@@ -11,10 +11,14 @@ import {
   clockFontSize,
   fitClock,
   isTenFootLayout,
+  tvCardCopy,
   tvClockChrome,
+  tvColumnBasis,
   tvHomeLayout,
+  tvMenuColumns,
   tvSafeBox,
   tvSafeInset,
+  tvStartReserve,
 } from './layout';
 
 describe('TV layout', () => {
@@ -82,19 +86,47 @@ describe('TV layout', () => {
     }
   });
 
-  it('fits every conditioning card on a 1080p and a 720p television', () => {
+  it('fits every conditioning card on a 1080p panel, a 720p panel, and Fire TV dp', () => {
     for (const screen of [
       { width: 1920, height: 1080 },
       { width: 1280, height: 720 },
+      { width: 960, height: 540 },
     ]) {
       const layout = tvHomeLayout(screen.width, screen.height, 6);
-      expect(layout.columns).toBe(2);
-      expect(layout.rows).toBe(3);
+      expect(layout.columns).toBe(3);
+      expect(layout.rows).toBe(2);
       expect(layout.contentHeight).toBeLessThanOrEqual(layout.viewportHeight);
-      expect(layout.cardHeight).toBeGreaterThanOrEqual(96);
-      const textBlock = layout.titleSize + 4 + (layout.detailSize + 4) * 2 + 16;
+      expect(layout.cardHeight).toBeGreaterThanOrEqual(120);
+      expect(layout.titleSize).toBeGreaterThanOrEqual(20);
+      expect(tvCardCopy(layout.cardHeight, screen.height < 1000).titleSize).toBe(layout.titleSize);
+      const textBlock = layout.titleSize + 2 + (layout.detailSize + 2) * layout.detailLines + 12;
+      expect(textBlock).toBeLessThanOrEqual(layout.cardHeight);
+      expect(tvColumnBasis(layout.columns)).toBe('33.3333%');
+    }
+  });
+
+  it('fits the four round presets above the start button on 720p and 1080p', () => {
+    for (const screen of [
+      { width: 1920, height: 1080 },
+      { width: 1280, height: 720 },
+      { width: 960, height: 540 },
+    ]) {
+      const reserve = tvStartReserve(screen.height);
+      const layout = tvHomeLayout(screen.width, screen.height, 4, reserve);
+      expect(tvMenuColumns(screen.width, 4)).toBe(2);
+      expect(layout.columns).toBe(2);
+      expect(layout.rows).toBe(2);
+      expect(layout.contentHeight).toBeLessThanOrEqual(layout.viewportHeight);
+      expect(layout.cardHeight).toBeGreaterThanOrEqual(72);
+      const textBlock = layout.titleSize + 2 + (layout.detailSize + 2) * layout.detailLines + 12;
       expect(textBlock).toBeLessThanOrEqual(layout.cardHeight);
     }
+  });
+
+  it('does not let a minimum card height force the list to scroll', () => {
+    const layout = tvHomeLayout(640, 480, 6);
+    expect(layout.contentHeight).toBeLessThanOrEqual(layout.viewportHeight);
+    expect(layout.columns).toBeGreaterThanOrEqual(1);
   });
 
   it('gives the TV clock a readable gym name and a real logo', () => {

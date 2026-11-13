@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { unlockAudio } from '@/src/audio/sounds';
@@ -11,7 +11,17 @@ import { TvFocusPressable } from '@/src/components/TvFocus';
 import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_MENU_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
+import {
+  TV_BODY_FONT,
+  TV_MENU_FONT,
+  TV_SAFE_HORIZONTAL,
+  TV_SECTION_FONT,
+  tvColumnBasis,
+  tvHomeLayout,
+  tvSafeBox,
+  tvStartReserve,
+  type TvHomeLayout,
+} from '@/src/tv/layout';
 import { formatSeconds } from '@/src/timer/format';
 import { BUILTIN_PRESETS, configFromPreset, type RoundPreset } from '@/src/timer/presets';
 import { listPresets, type SavedPreset } from '@/src/timer/presetStorage';
@@ -43,6 +53,8 @@ export default function RoundsScreen() {
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
   const tv = Platform.isTV === true;
   const box = tvSafeBox(tv);
+  const { width, height } = useWindowDimensions();
+  const home = tv ? tvHomeLayout(width, height, BUILTIN_PRESETS.length, tvStartReserve(height)) : null;
   const restColor = readableDigitColor(branding.restColor, branding.backgroundColor);
   const [draft, setDraft] = useState<RoundPreset>(BUILTIN_PRESETS[0]);
   const [selectedId, setSelectedId] = useState(BUILTIN_PRESETS[0].id);
@@ -91,19 +103,53 @@ export default function RoundsScreen() {
         contentContainerStyle={[styles.content, tv && styles.contentTv]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={[styles.wordmark, { color: accent }, tv && styles.wordmarkTv]}>Americana</Text>
-        <Text style={[styles.title, tv && styles.titleTv]}>Rounds</Text>
-        <Text style={[styles.lede, tv && styles.ledeTv]}>Jiu-jitsu, striking, and sparring. Rest is a different color from work.</Text>
+        <Text
+          style={[
+            styles.wordmark,
+            { color: accent },
+            tv && styles.wordmarkTv,
+            home ? { fontSize: home.wordmarkSize, lineHeight: home.wordmarkSize + 4, marginTop: 0 } : null,
+          ]}
+        >
+          Americana
+        </Text>
+        <Text style={[styles.title, tv && styles.titleTv, home ? { fontSize: home.gymSize, lineHeight: home.gymSize + 4 } : null]}>
+          Rounds
+        </Text>
+        <Text
+          style={[
+            styles.lede,
+            tv && styles.ledeTv,
+            home ? { fontSize: home.sectionSize, lineHeight: home.sectionSize + 4, marginTop: 0 } : null,
+          ]}
+        >
+          Jiu-jitsu, striking, and sparring. Rest is a different color from work.
+        </Text>
         <View style={[styles.presets, tv && styles.presetsTv]}>
           {BUILTIN_PRESETS.map((preset) => (
-            <StandardCard
+            <View
               key={preset.id}
-              preset={preset}
-              accent={accent}
-              selected={selectedId === preset.id}
-              onPress={() => apply(preset)}
-              tv={tv}
-            />
+              style={
+                home
+                  ? {
+                      width: tvColumnBasis(home.columns),
+                      maxWidth: tvColumnBasis(home.columns),
+                      flexGrow: 0,
+                      flexShrink: 0,
+                      padding: home.gridGap / 2,
+                    }
+                  : undefined
+              }
+            >
+              <StandardCard
+                preset={preset}
+                accent={accent}
+                selected={selectedId === preset.id}
+                onPress={() => apply(preset)}
+                tv={tv}
+                frame={home}
+              />
+            </View>
           ))}
         </View>
 
@@ -189,23 +235,64 @@ function StandardCard({
   selected,
   onPress,
   tv,
+  frame,
 }: {
   preset: RoundPreset;
   accent: string;
   selected: boolean;
   onPress: () => void;
   tv: boolean;
+  frame: TvHomeLayout | null;
 }) {
   return (
     <TvFocusPressable
       accent={accent}
       testID={`preset-${preset.id}`}
       accessibilityRole="button"
+      accessibilityState={{ selected }}
       onPress={onPress}
-      style={() => [styles.preset, tv && styles.presetTv, { borderColor: selected ? accent : chrome.line }]}
+      style={() => [
+        styles.preset,
+        tv && !frame && styles.presetTv,
+        frame
+          ? {
+              width: '100%',
+              height: frame.cardHeight,
+              minHeight: frame.cardHeight,
+              flexGrow: 0,
+              flexBasis: 'auto',
+              padding: 12,
+              borderRadius: 16,
+            }
+          : null,
+        { borderColor: selected && !tv ? accent : chrome.line },
+      ]}
     >
-      <Text style={[styles.presetName, tv && styles.presetNameTv]}>{preset.name}</Text>
-      <Text style={[styles.presetMeta, tv && styles.presetMetaTv]}>{presetMeta(preset)}</Text>
+      <View style={styles.presetTop}>
+        <Text
+          style={[
+            styles.presetName,
+            tv && !frame && styles.presetNameTv,
+            frame ? { fontSize: frame.titleSize, lineHeight: frame.titleSize + 2 } : null,
+          ]}
+          numberOfLines={1}
+        >
+          {preset.name}
+        </Text>
+        {selected ? (
+          <Text style={[styles.presetCheck, { color: accent }, frame ? { fontSize: frame.titleSize } : null]}>✓</Text>
+        ) : null}
+      </View>
+      <Text
+        style={[
+          styles.presetMeta,
+          tv && !frame && styles.presetMetaTv,
+          frame ? { fontSize: frame.detailSize, lineHeight: frame.detailSize + 4 } : null,
+        ]}
+        numberOfLines={frame ? frame.detailLines : 2}
+      >
+        {presetMeta(preset)}
+      </Text>
     </TvFocusPressable>
   );
 }
@@ -241,8 +328,8 @@ const styles = StyleSheet.create({
     color: chrome.text,
   },
   titleTv: {
-    fontSize: TV_TITLE_FONT,
-    lineHeight: TV_TITLE_FONT + 8,
+    fontSize: 56,
+    lineHeight: 64,
   },
   lede: {
     color: chrome.muted,
@@ -263,7 +350,7 @@ const styles = StyleSheet.create({
   },
   contentTv: {
     flexGrow: 1,
-    gap: 28,
+    gap: 16,
     paddingHorizontal: TV_SAFE_HORIZONTAL,
     paddingTop: 0,
   },
@@ -273,7 +360,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   presetsTv: {
-    gap: 24,
+    gap: 0,
+    marginHorizontal: 0,
   },
   preset: {
     width: '48%',
@@ -293,7 +381,17 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     width: '46%',
   },
+  presetTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  presetCheck: {
+    fontFamily: 'Oswald',
+    fontSize: 22,
+  },
   presetName: {
+    flex: 1,
     fontFamily: 'Oswald',
     fontSize: 22,
     color: chrome.text,

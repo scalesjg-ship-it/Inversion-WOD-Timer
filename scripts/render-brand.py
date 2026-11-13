@@ -68,6 +68,47 @@ def draw_centered(draw: ImageDraw.ImageDraw, text: str, y: int, font: ImageFont.
     draw.text((x, y), text, font=font, fill=fill)
 
 
+def opaque(image: Image.Image) -> Image.Image:
+    """Amazon Fire TV rejects an alpha channel on the background and the 1280×720 icon."""
+    if image.mode != "RGBA":
+        image = image.convert("RGBA")
+    flat = Image.new("RGB", image.size, BG[:3])
+    flat.paste(image, mask=image.getchannel("A"))
+    return flat
+
+
+def firetv_background(width: int, height: int) -> Image.Image:
+    """Put the mark in the upper-right mini-detail.
+
+    Amazon shows this 1920×1080 image in the circle at the top right of Apps and
+    subscriptions. The safe subject box is 1214×830, kept off the left side where
+    the title sits. A left-aligned banner leaves that circle empty.
+    """
+    image = Image.new("RGBA", (width, height), BG)
+    safe_w = round(width * (1214 / 1920))
+    safe_h = round(height * (830 / 1080))
+    safe_x = width - round(width * (64 / 1920)) - safe_w
+    safe_y = max(0, (height - safe_h) // 2)
+    mark = int(min(safe_w, safe_h) * 0.92)
+    paste_mark(image, mark, (safe_x + (safe_w - mark) // 2, safe_y + (safe_h - mark) // 2), "full")
+    return opaque(image)
+
+
+def firetv_square_icon(size: int) -> Image.Image:
+    image = Image.new("RGBA", (size, size), BG)
+    mark = int(size * 0.86)
+    paste_mark(image, mark, ((size - mark) // 2, (size - mark) // 2), "full")
+    return opaque(image)
+
+
+def firetv_wide_icon(width: int, height: int) -> Image.Image:
+    """1280×720 Fire TV app icon. The mark is centered so a circular crop still shows it."""
+    image = Image.new("RGBA", (width, height), BG)
+    mark = int(height * 0.86)
+    paste_mark(image, mark, ((width - mark) // 2, (height - mark) // 2), "full")
+    return opaque(image)
+
+
 def banner(width: int, height: int, title_size: int, sub_size: int) -> Image.Image:
     image = Image.new("RGBA", (width, height), BG)
     draw = ImageDraw.Draw(image)
@@ -141,14 +182,14 @@ def main() -> None:
     save(banner(4640, 1440, 220, 80), TV / "topshelf-wide-4640x1440.png")
 
     save(banner(320, 180, 28, 12), TV / "android-tv-banner.png")
-    tv_icon = Image.new("RGBA", (320, 180), BG)
-    paste_mark(tv_icon, 168, (76, 6), "front")
-    save(tv_icon, TV / "android-tv-icon.png")
+    # Square launcher icon. config-tv points android:icon at this file on Fire TV.
+    # A 320×180 bitmap is cropped into the hero circle and the mark falls outside it.
+    save(firetv_square_icon(512), TV / "android-tv-icon.png")
 
     save(icon.resize((512, 512), Image.Resampling.LANCZOS), STORE / "amazon-icon-512.png")
     save(icon.resize((114, 114), Image.Resampling.LANCZOS), STORE / "amazon-icon-114.png")
-    save(banner(1280, 720, 84, 30), STORE / "firetv-background-1280x720.png")
-    save(banner(1920, 1080, 128, 44), STORE / "firetv-background-1920x1080.png")
+    save(firetv_wide_icon(1280, 720), STORE / "firetv-background-1280x720.png")
+    save(firetv_background(1920, 1080), STORE / "firetv-background-1920x1080.png")
 
     old = list(TV.glob("placeholder-*"))
     for path in old:

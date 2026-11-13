@@ -1,5 +1,6 @@
 import { NativeModules } from 'react-native';
 
+import { isReachableLanIPv4 } from './address';
 import { encodeHtmlResponse, HttpAccumulator } from './http';
 import { messagePage } from './page';
 import type { LogoTransferSession } from './session';
@@ -18,7 +19,7 @@ export type LanServer = {
  */
 export class LanListenerUnavailableError extends Error {
   constructor() {
-    super('This TV cannot open a link for a logo. Add the logo from the Americana app on your iPhone.');
+    super('This TV cannot open a Wi-Fi link for a logo. Paste an https image link below to save one on this TV.');
     this.name = 'LanListenerUnavailableError';
   }
 }
@@ -54,6 +55,34 @@ type ConnectedSocket = {
   pause(): void;
   setTimeout(ms: number): void;
 };
+
+/**
+ * Ask the TV which address it would use to reach the internet.
+ * Fire TV on Ethernet often has no Wi-Fi address. The socket is closed as soon as it connects.
+ */
+export async function readRouteLanAddress(): Promise<string> {
+  const TcpSocket = await loadTcpSocket();
+  return await new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (ip: string) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        socket.destroy();
+      } catch {
+        // The probe socket may already be closed.
+      }
+      if (isReachableLanIPv4(ip)) resolve(ip);
+      else reject(new Error('This TV could not find an address on the local network.'));
+    };
+    const timer = setTimeout(() => finish(''), 3000);
+    const socket = TcpSocket.createConnection({ port: 443, host: '1.1.1.1' }, () => {
+      finish(typeof socket.localAddress === 'string' ? socket.localAddress : '');
+    });
+    socket.on('error', () => finish(''));
+  });
+}
 
 export async function startLanServer(session: LogoTransferSession): Promise<LanServer> {
   const TcpSocket = await loadTcpSocket();

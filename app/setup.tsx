@@ -10,7 +10,7 @@ import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvToggle } from 
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
+import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, tvSafeBox } from '@/src/tv/layout';
 import { normalizeConfig } from '@/src/timer/engine';
 import { modeTitle } from '@/src/timer/labels';
 import { defaultConfig } from '@/src/timer/presets';
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   },
   contentTv: {
     paddingHorizontal: TV_SAFE_HORIZONTAL,
-    gap: 22,
+    gap: 14,
     paddingTop: 4,
     paddingBottom: 8,
   },
@@ -334,8 +334,8 @@ const styles = StyleSheet.create({
     lineHeight: 52,
   },
   titleTv: {
-    fontSize: TV_TITLE_FONT,
-    lineHeight: TV_TITLE_FONT + 8,
+    fontSize: 56,
+    lineHeight: 64,
   },
   summary: {
     color: chrome.muted,

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_BRANDING } from '../types';
 import { sanitizeBranding } from '../storage';
-import { isReachableLanIPv4, pairingUrl } from './address';
+import { chooseLanIPv4, isReachableLanIPv4, pairingUrl } from './address';
 import { applyUploadedLogo } from './applyUpload';
 import { encodeHtmlResponse, HttpAccumulator, type Inbound } from './http';
 import { MAX_IMAGE_BYTES } from './limits';
@@ -46,6 +46,13 @@ describe('lan address', () => {
     expect(isReachableLanIPv4('256.1.1.1')).toBe(false);
     expect(isReachableLanIPv4('::1')).toBe(false);
     expect(pairingUrl('192.168.1.20', 8741, TOKEN)).toBe(`http://192.168.1.20:8741/?t=${TOKEN}`);
+  });
+
+  it('prefers a Wi-Fi address over link-local and ignores a missing one', () => {
+    expect(chooseLanIPv4(['0.0.0.0', '169.254.8.1', '192.168.1.42'])).toBe('192.168.1.42');
+    expect(chooseLanIPv4(['0.0.0.0', ''])).toBeNull();
+    expect(chooseLanIPv4(['169.254.1.8'])).toBe('169.254.1.8');
+    expect(chooseLanIPv4(['8.8.8.8', '10.0.0.8'])).toBe('10.0.0.8');
   });
 });
 
