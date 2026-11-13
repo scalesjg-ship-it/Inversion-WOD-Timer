@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { contrastRatio, digitColor, hsvToHex, normalizeHex, phaseLabelInk, readableDigitColor, relativeLuminance } from './color';
+import { contrastRatio, digitColor, hsvToHex, normalizeHex, phaseLabelInk, readableDigitColor, relativeLuminance, sameHex } from './color';
 import { COLOR_PALETTES } from './palettes';
 
 describe('brand colors', () => {
+  it('matches the selected swatch without caring about case', () => {
+    expect(sameHex('#4c8dff', '#4C8DFF')).toBe(true);
+    expect(sameHex('80ff00', '#80FF00')).toBe(true);
+    expect(sameHex('#4C8DFF', '#80FF00')).toBe(false);
+    expect(sameHex('blue', '#0000FF')).toBe(false);
+  });
+
   it('accepts six-digit hex with or without a hash', () => {
     expect(normalizeHex('#ff4d2e')).toBe('#FF4D2E');
     expect(normalizeHex('3ddc97')).toBe('#3DDC97');

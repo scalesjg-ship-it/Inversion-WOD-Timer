@@ -18,7 +18,18 @@ describe('brand palettes and templates', () => {
     expect(COLOR_PALETTES.length).toBeGreaterThanOrEqual(8);
     const names = COLOR_PALETTES.map((palette) => palette.name);
     expect(names).toEqual(
-      expect.arrayContaining(['Classic Black/Yellow', 'Patriot Red/White/Blue', 'Neon', 'Monochrome', 'Ocean', 'Forest']),
+      expect.arrayContaining([
+        'Classic Black/Yellow',
+        'Patriot Red/White/Blue',
+        'Neon',
+        'Monochrome',
+        'Ocean',
+        'Forest',
+        'Inversion',
+        'Dark',
+        'High-contrast',
+        'Fight',
+      ]),
     );
     for (const palette of COLOR_PALETTES) {
       const saved = sanitizeBranding(paletteColors(palette));
@@ -29,6 +40,9 @@ describe('brand palettes and templates', () => {
   });
 
   it('applies a template as colors plus layout and leaves the logo file alone', () => {
+    expect(BRAND_TEMPLATES.map((template) => template.name)).toEqual(
+      expect.arrayContaining(['Inversion', 'Dark', 'High-contrast', 'Neon', 'Fight']),
+    );
     expect(BRAND_TEMPLATES.length).toBeGreaterThanOrEqual(4);
     for (const template of BRAND_TEMPLATES) {
       const patch = templatePatch(template);

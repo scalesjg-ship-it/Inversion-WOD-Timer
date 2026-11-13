@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { moduleRuns, qrModules } from './qrMatrix';
 
-const TARGET_PX = 520;
+const TARGET_PX = 360;
 
 export function QrMark({ value }: { value: string }) {
   const matrix = useMemo(() => qrModules(value), [value]);

@@ -1,5 +1,11 @@
 import type { Branding } from './types';
 
+export function sameHex(left: string, right: string): boolean {
+  const a = normalizeHex(left);
+  const b = normalizeHex(right);
+  return a !== null && a === b;
+}
+
 export function normalizeHex(input: string): string | null {
   const value = input.trim().replace(/^#/, '');
   if (!/^[0-9a-fA-F]{6}$/.test(value)) return null;

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 
-import { hexToHue, hsvToHex, inkOn, normalizeHex } from '@/src/branding/color';
+import { hexToHue, hsvToHex, inkOn, normalizeHex, sameHex } from '@/src/branding/color';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
+import { TV_FOCUS_BORDER } from '@/src/tv/controls';
 
 const HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
 const VALUES = [1, 0.78, 0.55, 0.32];
@@ -73,7 +74,7 @@ export function ColorPicker({
               <Swatch
                 key={swatch}
                 color={swatch}
-                selected={value.toUpperCase() === swatch}
+                selected={sameHex(value, swatch)}
                 label={`${label} ${swatch}`}
                 testID={`${testID}-swatch-${swatch.slice(1)}`}
                 wide={false}
@@ -88,7 +89,7 @@ export function ColorPicker({
                 <Swatch
                   key={item}
                   color={next}
-                  selected={Math.abs(hue - item) < 15}
+                  selected={sameHex(value, next)}
                   label={`${label} hue ${item}`}
                   testID={`${testID}-hue-${item}`}
                   wide={false}
@@ -105,7 +106,7 @@ export function ColorPicker({
                 <Swatch
                   key={amount}
                   color={next}
-                  selected={false}
+                  selected={sameHex(value, next)}
                   label={`${label} value ${amount}`}
                   testID={`${testID}-value-${amount}`}
                   wide
@@ -138,8 +139,11 @@ function Swatch({
   onPress: () => void;
 }) {
   const tv = Platform.isTV === true;
+  const ink = inkOn(color);
   return (
     <TvFocusPressable
+      dim={false}
+      scale={false}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
@@ -149,14 +153,20 @@ function Swatch({
         wide ? styles.value : tall ? styles.hue : styles.chip,
         tv && (wide ? styles.valueTv : tall ? styles.hueTv : styles.chipTv),
         { backgroundColor: color },
-        !tv && selected ? styles.chipOn : null,
-        tv ? { borderWidth: 4, borderColor: selected ? '#F4F7FB' : 'transparent' } : null,
+        tv ? { borderWidth: TV_FOCUS_BORDER, borderColor: 'transparent' } : null,
       ]}
     >
       {selected ? (
-        <Text style={[styles.check, tv && styles.checkTv, { color: inkOn(color) }]} accessible={false}>
-          ✓
-        </Text>
+        <View pointerEvents="none" style={styles.selectedMark}>
+          <View
+            style={[
+              styles.selectedRing,
+              tv && styles.selectedRingTv,
+              { borderColor: ink },
+            ]}
+          />
+          <View style={[styles.selectedDot, tv && styles.selectedDotTv, { backgroundColor: ink }]} />
+        </View>
       ) : null}
     </TvFocusPressable>
   );
@@ -251,9 +261,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   chip: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -263,9 +273,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   hue: {
-    width: 22,
-    height: 28,
-    borderRadius: 6,
+    width: 32,
+    height: 36,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -276,8 +286,8 @@ const styles = StyleSheet.create({
   },
   value: {
     flex: 1,
-    height: 22,
-    borderRadius: 6,
+    height: 32,
+    borderRadius: 8,
     minWidth: 36,
     alignItems: 'center',
     justifyContent: 'center',
@@ -287,17 +297,38 @@ const styles = StyleSheet.create({
     minWidth: 72,
     borderRadius: 16,
   },
-  chipOn: {
+  selectedMark: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedRing: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    margin: 2,
     borderWidth: 2,
-    borderColor: '#F4F7FB',
+    borderRadius: 6,
   },
-  check: {
-    fontFamily: 'Oswald',
-    fontSize: 12,
-    lineHeight: 14,
+  selectedRingTv: {
+    margin: 5,
+    borderWidth: 4,
+    borderRadius: 12,
   },
-  checkTv: {
-    fontSize: 36,
-    lineHeight: 42,
+  selectedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  selectedDotTv: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
   },
 });

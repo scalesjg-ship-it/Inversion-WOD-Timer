@@ -217,7 +217,7 @@ export function Chip({
       ]}
     >
       <Text style={[styles.chipLabel, tv && styles.chipLabelTv, { color: selected ? chrome.text : chrome.muted }]}>
-        {label}
+        {selected ? `✓  ${label}` : label}
       </Text>
     </TvFocusPressable>
   );

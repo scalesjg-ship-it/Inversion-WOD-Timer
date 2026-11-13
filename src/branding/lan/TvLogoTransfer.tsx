@@ -20,7 +20,7 @@ export function TvLogoTransfer({
   return (
     <View style={styles.block} testID="tv-logo-transfer">
       <Text style={styles.headline} testID="tv-brand-note">
-        Scan with your phone to send a logo
+        Send a logo from your phone
       </Text>
       <TransferBody phase={phase} accent={accent} restart={restart} />
       <Text style={styles.help}>
@@ -104,8 +104,8 @@ const styles = StyleSheet.create({
   headline: {
     color: chrome.text,
     fontFamily: 'Oswald',
-    fontSize: 48,
-    lineHeight: 56,
+    fontSize: 36,
+    lineHeight: 42,
   },
   help: {
     color: chrome.muted,

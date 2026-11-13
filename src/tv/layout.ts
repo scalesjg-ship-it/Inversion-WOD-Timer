@@ -82,6 +82,8 @@ export interface TvHomeLayout {
   cardHeight: number;
   titleSize: number;
   detailSize: number;
+  /** 2 when the card is tall enough for the subtitle, otherwise 1. */
+  detailLines: 1 | 2;
   gymSize: number;
   wordmarkSize: number;
   sectionSize: number;
@@ -95,39 +97,85 @@ export interface TvHomeLayout {
   viewportHeight: number;
 }
 
+/** Width that places `columns` cells on one row. Four decimals stay under 100% so the row does not wrap. */
+export function tvColumnBasis(columns: number): string {
+  const count = Math.max(1, columns);
+  return `${(100 / count).toFixed(4)}%`;
+}
+
+/** Start button and its footer. Preset grids leave this much of the TV clear. */
+export function tvStartReserve(screenHeight: number): number {
+  return screenHeight < 1000 ? 148 : 164;
+}
+
 /**
- * Sizes the WOD mode list so every built-in timer fits on one 720p or 1080p TV.
- * The tab bar is outside this viewport. Card text is sized to the card, not the other way around.
+ * Column count for a TV option list.
+ * Six conditioning modes use three columns on a 720p or 1080p television, including
+ * the 960dp width Fire TV reports for a 1080p panel. Four round presets stay a 2×2.
  */
-export function tvHomeLayout(screenWidth: number, screenHeight: number, optionCount: number): TvHomeLayout {
-  const columns = screenWidth >= 900 ? 2 : 1;
-  const rows = Math.max(1, Math.ceil(Math.max(0, optionCount) / columns));
+export function tvMenuColumns(screenWidth: number, optionCount: number): number {
+  const count = Math.max(1, optionCount);
+  if (count <= 1) return 1;
+  const fitted = Math.max(1, Math.min(3, count, Math.floor(Math.max(0, screenWidth) / 260)));
+  if (count === 4 && fitted > 2) return 2;
+  return fitted;
+}
+
+const CARD_COPY_CHROME = 12;
+
+/** Title and subtitle sizes that stay inside the card, readable from the couch. */
+export function tvCardCopy(cardHeight: number, compact: boolean): { titleSize: number; detailSize: number; detailLines: 1 | 2 } {
+  let titleSize = Math.min(compact ? 28 : 34, Math.max(16, Math.floor(cardHeight * 0.26)));
+  let detailSize = Math.min(compact ? 16 : 20, Math.max(12, Math.floor(cardHeight * 0.14)));
+  const block = (lines: number) => titleSize + 2 + (detailSize + 2) * lines + CARD_COPY_CHROME;
+  let detailLines: 1 | 2 = block(2) <= cardHeight ? 2 : 1;
+  while (block(detailLines) > cardHeight && titleSize > 14) {
+    titleSize -= 1;
+    if (detailSize > 12) detailSize -= 1;
+  }
+  if (block(detailLines) > cardHeight) detailLines = 1;
+  return { titleSize, detailSize, detailLines };
+}
+
+/**
+ * Sizes a TV option list so every built-in choice fits on one 720p or 1080p screen.
+ * `reservedBottom` is for a pinned control such as Start. The tab bar is already outside this viewport.
+ * Card text is sized to the card. The minimum card height never pushes the list into a scroll.
+ */
+export function tvHomeLayout(
+  screenWidth: number,
+  screenHeight: number,
+  optionCount: number,
+  reservedBottom = 0,
+): TvHomeLayout {
+  const count = Math.max(1, optionCount);
+  const columns = tvMenuColumns(screenWidth, count);
+  const rows = Math.max(1, Math.ceil(count / columns));
   const tab = tabBarControlSize(true, screenHeight);
   const tabBlock = tab.barContentHeight + 16;
-  const viewportHeight = Math.max(0, screenHeight - tabBlock);
-  const compact = screenHeight < 1000;
-  const padTop = compact ? 20 : 36;
-  const padBottom = 8;
-  const stackGap = compact ? 6 : 8;
+  const viewportHeight = Math.max(0, screenHeight - tabBlock - Math.max(0, reservedBottom));
+  const compact = screenHeight < 1000 || viewportHeight < 520;
+  const padTop = compact ? 10 : 20;
+  const padBottom = compact ? 4 : 6;
+  const stackGap = compact ? 4 : 6;
   const gridGap = compact ? 8 : 12;
-  const wordmarkSize = compact ? 16 : 22;
-  const gymSize = compact ? 28 : 44;
-  const sectionSize = compact ? 16 : 22;
-  const hintSize = compact ? 16 : 20;
-  const header = padTop + wordmarkSize + stackGap + gymSize + stackGap + sectionSize + stackGap;
-  const footer = stackGap + hintSize + padBottom;
+  const wordmarkSize = compact ? 14 : 18;
+  const gymSize = compact ? 24 : 36;
+  const sectionSize = compact ? 14 : 18;
+  const hintSize = compact ? 14 : 18;
+  // Line boxes are 4px taller than the font so Oswald is not clipped.
+  const header = padTop + (wordmarkSize + 4) + stackGap + (gymSize + 4) + stackGap + (sectionSize + 4) + stackGap;
+  const footer = stackGap + (hintSize + 4) + padBottom;
   const gridExtra = rows * gridGap;
-  const available = viewportHeight - header - footer - gridExtra;
-  const cardHeight = Math.max(64, Math.floor(available / rows));
+  const room = viewportHeight - header - footer - gridExtra;
+  const cardHeight = Math.max(1, Math.floor(room / rows));
   const contentHeight = header + footer + rows * cardHeight + gridExtra;
-  const titleSize = Math.min(compact ? 26 : 32, Math.max(18, Math.floor(cardHeight * 0.28)));
-  const detailSize = Math.min(compact ? 16 : 18, Math.max(13, Math.floor(cardHeight * 0.16)));
+  const copy = tvCardCopy(cardHeight, compact);
   return {
     columns,
     rows,
     cardHeight,
-    titleSize,
-    detailSize,
+    ...copy,
     gymSize,
     wordmarkSize,
     sectionSize,

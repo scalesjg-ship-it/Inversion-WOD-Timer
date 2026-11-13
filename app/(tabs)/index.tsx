@@ -9,7 +9,7 @@ import { readableDigitColor } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
-import { isTenFootLayout, tvHomeLayout, tvSafeBox, tvSafeInset, type TvHomeLayout } from '@/src/tv/layout';
+import { isTenFootLayout, tvColumnBasis, tvHomeLayout, tvSafeBox, tvSafeInset, type TvHomeLayout } from '@/src/tv/layout';
 import { scrollOffsetForFocus } from '@/src/tv/scroll';
 import { modeTitle } from '@/src/timer/labels';
 import { loadPresets, presetSummary, type SavedPreset } from '@/src/timer/presetStorage';
@@ -149,7 +149,17 @@ export default function WodScreen() {
           {MODES.map((item, index) => (
             <View
               key={item.mode}
-              style={tv && home ? { width: '50%', padding: home.gridGap / 2 } : undefined}
+              style={
+                tv && home
+                  ? {
+                      width: tvColumnBasis(home.columns),
+                      maxWidth: tvColumnBasis(home.columns),
+                      flexGrow: 0,
+                      flexShrink: 0,
+                      padding: home.gridGap / 2,
+                    }
+                  : undefined
+              }
               onLayout={(event) => {
                 cardLocal.current[item.mode] = {
                   y: event.nativeEvent.layout.y,
@@ -336,7 +346,7 @@ function ModeCard({
       ]}
     >
       <View style={[styles.bar, { backgroundColor: accent }]} />
-      <View style={styles.cardBody}>
+        <View style={[styles.cardBody, frame ? styles.cardBodyFrame : null]}>
         <Text
           style={[
             styles.cardTitle,
@@ -353,7 +363,7 @@ function ModeCard({
             tenFoot && styles.cardDetailTv,
             frame ? { fontSize: frame.detailSize, lineHeight: frame.detailSize + 4 } : null,
           ]}
-          numberOfLines={2}
+          numberOfLines={frame ? frame.detailLines : 2}
         >
           {item.detail}
         </Text>
@@ -447,9 +457,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   cardBodyFrame: {
-    paddingVertical: 22,
-    paddingHorizontal: 24,
-    gap: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    gap: 2,
   },
   cardTitle: {
     fontFamily: 'Oswald',

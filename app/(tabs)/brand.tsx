@@ -25,7 +25,7 @@ import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { TvLogoUrl } from '@/src/components/TvLogoUrl';
 import { Chip, TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
+import { TV_BODY_FONT, TV_SECTION_FONT, tvSafeBox } from '@/src/tv/layout';
 
 export function ErrorBoundary(props: { error: Error; retry: () => Promise<void> }) {
   return <RouteErrorBoundary {...props} />;
@@ -116,8 +116,6 @@ export default function BrandScreen() {
           Your gym name, colors, and logo stay on this device. The timer reads them on every screen.
         </Text>
 
-        {Platform.isTV ? <TvLogoTransfer branding={branding} update={update} accent={accent} /> : null}
-
         <View
           testID="brand-preview"
           style={[styles.preview, tv && styles.previewTv, { backgroundColor: branding.backgroundColor }]}
@@ -163,6 +161,7 @@ export default function BrandScreen() {
         <ColorPicker label="Accent" testID="color-ui" value={branding.uiColor} onChange={(uiColor) => void update({ uiColor })} />
 
         <Text style={labelStyle}>Logo</Text>
+        {Platform.isTV ? <TvLogoTransfer branding={branding} update={update} accent={accent} /> : null}
         {Platform.isTV ? <TvLogoUrl onStored={async (logoUri) => update({ logoUri })} /> : null}
         {Platform.isTV ? null : (
           <View style={styles.row}>
@@ -184,9 +183,7 @@ export default function BrandScreen() {
           >
             <Text style={[styles.link, tv && styles.linkTv, { color: accent }]}>Remove logo</Text>
           </TvFocusPressable>
-        ) : Platform.isTV ? (
-          <Text style={[styles.help, styles.helpTv]}>Or scan the code above and send a logo from a phone on this Wi-Fi.</Text>
-        ) : (
+        ) : Platform.isTV ? null : (
           <Text style={styles.help}>Any gym logo works. Pick it from your photo library or Files. It stays on this device.</Text>
         )}
         <View style={styles.chips}>
@@ -286,27 +283,27 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 0,
     paddingTop: 0,
-    gap: 28,
+    gap: 16,
     paddingBottom: 48,
   },
   wordmarkTv: {
     fontSize: 32,
   },
   titleTv: {
-    fontSize: TV_TITLE_FONT,
-    lineHeight: TV_TITLE_FONT + 8,
+    fontSize: 56,
+    lineHeight: 64,
   },
   ledeTv: {
     fontSize: TV_BODY_FONT,
     lineHeight: TV_BODY_FONT + 8,
   },
   previewTv: {
-    height: 420,
-    borderRadius: 28,
+    height: 200,
+    borderRadius: 20,
   },
   previewClockTv: {
-    fontSize: 180,
-    lineHeight: 200,
+    fontSize: 84,
+    lineHeight: 96,
   },
   wordmark: {
     fontFamily: 'OswaldMedium',

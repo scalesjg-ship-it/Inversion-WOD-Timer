@@ -10,7 +10,7 @@ import { PresetShelf } from '@/src/components/PresetShelf';
 import { BigButton, Chip, HeaderBack, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
+import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, tvSafeBox } from '@/src/tv/layout';
 import {
   WARNING_MARK_CHOICES,
   addCountdownSeconds,
@@ -189,9 +189,9 @@ const styles = StyleSheet.create({
   // the content pads back in to the safe margin.
   scrollTv: { flex: 1, alignSelf: 'stretch', marginHorizontal: -TV_SAFE_HORIZONTAL },
   content: { gap: 16, paddingTop: 12, paddingBottom: 24 },
-  contentTv: { flexGrow: 1, gap: 32, paddingTop: 8, paddingHorizontal: TV_SAFE_HORIZONTAL },
+  contentTv: { flexGrow: 1, gap: 14, paddingTop: 8, paddingHorizontal: TV_SAFE_HORIZONTAL },
   title: { fontFamily: 'Oswald', fontSize: 48, color: chrome.text, lineHeight: 52 },
-  titleTv: { fontSize: TV_TITLE_FONT, lineHeight: TV_TITLE_FONT + 8 },
+  titleTv: { fontSize: 56, lineHeight: 64 },
   summary: { color: chrome.muted, fontSize: 16, marginTop: -8 },
   summaryTv: { fontSize: TV_BODY_FONT, lineHeight: TV_BODY_FONT + 8 },
   field: { gap: 10 },
