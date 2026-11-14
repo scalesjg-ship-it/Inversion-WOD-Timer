@@ -16,7 +16,9 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Americana uses your photo library so your gym logo can appear on the timer.",
         "NSLocalNetworkUsageDescription": "Americana listens on your Wi-Fi so a phone on the same network can send a gym logo to this TV. The logo is saved on this TV and is not sent to a server.",
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio"
+        ]
       }
     },
     "android": {
@@ -113,7 +115,18 @@
           ],
           "enableRemoteNotifications": false
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ],
+      "./plugins/withAndroidSystemBars",
+      "./plugins/withAndroidResourceKeeps"
     ],
     "experiments": {
       "typedRoutes": true

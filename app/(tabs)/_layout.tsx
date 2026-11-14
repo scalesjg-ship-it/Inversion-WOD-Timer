@@ -1,16 +1,23 @@
 import { Tabs } from 'expo-router';
 import { Platform, Text, type TextStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { TvTabBar } from '@/src/components/TvTabBar';
 import { chrome } from '@/src/theme/chrome';
 
+const TAB_BAR_CONTENT_HEIGHT = 64;
+
 export default function TabLayout() {
   const { branding } = useBranding();
   const tint = readableDigitColor(branding.uiColor, branding.backgroundColor);
+  const insets = useSafeAreaInsets();
 
   const tv = Platform.isTV === true;
+  // Android phone draws edge-to-edge. The fixed 64pt bar would sit under the
+  // navigation bar. iOS and TV keep the existing bar.
+  const androidPhone = Platform.OS === 'android' && !tv;
 
   return (
     <Tabs
@@ -22,8 +29,9 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: chrome.bg,
           borderTopColor: chrome.line,
-          height: 64,
+          height: androidPhone ? TAB_BAR_CONTENT_HEIGHT + insets.bottom : TAB_BAR_CONTENT_HEIGHT,
           paddingTop: 6,
+          ...(androidPhone ? { paddingBottom: insets.bottom } : null),
         },
         tabBarLabelStyle: {
           fontFamily: 'OswaldMedium',

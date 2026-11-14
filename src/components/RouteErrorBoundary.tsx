@@ -1,4 +1,5 @@
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
@@ -17,12 +18,21 @@ type RouteErrorProps = {
  */
 export function RouteErrorBoundary({ error, retry }: RouteErrorProps) {
   const tv = Platform.isTV === true;
+  const androidPhone = Platform.OS === 'android' && !tv;
+  const insets = useSafeAreaInsets();
   const box = tvSafeBox(tv);
   const detail = error.name && error.name !== 'Error' ? `${error.name}: ${error.message}` : error.message;
 
   return (
     <View
-      style={[styles.safe, tv && { paddingHorizontal: box.horizontal, paddingTop: box.vertical, paddingBottom: box.vertical }]}
+      style={[
+        styles.safe,
+        tv && { paddingHorizontal: box.horizontal, paddingTop: box.vertical, paddingBottom: box.vertical },
+        androidPhone && {
+          paddingTop: Math.max(24, insets.top),
+          paddingBottom: Math.max(24, insets.bottom),
+        },
+      ]}
     >
       <ScrollView contentContainerStyle={[styles.content, tv && styles.contentTv]} testID="route-error">
         <Text style={[styles.title, tv && styles.titleTv]}>Something went wrong</Text>
