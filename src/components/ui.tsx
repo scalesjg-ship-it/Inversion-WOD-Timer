@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { inkOn } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
 import { stepperControlSize } from '@/src/tv/controls';
+import { scaleTvStyle, tvScale } from '@/src/tv/layout';
 
 export function BigButton({
   label,
@@ -21,6 +22,8 @@ export function BigButton({
 }) {
   const solid = variant === 'solid';
   const tv = Platform.isTV === true;
+  const { width, height } = useWindowDimensions();
+  const scale = tv ? tvScale(width, height) : 1;
   const ink = solid ? inkOn(color) : color;
   return (
     <TvFocusPressable
@@ -30,14 +33,14 @@ export function BigButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.big,
-        tv && styles.bigTv,
+        tv && scaleTvStyle({ minHeight: 128, borderRadius: 28, paddingHorizontal: 28 }, scale),
         solid
           ? { backgroundColor: color }
           : { backgroundColor: 'transparent', borderWidth: 1, borderColor: color },
         { opacity: pressed ? 0.72 : 1 },
       ]}
     >
-      <Text style={[styles.bigLabel, tv && styles.bigLabelTv, { color: ink }]}>{label}</Text>
+      <Text style={[styles.bigLabel, tv && scaleTvStyle({ fontSize: 48, letterSpacing: 2 }, scale), { color: ink }]}>{label}</Text>
     </TvFocusPressable>
   );
 }
@@ -60,7 +63,8 @@ export function NumberStepper({
   accent: string;
 }) {
   const tv = Platform.isTV === true;
-  const size = stepperControlSize(tv);
+  const { height } = useWindowDimensions();
+  const size = stepperControlSize(tv, tv ? height : 1080);
   const [text, setText] = useState(String(value));
   const [tracked, setTracked] = useState(value);
   if (value !== tracked) {
@@ -157,11 +161,13 @@ export function TimeField({
   accent: string;
 }) {
   const tv = Platform.isTV === true;
+  const { width, height } = useWindowDimensions();
+  const scale = tv ? tvScale(width, height) : 1;
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   return (
     <View style={styles.field}>
-      <Text style={[styles.fieldLabel, tv && styles.fieldLabelTv]}>{label}</Text>
+      <Text style={[styles.fieldLabel, tv && scaleTvStyle({ fontSize: 32, letterSpacing: 2 }, scale)]}>{label}</Text>
       <View style={[styles.fieldRow, tv && styles.fieldRowTv]}>
         <NumberStepper
           value={minutes}
@@ -200,6 +206,8 @@ export function Chip({
   testID?: string;
 }) {
   const tv = Platform.isTV === true;
+  const { width, height } = useWindowDimensions();
+  const scale = tv ? tvScale(width, height) : 1;
   return (
     <TvFocusPressable
       accent={color}
@@ -209,14 +217,14 @@ export function Chip({
       onPress={onPress}
       style={() => [
         styles.chip,
-        tv && styles.chipTv,
+        tv && scaleTvStyle({ minHeight: 88, paddingHorizontal: 28, paddingVertical: 18, borderWidth: 4 }, scale),
         {
           borderColor: selected ? color : chrome.line,
           backgroundColor: selected ? `${color}22` : chrome.surface,
         },
       ]}
     >
-      <Text style={[styles.chipLabel, tv && styles.chipLabelTv, { color: selected ? chrome.text : chrome.muted }]}>
+      <Text style={[styles.chipLabel, tv && scaleTvStyle({ fontSize: 32 }, scale), { color: selected ? chrome.text : chrome.muted }]}>
         {selected ? `✓  ${label}` : label}
       </Text>
     </TvFocusPressable>

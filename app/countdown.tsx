@@ -1,12 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
+import { TvPager } from '@/src/components/TvPager';
 import { BigButton, Chip, HeaderBack, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
@@ -36,7 +37,8 @@ export default function CountdownScreen() {
   const { setSession } = useTimerSession();
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
   const tv = Platform.isTV === true;
-  const box = tvSafeBox(tv);
+  const { width, height } = useWindowDimensions();
+  const box = tvSafeBox(tv, width, height);
   const initial = defaultConfig('countdown');
   const initialParts = splitDuration(initial.workSeconds);
   const [hours, setHours] = useState(initialParts.hours);
@@ -95,6 +97,110 @@ export default function CountdownScreen() {
     setSession({ config: nextConfig, label });
     router.push('/timer');
   };
+
+  const shelf = (
+    <PresetShelf
+      mode="countdown"
+      accent={accent}
+      config={config}
+      selectedId={selectedId}
+      onLoad={loadPreset}
+      onStart={(preset) => start(preset.config, preset.name)}
+      onClearSelection={() => {
+        setSelectedId('');
+        setRunLabel('Countdown');
+      }}
+    />
+  );
+
+  if (tv) {
+    return (
+      <SafeAreaView style={styles.safe} edges={[]}>
+        <View style={styles.header}>
+          <HeaderBack testID="countdown-back" onPress={() => router.back()} color={accent} />
+          <Text style={styles.kickerTv}>Americana</Text>
+        </View>
+        <TvPager
+          accent={accent}
+          pages={[
+            {
+              key: 'length',
+              label: 'Countdown',
+              content: (
+                <ScrollView testID="screen-countdown" contentContainerStyle={styles.tvPage}>
+                  <Text style={styles.summaryTv}>{formatSeconds(config.workSeconds)}</Text>
+                  <View style={styles.field}>
+                    <Text style={styles.fieldLabelTv}>Duration</Text>
+                    <NumberStepper value={hours} min={0} max={23} suffix="hr" testID="countdown-hours" accent={accent} onChange={(value) => applyDuration(joinDuration(value, minutes, seconds))} />
+                    <NumberStepper value={minutes} min={0} max={59} suffix="min" testID="countdown-minutes" accent={accent} onChange={(value) => applyDuration(joinDuration(hours, value, seconds))} />
+                    <NumberStepper value={seconds} min={0} max={59} suffix="sec" testID="countdown-seconds" accent={accent} onChange={(value) => applyDuration(joinDuration(hours, minutes, value))} />
+                  </View>
+                </ScrollView>
+              ),
+            },
+            {
+              key: 'adds',
+              label: 'Add time',
+              content: (
+                <ScrollView contentContainerStyle={styles.tvPage}>
+                  <View style={styles.chips}>
+                    <Chip label="+30s" color={accent} selected={false} testID="add-30" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 30))} />
+                    <Chip label="+1m" color={accent} selected={false} testID="add-60" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 60))} />
+                    <Chip label="+5m" color={accent} selected={false} testID="add-300" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 300))} />
+                  </View>
+                </ScrollView>
+              ),
+            },
+            {
+              key: 'beeps',
+              label: 'Warning beeps',
+              content: (
+                <ScrollView contentContainerStyle={styles.tvPage}>
+                  <TimeField label="Lead-in" seconds={leadInSeconds} onChange={(value) => setLeadInSeconds(Math.min(600, value))} testID="lead-in" accent={accent} />
+                  <View style={styles.field}>
+                    <Text style={styles.fieldLabelTv}>Warning beeps</Text>
+                    <View style={styles.chips}>
+                      {WARNING_MARK_CHOICES.map((choice) => (
+                        <Chip
+                          key={choice.id}
+                          label={choice.label}
+                          color={accent}
+                          selected={marks.includes(choice.seconds)}
+                          testID={`mark-${choice.id}`}
+                          onPress={() => {
+                            setMarks((current) =>
+                              current.includes(choice.seconds)
+                                ? current.filter((mark) => mark !== choice.seconds)
+                                : [...current, choice.seconds].sort((left, right) => right - left),
+                            );
+                          }}
+                        />
+                      ))}
+                      <Chip
+                        label="Last 3s"
+                        color={accent}
+                        selected={finalBeepsEnabled(marks)}
+                        testID="mark-final"
+                        onPress={() => setMarks((current) => withFinalBeeps(current, !finalBeepsEnabled(current), durationSeconds))}
+                      />
+                    </View>
+                  </View>
+                </ScrollView>
+              ),
+            },
+            {
+              key: 'presets',
+              label: 'Saved presets',
+              content: <ScrollView contentContainerStyle={styles.tvPage}>{shelf}</ScrollView>,
+            },
+          ]}
+        />
+        <View style={styles.footer}>
+          <BigButton testID="start-countdown" label="Start countdown" color={accent} onPress={() => start(config, runLabel)} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -190,6 +296,7 @@ const styles = StyleSheet.create({
   scrollTv: { flex: 1, alignSelf: 'stretch', marginHorizontal: -TV_SAFE_HORIZONTAL },
   content: { gap: 16, paddingTop: 12, paddingBottom: 24 },
   contentTv: { flexGrow: 1, gap: 14, paddingTop: 8, paddingHorizontal: TV_SAFE_HORIZONTAL },
+  tvPage: { gap: 22, paddingBottom: 12 },
   title: { fontFamily: 'Oswald', fontSize: 48, color: chrome.text, lineHeight: 52 },
   titleTv: { fontSize: 56, lineHeight: 64 },
   summary: { color: chrome.muted, fontSize: 16, marginTop: -8 },

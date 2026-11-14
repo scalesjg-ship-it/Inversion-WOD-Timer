@@ -15,7 +15,6 @@ export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }:
   const focusedOptions = focusedRoute ? descriptors[focusedRoute.key]?.options : undefined;
   const active = colorString(focusedOptions?.tabBarActiveTintColor, chrome.text);
   const inactive = colorString(focusedOptions?.tabBarInactiveTintColor, chrome.muted);
-  const bottomInset = Math.max(insets.bottom, 16);
 
   return (
     <View
@@ -25,8 +24,9 @@ export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }:
         {
           gap: metrics.gap,
           paddingHorizontal: metrics.paddingHorizontal,
-          paddingBottom: bottomInset,
-          minHeight: metrics.barContentHeight + bottomInset,
+          paddingTop: metrics.paddingTop,
+          paddingBottom: Math.max(insets.bottom, metrics.paddingBottom),
+          minHeight: metrics.paddingTop + metrics.barContentHeight + Math.max(insets.bottom, metrics.paddingBottom),
         },
       ]}
     >
@@ -83,7 +83,6 @@ const styles = StyleSheet.create({
     backgroundColor: chrome.bg,
     borderTopColor: chrome.line,
     borderTopWidth: 2,
-    paddingTop: 18,
   },
   item: {
     flex: 1,

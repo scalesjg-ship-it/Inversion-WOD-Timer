@@ -62,6 +62,9 @@ describe('TV control sizes', () => {
     expect(tab.icon).toBeGreaterThanOrEqual(40);
     expect(tab.itemMinHeight).toBeGreaterThanOrEqual(120);
     expect(tab.barContentHeight).toBeGreaterThanOrEqual(160);
+    const fourK = tabBarControlSize(true, 2160);
+    expect(fourK.label).toBeGreaterThanOrEqual(tab.label * 2 - 1);
+    expect(fourK.barContentHeight).toBeGreaterThanOrEqual(tab.barContentHeight * 2 - 1);
   });
 });
 

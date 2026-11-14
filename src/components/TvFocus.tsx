@@ -3,13 +3,15 @@ import {
   Platform,
   Pressable,
   TextInput,
+  useWindowDimensions,
   type PressableProps,
   type StyleProp,
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
 
-import { focusChrome, TV_FOCUS_RING, type FocusOptions } from '@/src/tv/controls';
+import { focusChrome, TV_FOCUS_BORDER, TV_FOCUS_RING, type FocusOptions } from '@/src/tv/controls';
+import { tvScaled } from '@/src/tv/layout';
 import { tvParallaxProps } from '@/src/tv/pressable';
 import { usePointerFocus } from '@/src/tv/usePointerFocus';
 
@@ -36,8 +38,14 @@ export function TvFocusPressable({
   children?: ReactNode;
 }) {
   const tv = Platform.isTV === true;
+  const { width, height } = useWindowDimensions();
   const pointer = usePointerFocus();
-  const options: FocusOptions = { dim, scale, tint: false };
+  const options: FocusOptions = {
+    dim,
+    scale,
+    tint: false,
+    borderWidth: tv ? tvScaled(TV_FOCUS_BORDER, width, height) : undefined,
+  };
   return (
     <Pressable
       {...rest}
@@ -70,6 +78,7 @@ export function TvTextField({
   ...rest
 }: TextInputProps & { accent?: string }) {
   const tv = Platform.isTV === true;
+  const { width, height } = useWindowDimensions();
   const [focused, setFocused] = useState(false);
   return (
     <TextInput
@@ -82,7 +91,14 @@ export function TvTextField({
         if (tv) setFocused(false);
         onBlur?.(event);
       }}
-      style={[style, focusChrome(tv, focused, accent, { scale: false, tint: false })]}
+      style={[
+        style,
+        focusChrome(tv, focused, accent, {
+          scale: false,
+          tint: false,
+          borderWidth: tv ? tvScaled(TV_FOCUS_BORDER, width, height) : undefined,
+        }),
+      ]}
     />
   );
 }

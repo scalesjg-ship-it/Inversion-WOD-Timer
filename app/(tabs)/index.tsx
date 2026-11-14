@@ -7,9 +7,11 @@ import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
+import { TvMenuCell } from '@/src/components/TvMenuCell';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
-import { isTenFootLayout, tvColumnBasis, tvHomeLayout, tvSafeBox, tvSafeInset, type TvHomeLayout } from '@/src/tv/layout';
+import { isTenFootLayout, tvColumnBasis, tvFocusGutter, tvSafeInset, type TvHomeLayout } from '@/src/tv/layout';
+import { useTvMenuFrame } from '@/src/tv/useTvMenuFrame';
 import { scrollOffsetForFocus } from '@/src/tv/scroll';
 import { modeTitle } from '@/src/timer/labels';
 import { loadPresets, presetSummary, type SavedPreset } from '@/src/timer/presetStorage';
@@ -49,9 +51,9 @@ export default function WodScreen() {
   const tv = Platform.isTV === true;
   const tenFoot = isTenFootLayout(width, height, tv);
   const inset = tvSafeInset(tenFoot);
-  const box = tvSafeBox(tv);
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
-  const home = tv ? tvHomeLayout(width, height, MODES.length) : null;
+  const menu = useTvMenuFrame(MODES.length, { header: 'home', insets: true });
+  const home = tv ? menu.frame : null;
   const scrollRef = useRef<ScrollViewInstance>(null);
   const scrollOffset = useRef(0);
   const viewportHeight = useRef(0);
@@ -94,6 +96,7 @@ export default function WodScreen() {
         scrollEventThrottle={16}
         onLayout={(event) => {
           viewportHeight.current = event.nativeEvent.layout.height;
+          if (tv) menu.onSceneLayout(event);
         }}
         onScroll={(event) => {
           scrollOffset.current = event.nativeEvent.contentOffset.y;
@@ -103,9 +106,9 @@ export default function WodScreen() {
           tenFoot && !tv && { paddingHorizontal: inset, paddingBottom: inset },
           tv && home
             ? {
-                paddingHorizontal: box.horizontal,
+                paddingHorizontal: home.padHorizontal,
                 paddingTop: home.padTop,
-                paddingBottom: home.padBottom,
+                paddingBottom: home.stackGap,
                 gap: home.stackGap,
               }
             : null,
@@ -117,7 +120,7 @@ export default function WodScreen() {
             styles.wordmark,
             { color: accent },
             tenFoot && !tv && styles.wordmarkTv,
-            tv && home ? { fontSize: home.wordmarkSize, lineHeight: home.wordmarkSize + 4, marginTop: 0 } : null,
+            tv && home ? { fontSize: home.wordmarkSize, lineHeight: home.wordmarkLine, marginTop: 0 } : null,
           ]}
         >
           Americana
@@ -126,7 +129,7 @@ export default function WodScreen() {
           style={[
             styles.gym,
             tenFoot && !tv && styles.gymTv,
-            tv && home ? { fontSize: home.gymSize, lineHeight: home.gymSize + 4 } : null,
+            tv && home ? { fontSize: home.gymSize, lineHeight: home.gymLine } : null,
           ]}
           numberOfLines={1}
         >
@@ -135,7 +138,7 @@ export default function WodScreen() {
         <Text
           style={[
             styles.section,
-            tv && home ? { fontSize: home.sectionSize, lineHeight: home.sectionSize + 4, marginTop: 0, marginBottom: 0 } : null,
+            tv && home ? { fontSize: home.sectionSize, lineHeight: home.sectionLine, marginTop: 0, marginBottom: 0 } : null,
           ]}
         >
           Conditioning
@@ -146,54 +149,79 @@ export default function WodScreen() {
             gridTop.current = event.nativeEvent.layout.y;
           }}
         >
-          {MODES.map((item, index) => (
-            <View
-              key={item.mode}
-              style={
-                tv && home
-                  ? {
-                      width: tvColumnBasis(home.columns),
-                      maxWidth: tvColumnBasis(home.columns),
-                      flexGrow: 0,
-                      flexShrink: 0,
-                      padding: home.gridGap / 2,
-                    }
-                  : undefined
-              }
-              onLayout={(event) => {
-                cardLocal.current[item.mode] = {
-                  y: event.nativeEvent.layout.y,
-                  height: event.nativeEvent.layout.height,
-                };
-              }}
-            >
-              <ModeCard
-                item={item}
-                accent={accent}
-                preferred={index === 0}
-                tenFoot={tenFoot && !tv}
+          {MODES.map((item, index) =>
+            tv && home ? (
+              <TvMenuCell
+                key={item.mode}
+                basis={tvColumnBasis(home.columns)}
                 frame={home}
-                onReveal={() => {
-                  const local = cardLocal.current[item.mode];
-                  if (!local) return;
-                  reveal(gridTop.current + local.y, local.height);
+                onLayout={(event) => {
+                  cardLocal.current[item.mode] = {
+                    y: event.nativeEvent.layout.y,
+                    height: event.nativeEvent.layout.height,
+                  };
                 }}
-              />
-            </View>
-          ))}
+              >
+                {(focus) => (
+                  <ModeCard
+                    item={item}
+                    accent={accent}
+                    preferred={index === 0}
+                    tenFoot={false}
+                    frame={home}
+                    onFocus={focus.onFocus}
+                    onBlur={focus.onBlur}
+                    onReveal={() => {
+                      const local = cardLocal.current[item.mode];
+                      if (!local) return;
+                      reveal(gridTop.current + local.y, local.height);
+                    }}
+                  />
+                )}
+              </TvMenuCell>
+            ) : (
+              <View
+                key={item.mode}
+                onLayout={(event) => {
+                  cardLocal.current[item.mode] = {
+                    y: event.nativeEvent.layout.y,
+                    height: event.nativeEvent.layout.height,
+                  };
+                }}
+              >
+                <ModeCard
+                  item={item}
+                  accent={accent}
+                  preferred={index === 0}
+                  tenFoot={tenFoot && !tv}
+                  frame={null}
+                  onReveal={() => {
+                    const local = cardLocal.current[item.mode];
+                    if (!local) return;
+                    reveal(gridTop.current + local.y, local.height);
+                  }}
+                />
+              </View>
+            ),
+          )}
         </View>
         {presets && presets.length > 0 ? (
           <>
-            <Text style={styles.section}>My presets</Text>
+            <Text style={[styles.section, tv && home ? { fontSize: home.sectionSize, lineHeight: home.sectionLine, marginTop: 0 } : null]}>
+              My presets
+            </Text>
             <View
               style={styles.list}
               onLayout={(event) => {
                 presetListTop.current = event.nativeEvent.layout.y;
               }}
             >
-              {presets.map((preset) => (
+              {presets.map((preset) => {
+                const gutter = home ? tvFocusGutter(width - home.padHorizontal * 2) : 0;
+                return (
                 <View
                   key={preset.id}
+                  style={tv && home ? { paddingHorizontal: gutter, paddingVertical: home.gutterTop, zIndex: 0 } : undefined}
                   onLayout={(event) => {
                     presetLocal.current[preset.id] = {
                       y: event.nativeEvent.layout.y,
@@ -205,6 +233,9 @@ export default function WodScreen() {
                     preset={preset}
                     accent={accent}
                     tenFoot={tenFoot && !tv}
+                    tall={tv && home ? Math.round(home.cardHeight * 0.62) : 0}
+                    titleSize={tv && home ? home.titleSize : 0}
+                    detailSize={tv && home ? home.detailSize : 0}
                     onOpen={() => openPreset(preset)}
                     onStart={() => startPreset(preset)}
                     onReveal={() => {
@@ -214,11 +245,12 @@ export default function WodScreen() {
                     }}
                   />
                 </View>
-              ))}
+                );
+              })}
             </View>
           </>
         ) : null}
-        <Text style={[styles.hint, tv && home ? { fontSize: home.hintSize, lineHeight: home.hintSize + 6, marginTop: 0 } : null]}>
+        <Text style={[styles.hint, tv && home ? { fontSize: home.hintSize, lineHeight: home.hintLine, marginTop: 0 } : null]}>
           Jiu-jitsu, boxing, and sparring rounds are on the Rounds tab.
         </Text>
       </ScrollView>
@@ -252,6 +284,9 @@ function SavedPresetCard({
   preset,
   accent,
   tenFoot,
+  tall = 0,
+  titleSize = 0,
+  detailSize = 0,
   onOpen,
   onStart,
   onReveal,
@@ -259,13 +294,16 @@ function SavedPresetCard({
   preset: SavedPreset;
   accent: string;
   tenFoot: boolean;
+  tall?: number;
+  titleSize?: number;
+  detailSize?: number;
   onOpen: () => void;
   onStart: () => void;
   onReveal: () => void;
 }) {
   const tv = Platform.isTV === true;
   return (
-    <View style={[styles.card, tenFoot && styles.cardTv, tv && styles.presetCardTv]}>
+    <View style={[styles.card, tenFoot && styles.cardTv, tv && styles.presetCardTv, tall > 0 ? { minHeight: tall, height: tall } : null]}>
       <View style={[styles.bar, { backgroundColor: accent }]} />
       <TvFocusPressable
         accent={accent}
@@ -277,10 +315,23 @@ function SavedPresetCard({
         onFocus={onReveal}
         style={({ pressed }) => [styles.cardBody, { opacity: pressed ? 0.78 : 1 }]}
       >
-        <Text style={[styles.cardTitle, tenFoot && styles.cardTitleTv]} numberOfLines={2}>
+        <Text
+          style={[
+            styles.cardTitle,
+            tenFoot && styles.cardTitleTv,
+            titleSize > 0 ? { fontSize: titleSize, lineHeight: titleSize + 6 } : null,
+          ]}
+          numberOfLines={2}
+        >
           {preset.name}
         </Text>
-        <Text style={[styles.cardDetail, tenFoot && styles.cardDetailTv]}>
+        <Text
+          style={[
+            styles.cardDetail,
+            tenFoot && styles.cardDetailTv,
+            detailSize > 0 ? { fontSize: detailSize, lineHeight: detailSize + 8 } : null,
+          ]}
+        >
           {modeTitle(preset.mode)} · {presetSummary(preset.config)}
         </Text>
       </TvFocusPressable>
@@ -305,6 +356,8 @@ function ModeCard({
   preferred,
   tenFoot,
   frame,
+  onFocus,
+  onBlur,
   onReveal,
 }: {
   item: (typeof MODES)[number];
@@ -312,6 +365,8 @@ function ModeCard({
   preferred: boolean;
   tenFoot: boolean;
   frame: TvHomeLayout | null;
+  onFocus?: () => void;
+  onBlur?: () => void;
   onReveal: () => void;
 }) {
   const tv = frame !== null;
@@ -322,7 +377,11 @@ function ModeCard({
       accessibilityRole="button"
       accessibilityLabel={modeTitle(item.mode)}
       hasTVPreferredFocus={preferred}
-      onFocus={onReveal}
+      onFocus={() => {
+        onFocus?.();
+        onReveal();
+      }}
+      onBlur={() => onBlur?.()}
       onPress={() => {
         if (item.mode === 'countdown') {
           router.push('/countdown');
@@ -351,7 +410,7 @@ function ModeCard({
           style={[
             styles.cardTitle,
             tenFoot && styles.cardTitleTv,
-            frame ? { fontSize: frame.titleSize, lineHeight: frame.titleSize + 2 } : null,
+            frame ? { fontSize: frame.titleSize, lineHeight: frame.titleSize + Math.max(4, Math.round(frame.titleSize * 0.12)) } : null,
           ]}
           numberOfLines={1}
         >
@@ -361,7 +420,7 @@ function ModeCard({
           style={[
             styles.cardDetail,
             tenFoot && styles.cardDetailTv,
-            frame ? { fontSize: frame.detailSize, lineHeight: frame.detailSize + 4 } : null,
+            frame ? { fontSize: frame.detailSize, lineHeight: frame.detailSize + Math.max(6, Math.round(frame.detailSize * 0.25)) } : null,
           ]}
           numberOfLines={frame ? frame.detailLines : 2}
         >
@@ -435,6 +494,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 0,
     marginHorizontal: 0,
+    overflow: 'visible',
   },
   card: {
     flexDirection: 'row',
