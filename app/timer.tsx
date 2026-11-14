@@ -18,7 +18,7 @@ import { formatSnapshot, phaseLabel, roundLabel } from '@/src/timer/labels';
 import { useTimer } from '@/src/timer/useTimer';
 import type { Phase } from '@/src/timer/types';
 import { clockStatusHint } from '@/src/tv/copy';
-import { fitClock, isTenFootLayout, tvClockChrome, tvSafeBox, tvSafeInset } from '@/src/tv/layout';
+import { fitClock, isTenFootLayout, scaleTvStyle, tvClockChrome, tvSafeBox, tvSafeInset, tvScale } from '@/src/tv/layout';
 import type { RemoteCommand } from '@/src/tv/remoteMap';
 import { useRemoteCommands } from '@/src/tv/useRemoteCommands';
 
@@ -37,7 +37,8 @@ export default function TimerScreen() {
   const tv = Platform.isTV === true;
   const tenFoot = isTenFootLayout(width, height, tv);
   const overscan = tvSafeInset(tenFoot);
-  const box = tvSafeBox(tv);
+  const box = tvSafeBox(tv, width, height);
+  const typeScale = tv ? tvScale(width, height) : 1;
   const safe = tv
     ? {
         top: Math.max(insets.top, box.vertical),
@@ -210,10 +211,10 @@ export default function TimerScreen() {
             {clockText}
           </Text>
           <View pointerEvents="none" style={[tv ? styles.metaFlow : styles.meta, { marginTop: labelGap }]}>
-            <Text style={[styles.round, tv && styles.roundTv, { color: palette.text }]} testID="timer-round">
+            <Text style={[styles.round, tv && scaleTvStyle(roundTv, typeScale), { color: palette.text }]} testID="timer-round">
               {roundLabel(timer.snapshot, config)}
             </Text>
-            <Text style={[styles.label, tv && styles.labelTv, { color: palette.muted }]}>{label}</Text>
+            <Text style={[styles.label, tv && scaleTvStyle(labelTv, typeScale), { color: palette.muted }]}>{label}</Text>
             {timer.snapshot.warningActive ? (
               <Text style={[styles.warning, { color: attention }]} testID="timer-warning">
                 Last {config.warningSeconds} seconds
@@ -225,7 +226,7 @@ export default function TimerScreen() {
               </Text>
             ) : null}
             {timer.snapshot.running && !(tv && controlsVisible) ? (
-              <Text style={[styles.hint, tv && styles.hintTv, { color: palette.muted }]} testID="timer-hint">
+              <Text style={[styles.hint, tv && scaleTvStyle(hintTv, typeScale), { color: palette.muted }]} testID="timer-hint">
                 {clockStatusHint(tv, 'running')}
               </Text>
             ) : null}
@@ -285,7 +286,7 @@ export default function TimerScreen() {
               tv && pressed ? { opacity: 0.75 } : null,
             ]}
           >
-            <Text style={[styles.back, tv && styles.backTv, { color: palette.text }]}>Back</Text>
+            <Text style={[styles.back, tv && scaleTvStyle(backTv, typeScale), { color: palette.text }]}>Back</Text>
           </TvFocusPressable>
           {tv ? null : (
             <View style={[styles.cornerSlot, { right: Math.max(18, safe.right) }]}>
@@ -351,6 +352,11 @@ function phaseInk(phase: Phase, branding: Branding, warningActive: boolean): str
     }
   }
 }
+
+const roundTv = { fontSize: 52, lineHeight: 64 };
+const labelTv = { fontSize: 32, lineHeight: 40 };
+const hintTv = { fontSize: 26, lineHeight: 34 };
+const backTv = { fontSize: 40 };
 
 const styles = StyleSheet.create({
   root: {

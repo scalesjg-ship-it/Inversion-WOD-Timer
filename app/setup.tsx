@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
+import { TvPager } from '@/src/components/TvPager';
 import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvToggle } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
@@ -79,7 +80,8 @@ function SetupForm({
   onStart: (config: TimerConfig, label: string) => void;
 }) {
   const tv = Platform.isTV === true;
-  const box = tvSafeBox(tv);
+  const { width, height } = useWindowDimensions();
+  const box = tvSafeBox(tv, width, height);
   const initial = defaultConfig(mode);
   const [leadInSeconds, setLeadInSeconds] = useState(initial.leadInSeconds);
   const [workSeconds, setWorkSeconds] = useState(mode === 'forTime' ? 12 * 60 : initial.workSeconds);
@@ -130,6 +132,121 @@ function SetupForm({
   });
 
   const summary = presetSummary(config);
+  const shelf = (
+    <PresetShelf
+      mode={mode}
+      accent={accent}
+      config={config}
+      selectedId={selectedId}
+      onLoad={loadPreset}
+      onStart={(preset) => onStart(preset.config, preset.name)}
+      onClearSelection={() => {
+        setSelectedId('');
+        setRunLabel(modeTitle(mode));
+      }}
+    />
+  );
+
+  if (tv) {
+    return (
+      <SafeAreaView style={styles.safe} edges={[]}>
+        <View style={styles.header}>
+          <HeaderBack onPress={() => router.back()} color={accent} />
+          <Text style={styles.kickerTv}>Americana</Text>
+        </View>
+        <TvPager
+          accent={accent}
+          pages={[
+            {
+              key: 'time',
+              label: modeTitle(mode),
+              content: (
+                <ScrollView contentContainerStyle={styles.tvPage}>
+                  <Text style={styles.summaryTv}>{summary}</Text>
+                  {mode === 'forTime' ? (
+                    <TvToggle
+                      label="Time cap"
+                      help="Stop the clock when the cap hits."
+                      value={capOn}
+                      onValueChange={setCapOn}
+                      testID="for-time-cap"
+                      accent={accent}
+                    />
+                  ) : null}
+                  {mode === 'forTime' && capOn ? (
+                    <TimeField label="Cap" seconds={workSeconds} onChange={setWorkSeconds} testID="cap" accent={accent} />
+                  ) : null}
+                  {mode === 'amrap' ? (
+                    <>
+                      <ChipRow
+                        accent={accent}
+                        options={[8, 10, 12, 15, 20].map((minutes) => ({
+                          label: `${minutes} min`,
+                          selected: workSeconds === minutes * 60,
+                          onPress: () => setWorkSeconds(minutes * 60),
+                          testID: `amrap-${minutes}`,
+                        }))}
+                      />
+                      <TimeField label="Time" seconds={workSeconds} onChange={setWorkSeconds} testID="amrap" accent={accent} />
+                    </>
+                  ) : null}
+                  {mode === 'emom' ? (
+                    <>
+                      <TimeField label="Every" seconds={workSeconds} onChange={setWorkSeconds} testID="emom-every" accent={accent} />
+                      <ChipRow
+                        accent={accent}
+                        options={[8, 10, 12, 20].map((count) => ({
+                          label: `${count} rounds`,
+                          selected: rounds === count,
+                          onPress: () => setRounds(count),
+                          testID: `emom-rounds-${count}`,
+                        }))}
+                      />
+                    </>
+                  ) : null}
+                  {mode === 'tabata' || mode === 'intervals' ? (
+                    <>
+                      <TimeField label="Work" seconds={workSeconds} onChange={setWorkSeconds} testID="work" accent={accent} />
+                      <TimeField label="Rest" seconds={restSeconds} onChange={setRestSeconds} testID="rest" accent={accent} />
+                    </>
+                  ) : null}
+                  {mode !== 'forTime' && mode !== 'amrap' ? (
+                    <View style={styles.field}>
+                      <Text style={styles.fieldLabelTv}>Rounds</Text>
+                      <NumberStepper value={rounds} min={1} max={99} suffix="rds" testID="rounds" accent={accent} onChange={setRounds} />
+                    </View>
+                  ) : null}
+                </ScrollView>
+              ),
+            },
+            {
+              key: 'lead-in',
+              label: 'Lead-in',
+              content: (
+                <ScrollView contentContainerStyle={styles.tvPage}>
+                  <TimeField
+                    label="Lead-in"
+                    seconds={leadInSeconds}
+                    onChange={(value) => setLeadInSeconds(Math.min(600, value))}
+                    testID="lead-in"
+                    accent={accent}
+                  />
+                </ScrollView>
+              ),
+            },
+            {
+              key: 'presets',
+              label: 'Saved presets',
+              content: <ScrollView contentContainerStyle={styles.tvPage}>{shelf}</ScrollView>,
+            },
+          ]}
+        />
+        <View style={styles.footer}>
+          <BigButton testID="start-timer" label="Start" color={accent} onPress={() => onStart(config, runLabel)} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -326,6 +443,10 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingTop: 4,
     paddingBottom: 8,
+  },
+  tvPage: {
+    gap: 22,
+    paddingBottom: 12,
   },
   title: {
     fontFamily: 'Oswald',

@@ -10,6 +10,7 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "com.garrettscales.americana",
+      "buildNumber": "18",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -20,6 +21,7 @@
     },
     "android": {
       "package": "com.garrettscales.americana",
+      "versionCode": 6,
       "adaptiveIcon": {
         "backgroundColor": "#07080A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -58,6 +60,7 @@
           "imageWidth": 280
         }
       ],
+      "./plugins/withTvForegroundAudio",
       [
         "expo-audio",
         {

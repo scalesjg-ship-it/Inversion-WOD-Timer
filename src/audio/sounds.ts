@@ -19,7 +19,8 @@ async function ensureMode(): Promise<void> {
   if (modeReady) return;
   await setAudioModeAsync({
     playsInSilentMode: true,
-    shouldPlayInBackground: true,
+    // Phones can keep cues going on the lock screen. A TV only sounds while this app is open.
+    shouldPlayInBackground: Platform.isTV !== true,
     interruptionMode: 'duckOthers',
   });
   modeReady = true;

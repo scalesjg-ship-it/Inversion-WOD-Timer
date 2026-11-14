@@ -30,6 +30,11 @@ export interface FocusOptions {
   dim?: boolean;
   /** Scale the control up when focused. Off for text fields. */
   scale?: boolean;
+  /**
+   * TV ring thickness. Idle and focused must use the same value.
+   * Defaults to the 1080p ring; callers pass a window-scaled width at 4K.
+   */
+  borderWidth?: number;
 }
 
 export interface StepperMetrics {
@@ -49,13 +54,20 @@ export interface TabBarMetrics {
   barContentHeight: number;
   gap: number;
   paddingHorizontal: number;
+  paddingTop: number;
+  paddingBottom: number;
 }
 
-function readFocusOptions(tintOrOptions: boolean | FocusOptions | undefined): { dim: boolean; scale: boolean } {
+function readFocusOptions(tintOrOptions: boolean | FocusOptions | undefined): {
+  dim: boolean;
+  scale: boolean;
+  borderWidth?: number;
+} {
   if (typeof tintOrOptions === 'object') {
     return {
       dim: tintOrOptions.dim !== false,
       scale: tintOrOptions.scale !== false,
+      borderWidth: tintOrOptions.borderWidth,
     };
   }
   return { dim: true, scale: true };
@@ -77,8 +89,9 @@ export function focusChrome(
     if (!focused) return null;
     return { borderWidth: 6, borderColor: color };
   }
+  const borderWidth = options.borderWidth ?? TV_FOCUS_BORDER;
   const chrome: FocusChrome = {
-    borderWidth: TV_FOCUS_BORDER,
+    borderWidth,
     shadowOffset: { width: 0, height: 0 },
   };
   if (options.scale) chrome.transform = [{ scale: focused ? TV_FOCUS_SCALE : 1 }];
@@ -91,7 +104,7 @@ export function focusChrome(
   chrome.borderColor = TV_FOCUS_RING;
   chrome.shadowColor = TV_FOCUS_RING;
   chrome.shadowOpacity = 0.9;
-  chrome.shadowRadius = 16;
+  chrome.shadowRadius = Math.round(16 * (borderWidth / TV_FOCUS_BORDER));
   chrome.elevation = 12;
   return chrome;
 }
@@ -105,26 +118,71 @@ export function tintHex(color: string, alpha: number): string {
   return `rgba(${red},${green},${blue},${alpha})`;
 }
 
-/** Phone stepper metrics match the existing iPhone stylesheet. */
-export function stepperControlSize(tv: boolean): StepperMetrics {
+/** Phone stepper metrics match the existing iPhone stylesheet. TV sizes scale from 1080p. */
+export function stepperControlSize(tv: boolean, screenHeight = 1080): StepperMetrics {
   if (!tv) {
     return { button: 52, glyph: 32, value: 32, suffix: 12, gap: 8, radius: 14, valueMinWidth: 56 };
   }
-  return { button: 120, glyph: 68, value: 60, suffix: 24, gap: 22, radius: 28, valueMinWidth: 108 };
+  const scale = Math.max(0.6, screenHeight / 1080);
+  return {
+    button: Math.round(120 * scale),
+    glyph: Math.round(68 * scale),
+    value: Math.round(60 * scale),
+    suffix: Math.round(24 * scale),
+    gap: Math.round(22 * scale),
+    radius: Math.round(28 * scale),
+    valueMinWidth: Math.round(108 * scale),
+  };
 }
 
 /**
  * Phone tab metrics match the existing iPhone tab bar.
- * A 1080p TV keeps 10-foot labels. A 720p TV uses a shorter bar so the WOD list can fit.
+ * TV metrics are the 1080p sizes times the window height, so a 4K window doubles them.
+ * A 720p TV keeps the shorter bar.
  */
 export function tabBarControlSize(tv: boolean, screenHeight = 1080): TabBarMetrics {
   if (!tv) {
-    return { label: 13, icon: 16, itemMinHeight: 49, barContentHeight: 64, gap: 0, paddingHorizontal: 0 };
+    return {
+      label: 13,
+      icon: 16,
+      itemMinHeight: 49,
+      barContentHeight: 64,
+      gap: 0,
+      paddingHorizontal: 0,
+      paddingTop: 6,
+      paddingBottom: 0,
+    };
   }
   if (screenHeight < 1000) {
-    return { label: 22, icon: 26, itemMinHeight: 68, barContentHeight: 96, gap: 10, paddingHorizontal: 24 };
+    const scale = screenHeight / 720;
+    return {
+      label: Math.round(22 * scale),
+      icon: Math.round(26 * scale),
+      itemMinHeight: Math.round(68 * scale),
+      barContentHeight: Math.round(96 * scale),
+      gap: Math.round(10 * scale),
+      paddingHorizontal: Math.round(24 * scale),
+      paddingTop: Math.round(12 * scale),
+      paddingBottom: Math.round(12 * scale),
+    };
   }
-  return { label: 48, icon: 56, itemMinHeight: 132, barContentHeight: 176, gap: 28, paddingHorizontal: 60 };
+  const scale = screenHeight / 1080;
+  return {
+    label: Math.round(48 * scale),
+    icon: Math.round(56 * scale),
+    itemMinHeight: Math.round(132 * scale),
+    barContentHeight: Math.round(176 * scale),
+    gap: Math.round(28 * scale),
+    paddingHorizontal: Math.round(60 * scale),
+    paddingTop: Math.round(18 * scale),
+    paddingBottom: Math.round(16 * scale),
+  };
+}
+
+/** Height of the TV tab bar, including its own padding. */
+export function tvTabBarHeight(screenHeight: number, bottomInset = 0): number {
+  const tab = tabBarControlSize(true, screenHeight);
+  return tab.paddingTop + tab.barContentHeight + Math.max(bottomInset, tab.paddingBottom);
 }
 
 /** Apple TV and Android TV have no Taptic Engine or vibration motor for this app. */

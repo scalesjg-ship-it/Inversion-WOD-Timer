@@ -1,4 +1,4 @@
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import {
   BRAND_TEMPLATES,
@@ -14,58 +14,81 @@ import { TvFocusPressable } from '@/src/components/TvFocus';
 import { Chip } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
 import { TV_FOCUS_BORDER } from '@/src/tv/controls';
-import { tvColumnBasis } from '@/src/tv/layout';
+import { tvColumnBasis, tvFocusGutter, tvScale, tvScaled } from '@/src/tv/layout';
 
 export function BrandChoices({
   branding,
   onChange,
+  part = 'all',
 }: {
   branding: Branding;
   onChange: (patch: Partial<Branding>) => void;
+  part?: 'all' | 'templates' | 'palettes';
 }) {
   const tv = Platform.isTV === true;
+  const { width, height } = useWindowDimensions();
+  const scale = tv ? tvScale(width, height) : 1;
   const columns = tv ? 3 : 2;
+  const gutter = tv ? Math.max(tvFocusGutter(width / columns), Math.round(18 * scale)) : 0;
+  const showTemplates = part === 'all' || part === 'templates';
+  const showPalettes = part === 'all' || part === 'palettes';
   return (
     <View style={styles.block}>
-      <Text style={[styles.label, tv && styles.labelTv]}>Color templates</Text>
-      <Text style={[styles.help, tv && styles.helpTv]}>
-        One press sets the colors, clock, and logo placement. You can still change any color below.
-      </Text>
-      <View style={[styles.templates, tv && styles.templatesTv]}>
-        {BRAND_TEMPLATES.map((template) => (
-          <View
-            key={template.id}
-            style={
-              tv
-                ? { width: tvColumnBasis(columns), maxWidth: tvColumnBasis(columns), padding: 6 }
-                : styles.templateCell
-            }
-          >
-            <TemplateCard
-              template={template}
-              selected={templateMatches(branding, template)}
-              onPress={() => {
-                const patch = templatePatch(template);
-                if (patch) onChange(patch);
-              }}
-            />
+      {showTemplates ? (
+        <>
+          <Text style={[styles.label, tv && { fontSize: tvScaled(32, width, height), letterSpacing: 2 }]}>Color templates</Text>
+          <Text style={[styles.help, tv && { fontSize: tvScaled(28, width, height), lineHeight: tvScaled(36, width, height) }]}>
+            {tv
+              ? 'One press sets the colors, clock, and logo placement.'
+              : 'One press sets the colors, clock, and logo placement. You can still change any color below.'}
+          </Text>
+          <View style={[styles.templates, tv && styles.templatesTv]}>
+            {BRAND_TEMPLATES.map((template) => (
+              <View
+                key={template.id}
+                style={
+                  tv
+                    ? {
+                        width: tvColumnBasis(columns),
+                        maxWidth: tvColumnBasis(columns),
+                        padding: gutter,
+                      }
+                    : styles.templateCell
+                }
+              >
+                <TemplateCard
+                  template={template}
+                  selected={templateMatches(branding, template)}
+                  onPress={() => {
+                    const patch = templatePatch(template);
+                    if (patch) onChange(patch);
+                  }}
+                />
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
-      <Text style={[styles.label, tv && styles.labelTv]}>Color sets</Text>
-      <Text style={[styles.help, tv && styles.helpTv]}>Colors only. The logo placement stays as it is.</Text>
-      <View style={styles.chips}>
-        {COLOR_PALETTES.map((palette) => (
-          <Chip
-            key={palette.id}
-            label={palette.name}
-            color={palette.uiColor}
-            selected={paletteMatches(branding, palette)}
-            onPress={() => onChange(paletteColors(palette))}
-            testID={`palette-${palette.id}`}
-          />
-        ))}
-      </View>
+        </>
+      ) : null}
+      {showPalettes ? (
+        <>
+          <Text style={[styles.label, tv && { fontSize: tvScaled(32, width, height), letterSpacing: 2 }]}>Color sets</Text>
+          <Text style={[styles.help, tv && { fontSize: tvScaled(28, width, height), lineHeight: tvScaled(36, width, height) }]}>
+            Colors only. The logo placement stays as it is.
+          </Text>
+          <View style={[styles.chips, tv && styles.chipsTv]}>
+            {COLOR_PALETTES.map((palette) => (
+              <Chip
+                key={palette.id}
+                label={palette.name}
+                color={palette.uiColor}
+                selected={paletteMatches(branding, palette)}
+                onPress={() => onChange(paletteColors(palette))}
+                testID={`palette-${palette.id}`}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -80,6 +103,7 @@ function TemplateCard({
   onPress: () => void;
 }) {
   const tv = Platform.isTV === true;
+  const { width, height } = useWindowDimensions();
   const palette = COLOR_PALETTES.find((item) => item.id === template.paletteId);
   return (
     <TvFocusPressable
@@ -89,7 +113,11 @@ function TemplateCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        tv && styles.cardTv,
+        tv && {
+          minHeight: tvScaled(220, width, height),
+          borderRadius: tvScaled(20, width, height),
+          padding: tvScaled(18, width, height),
+        },
         {
           width: '100%',
           borderColor: chrome.line,
@@ -100,7 +128,7 @@ function TemplateCard({
     >
       {selected ? <View pointerEvents="none" style={[styles.innerRing, tv && styles.innerRingTv]} /> : null}
       <View style={styles.cardTop}>
-        <Text style={[styles.cardName, tv && styles.cardNameTv]} numberOfLines={1}>
+        <Text style={[styles.cardName, tv && { fontSize: tvScaled(40, width, height) }]} numberOfLines={1}>
           {template.name}
         </Text>
         {selected ? <Text style={[styles.mark, tv && styles.markTv]}>✓</Text> : null}
@@ -110,7 +138,7 @@ function TemplateCard({
         <View style={[styles.dot, { backgroundColor: palette?.backgroundColor ?? chrome.bg }]} />
         <View style={[styles.dot, { backgroundColor: palette?.uiColor ?? chrome.text }]} />
       </View>
-      <Text style={[styles.blurb, tv && styles.blurbTv]} numberOfLines={2}>
+      <Text style={[styles.blurb, tv && { fontSize: tvScaled(28, width, height), lineHeight: tvScaled(36, width, height) }]} numberOfLines={3}>
         {template.blurb}
       </Text>
     </TvFocusPressable>
@@ -146,6 +174,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  chipsTv: {
+    flexDirection: 'column',
+    flexWrap: 'nowrap',
   },
   templates: {
     flexDirection: 'row',
