@@ -1,8 +1,9 @@
 import { type ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View, type TextStyle, type ViewStyle } from 'react-native';
 
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
+import { fitTvStyle } from '@/src/tv/layout';
 import type { Branding } from '../types';
 import { QrMark } from './QrMark';
 import type { ReceiverPhase } from './receiverPhase';
@@ -20,33 +21,44 @@ export function TvLogoTransfer({
   children?: ReactNode;
 }) {
   const { phase, restart } = useLogoReceiver(branding, update);
+  const { width, height } = useWindowDimensions();
   const ready = phase.kind === 'ready';
+  const block = fitTvStyle(styles.block, width, height);
+  const row = fitTvStyle(styles.row, width, height);
+  const stack = fitTvStyle(styles.stack, width, height);
+  const side = fitTvStyle(styles.side, width, height);
+  const headline = fitTvStyle(styles.headline, width, height);
+  const help = fitTvStyle(styles.help, width, height);
+  const saved = fitTvStyle(styles.saved, width, height);
+  const url = fitTvStyle(styles.url, width, height);
+  const button = fitTvStyle(styles.button, width, height);
+  const buttonLabel = fitTvStyle(styles.buttonLabel, width, height);
   return (
-    <View style={styles.block} testID="tv-logo-transfer">
-      <Text style={styles.headline} testID="tv-brand-note">
+    <View style={block} testID="tv-logo-transfer">
+      <Text style={headline} testID="tv-brand-note">
         Send a logo from your phone
       </Text>
       {ready ? (
-        <View style={styles.row}>
+        <View style={row}>
           <QrMark key={phase.url} value={phase.url} />
-          <View style={styles.side}>
+          <View style={side}>
             {phase.saved ? (
-              <Text style={styles.saved} testID="tv-logo-saved">
+              <Text style={saved} testID="tv-logo-saved">
                 Logo saved on this TV.
               </Text>
             ) : null}
-            <Text style={styles.help}>{helpText(branding.logoUri)}</Text>
+            <Text style={help}>{helpText(branding.logoUri)}</Text>
             {children}
           </View>
         </View>
       ) : (
-        <View style={styles.stack}>
-          <TransferBody phase={phase} accent={accent} restart={restart} />
+        <View style={stack}>
+          <TransferBody phase={phase} accent={accent} restart={restart} help={help} stack={stack} button={button} buttonLabel={buttonLabel} />
           {children}
         </View>
       )}
       {ready ? (
-        <Text selectable style={styles.url} testID="tv-logo-pairing-url">
+        <Text selectable style={url} testID="tv-logo-pairing-url">
           {phase.url}
         </Text>
       ) : null}
@@ -64,26 +76,34 @@ function TransferBody({
   phase,
   accent,
   restart,
+  help,
+  stack,
+  button,
+  buttonLabel,
 }: {
   phase: Exclude<ReceiverPhase, { kind: 'ready' }>;
   accent: string;
   restart: () => void;
+  help: TextStyle;
+  stack: ViewStyle;
+  button: ViewStyle;
+  buttonLabel: TextStyle;
 }) {
   switch (phase.kind) {
     case 'starting':
-      return <Text style={styles.help}>Opening a link on this network…</Text>;
+      return <Text style={help}>Opening a link on this network…</Text>;
     case 'expired':
       return (
-        <View style={styles.stack}>
-          <Text style={styles.help}>This link expired. Start a new one to send a logo.</Text>
-          <RestartButton accent={accent} label="New code" onPress={restart} />
+        <View style={stack}>
+          <Text style={help}>This link expired. Start a new one to send a logo.</Text>
+          <RestartButton accent={accent} label="New code" onPress={restart} button={button} buttonLabel={buttonLabel} />
         </View>
       );
     case 'error':
       return (
-        <View style={styles.stack}>
-          <Text style={styles.help}>{phase.message}</Text>
-          <RestartButton accent={accent} label="Try again" onPress={restart} />
+        <View style={stack}>
+          <Text style={help}>{phase.message}</Text>
+          <RestartButton accent={accent} label="Try again" onPress={restart} button={button} buttonLabel={buttonLabel} />
         </View>
       );
     default: {
@@ -93,7 +113,19 @@ function TransferBody({
   }
 }
 
-function RestartButton({ accent, label, onPress }: { accent: string; label: string; onPress: () => void }) {
+function RestartButton({
+  accent,
+  label,
+  onPress,
+  button,
+  buttonLabel,
+}: {
+  accent: string;
+  label: string;
+  onPress: () => void;
+  button: ViewStyle;
+  buttonLabel: TextStyle;
+}) {
   return (
     <TvFocusPressable
       accent={accent}
@@ -101,9 +133,9 @@ function RestartButton({ accent, label, onPress }: { accent: string; label: stri
       hasTVPreferredFocus
       testID="tv-logo-restart"
       onPress={onPress}
-      style={({ pressed }) => [styles.button, { borderColor: accent, opacity: pressed ? 0.72 : 1 }]}
+      style={({ pressed }) => [button, { borderColor: accent, opacity: pressed ? 0.72 : 1 }]}
     >
-      <Text style={styles.buttonLabel}>{label}</Text>
+      <Text style={buttonLabel}>{label}</Text>
     </TvFocusPressable>
   );
 }

@@ -22,6 +22,7 @@ import {
   tvMenuSceneHeight,
   tvSafeBox,
   tvSafeInset,
+  tvTemplateLabelBox,
 } from './layout';
 
 function scene(width: number, height: number) {
@@ -189,6 +190,28 @@ describe('TV layout', () => {
     expect(tvClockChrome(720, true).name).toBeGreaterThanOrEqual(32);
     expect(uhd.name).toBeGreaterThanOrEqual(full.name * 2 - 1);
     expect(uhd.logo).toBeGreaterThan(full.logo);
+  });
+
+  it('fits a template label inside a centered card at 1080p and at Fire TV 960x540', () => {
+    for (const frame of [
+      { width: 1920, height: 1080 },
+      { width: 960, height: 540 },
+    ]) {
+      const box = tvTemplateLabelBox(frame.width, frame.height);
+      const inner = box.height - box.border * 2 - box.padY * 2;
+      expect(inner).toBe(box.lineHeight);
+      expect(box.lineHeight).toBeGreaterThanOrEqual(Math.ceil(box.fontSize * 1.5));
+      expect(box.fontSize).toBeGreaterThanOrEqual(1);
+      expect(box.height).toBeGreaterThan(box.lineHeight);
+    }
+    const full = tvTemplateLabelBox(1920, 1080);
+    const fire = tvTemplateLabelBox(960, 540);
+    expect(full.fontSize).toBe(16);
+    expect(full.lineHeight).toBe(24);
+    expect(full.height).toBe(24 + full.padY * 2 + full.border * 2);
+    expect(fire.fontSize).toBe(8);
+    expect(fire.height).toBeLessThan(full.height);
+    expect(fire.lineHeight).toBeGreaterThanOrEqual(Math.ceil(fire.fontSize * 1.5));
   });
 
   it('sizes card copy from the card and the window scale', () => {

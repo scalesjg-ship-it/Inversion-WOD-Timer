@@ -89,6 +89,9 @@ await esbuild.build({
   loader: { '.ttf': 'empty' },
 });
 
+const frameWidth = Number(process.env.FRAME_WIDTH ?? 1920);
+const frameHeight = Number(process.env.FRAME_HEIGHT ?? 1080);
+
 const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -96,7 +99,7 @@ const html = `<!DOCTYPE html>
 <style>
   @font-face { font-family: Oswald; src: url(/assets/fonts/Oswald-Bold.ttf); font-weight: 700; }
   @font-face { font-family: OswaldMedium; src: url(/assets/fonts/Oswald-Medium.ttf); font-weight: 500; }
-  html, body, #root { margin: 0; width: 1920px; height: 1080px; background: #07080A; overflow: hidden; }
+  html, body, #root { margin: 0; width: ${frameWidth}px; height: ${frameHeight}px; background: #07080A; overflow: hidden; }
 </style>
 </head>
 <body>
@@ -141,7 +144,7 @@ const browser = await puppeteer.launch({
   executablePath: process.env.CHROME_PATH ?? '/usr/bin/google-chrome-stable',
   headless: true,
   args: ['--no-sandbox', '--disable-gpu', '--hide-scrollbars'],
-  defaultViewport: { width: 1920, height: 1080, deviceScaleFactor: 1 },
+  defaultViewport: { width: frameWidth, height: frameHeight, deviceScaleFactor: 1 },
 });
 const page = await browser.newPage();
 page.on('pageerror', (error) => console.error('PAGE', error));
@@ -157,6 +160,30 @@ const metrics = await page.evaluate(() => {
     return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, bottom: rect.bottom, right: rect.right };
   };
   const path = document.querySelector('[data-testid="tv-brand-qr"] path');
+  const templates = [...document.querySelectorAll('[data-testid^="template-"]')].filter((node) => node.getAttribute('data-testid')?.startsWith('template-') && !node.getAttribute('data-testid').includes('name'));
+  const names = templates.map((card) => {
+    const id = card.getAttribute('data-testid');
+    const name = document.querySelector(`[data-testid="template-name-${id?.slice('template-'.length)}"]`);
+    const cardRect = card.getBoundingClientRect();
+    const nameRect = name?.getBoundingClientRect();
+    const style = getComputedStyle(card);
+    const borderTop = Number.parseFloat(style.borderTopWidth) || 0;
+    const borderBottom = Number.parseFloat(style.borderBottomWidth) || 0;
+    const padTop = Number.parseFloat(style.paddingTop) || 0;
+    const padBottom = Number.parseFloat(style.paddingBottom) || 0;
+    const innerTop = cardRect.top + borderTop + padTop;
+    const innerBottom = cardRect.bottom - borderBottom - padBottom;
+    const center = nameRect ? (nameRect.top + nameRect.bottom) / 2 - (innerTop + innerBottom) / 2 : null;
+    return {
+      id,
+      text: name?.textContent ?? '',
+      clipped: !nameRect || nameRect.top < innerTop - 0.6 || nameRect.bottom > innerBottom + 0.6 || nameRect.left < cardRect.left || nameRect.right > cardRect.right + 0.6,
+      center,
+      cardHeight: cardRect.height,
+      nameHeight: nameRect?.height ?? 0,
+    };
+  });
+  const bottoms = [...document.querySelectorAll('[data-testid]')].map((node) => node.getBoundingClientRect().bottom);
   return {
     qr: box('tv-brand-qr'),
     url: box('tv-logo-pairing-url'),
@@ -165,12 +192,14 @@ const metrics = await page.evaluate(() => {
     preview: box('brand-preview'),
     pathLength: path?.getAttribute('d')?.length ?? 0,
     fill: path?.getAttribute('fill') ?? '',
-    sceneText: document.body.innerText.slice(0, 400),
+    templates: names,
+    lowest: Math.max(...bottoms),
+    window: { width: window.innerWidth, height: window.innerHeight },
   };
 });
 console.log(JSON.stringify(metrics, null, 2));
 const shot = process.env.SHOT_PATH ?? '/opt/cursor/artifacts/tv-brand-qr-1080.png';
-await page.screenshot({ path: shot, clip: { x: 0, y: 0, width: 1920, height: 1080 } });
+await page.screenshot({ path: shot, clip: { x: 0, y: 0, width: frameWidth, height: frameHeight } });
 console.log('wrote', shot);
 await browser.close();
 server.close();

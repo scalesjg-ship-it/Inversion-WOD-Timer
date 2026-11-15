@@ -5,7 +5,7 @@ import { inkOn } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
 import { stepperControlSize } from '@/src/tv/controls';
-import { scaleTvStyle, tvScale } from '@/src/tv/layout';
+import { fitTvStyle, scaleTvStyle, tvScale } from '@/src/tv/layout';
 
 export function BigButton({
   label,
@@ -294,6 +294,11 @@ export function TvToggle({
   accent: string;
   disabled?: boolean;
 }) {
+  const { width, height } = useWindowDimensions();
+  const toggle = fitTvStyle(styles.tvToggle, width, height);
+  const copy = fitTvStyle(styles.tvToggleCopy, width, height);
+  const labelStyle = fitTvStyle(styles.fieldLabelTv, width, height);
+  const valueStyle = fitTvStyle(styles.tvToggleValue, width, height);
   return (
     <TvFocusPressable
       accent={accent}
@@ -304,18 +309,18 @@ export function TvToggle({
       testID={testID}
       onPress={() => onValueChange(!value)}
       style={({ pressed }) => [
-        styles.tvToggle,
+        toggle,
         {
           opacity: disabled ? 0.4 : pressed ? 0.8 : 1,
           borderColor: value ? accent : chrome.line,
         },
       ]}
     >
-      <View style={styles.tvToggleCopy}>
-        <Text style={styles.fieldLabelTv}>{label}</Text>
+      <View style={copy}>
+        <Text style={labelStyle}>{label}</Text>
         {help ? <Text style={styles.tvToggleHelp}>{help}</Text> : null}
       </View>
-      <Text style={[styles.tvToggleValue, { color: value ? accent : chrome.muted }]}>{value ? 'On' : 'Off'}</Text>
+      <Text style={[valueStyle, { color: value ? accent : chrome.muted }]}>{value ? 'On' : 'Off'}</Text>
     </TvFocusPressable>
   );
 }

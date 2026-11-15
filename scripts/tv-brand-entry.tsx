@@ -1,4 +1,4 @@
-import { AppRegistry, Platform, Text, View } from 'react-native';
+import { AppRegistry, Platform, Text, useWindowDimensions, View } from 'react-native';
 
 import BrandScreen from '../app/(tabs)/brand';
 import { BrandingProvider } from '../src/branding/BrandingProvider';
@@ -10,12 +10,12 @@ Object.defineProperty(Platform, 'isTV', {
   get: () => true,
 });
 
-const tabBarHeight = tvTabBarHeight(1080, 0, 1920);
-
 function Frame() {
+  const { width, height } = useWindowDimensions();
+  const tabBarHeight = tvTabBarHeight(height, 0, width);
   return (
-    <View style={{ width: 1920, height: 1080, backgroundColor: chrome.bg }}>
-      <View style={{ height: 1080 - tabBarHeight, overflow: 'hidden' }}>
+    <View style={{ width, height, backgroundColor: chrome.bg }}>
+      <View style={{ height: height - tabBarHeight, overflow: 'hidden' }}>
         <BrandingProvider>
           <BrandScreen />
         </BrandingProvider>
@@ -31,9 +31,9 @@ function Frame() {
           justifyContent: 'space-around',
         }}
       >
-        <Text style={{ color: chrome.muted, fontFamily: 'OswaldMedium', fontSize: 28 }}>WOD</Text>
-        <Text style={{ color: chrome.muted, fontFamily: 'OswaldMedium', fontSize: 28 }}>Rounds</Text>
-        <Text style={{ color: chrome.text, fontFamily: 'OswaldMedium', fontSize: 28 }}>Brand</Text>
+        <Text style={{ color: chrome.muted, fontFamily: 'OswaldMedium', fontSize: Math.max(16, Math.round(28 * (height / 1080))) }}>WOD</Text>
+        <Text style={{ color: chrome.muted, fontFamily: 'OswaldMedium', fontSize: Math.max(16, Math.round(28 * (height / 1080))) }}>Rounds</Text>
+        <Text style={{ color: chrome.text, fontFamily: 'OswaldMedium', fontSize: Math.max(16, Math.round(28 * (height / 1080))) }}>Brand</Text>
       </View>
     </View>
   );

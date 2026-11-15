@@ -1,16 +1,26 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { downloadLogo } from '@/src/branding/downloadLogo';
 import { prepareLogo } from '@/src/branding/logo';
 import { parseLogoUrl } from '@/src/branding/logoUrl';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
+import { fitTvStyle } from '@/src/tv/layout';
 
 export function TvLogoUrl({ onStored }: { onStored: (uri: string) => Promise<void> }) {
   const [text, setText] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const { width, height } = useWindowDimensions();
+  const block = fitTvStyle(styles.block, width, height);
+  const row = fitTvStyle(styles.row, width, height);
+  const label = fitTvStyle(styles.label, width, height);
+  const help = fitTvStyle(styles.help, width, height);
+  const input = fitTvStyle(styles.input, width, height);
+  const button = fitTvStyle(styles.button, width, height);
+  const buttonLabel = fitTvStyle(styles.buttonLabel, width, height);
+  const statusStyle = fitTvStyle(styles.status, width, height);
 
   const load = async () => {
     if (!parseLogoUrl(text)) {
@@ -32,12 +42,12 @@ export function TvLogoUrl({ onStored }: { onStored: (uri: string) => Promise<voi
   };
 
   return (
-    <View style={styles.block} testID="tv-logo-url">
-      <Text style={styles.label}>Logo link</Text>
-      <Text style={styles.help} numberOfLines={2}>
+    <View style={block} testID="tv-logo-url">
+      <Text style={label}>Logo link</Text>
+      <Text style={help} numberOfLines={2}>
         Paste an https image address. It is downloaded and kept on this TV.
       </Text>
-      <View style={styles.row}>
+      <View style={row}>
         <TvTextField
           testID="logo-url"
           value={text}
@@ -47,7 +57,7 @@ export function TvLogoUrl({ onStored }: { onStored: (uri: string) => Promise<voi
           keyboardType="url"
           placeholder="https://"
           placeholderTextColor={chrome.muted}
-          style={styles.input}
+          style={input}
         />
         <TvFocusPressable
           accessibilityRole="button"
@@ -56,13 +66,13 @@ export function TvLogoUrl({ onStored }: { onStored: (uri: string) => Promise<voi
           disabled={busy}
           testID="logo-url-load"
           onPress={() => void load()}
-          style={({ pressed }) => [styles.button, { opacity: busy ? 0.5 : pressed ? 0.8 : 1 }]}
+          style={({ pressed }) => [button, { opacity: busy ? 0.5 : pressed ? 0.8 : 1 }]}
         >
-          <Text style={styles.buttonLabel}>{busy ? 'Saving…' : 'Save'}</Text>
+          <Text style={buttonLabel}>{busy ? 'Saving…' : 'Save'}</Text>
         </TvFocusPressable>
       </View>
       {status ? (
-        <Text style={styles.status} testID="logo-url-status">
+        <Text style={statusStyle} testID="logo-url-status">
           {status}
         </Text>
       ) : null}

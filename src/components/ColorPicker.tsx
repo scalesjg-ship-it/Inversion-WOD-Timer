@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { hexToHue, hsvToHex, inkOn, normalizeHex, sameHex } from '@/src/branding/color';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
 import { TV_FOCUS_BORDER } from '@/src/tv/controls';
+import { fitTvStyle } from '@/src/tv/layout';
 
 const HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
 const VALUES = [1, 0.78, 0.55, 0.32];
@@ -30,6 +31,12 @@ export function ColorPicker({
   }
   const hue = hexToHue(value);
   const tv = Platform.isTV === true;
+  const { width, height } = useWindowDimensions();
+  const tvHead = tv ? fitTvStyle(styles.headTv, width, height) : null;
+  const tvSample = tv ? fitTvStyle(styles.sampleTv, width, height) : null;
+  const tvLabel = tv ? fitTvStyle(styles.labelTv, width, height) : null;
+  const tvCurrent = tv ? fitTvStyle(styles.currentTv, width, height) : null;
+  const tvAction = tv ? fitTvStyle(styles.actionTv, width, height) : null;
 
   const commit = (next: string) => {
     const parsed = normalizeHex(next);
@@ -42,21 +49,21 @@ export function ColorPicker({
   };
 
   return (
-    <View style={styles.block} testID={testID}>
+    <View style={tv ? fitTvStyle(styles.block, width, height) : styles.block} testID={testID}>
       <TvFocusPressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         accessibilityLabel={`${label}, ${value}. ${open ? 'Close colors' : 'Change color'}`}
         testID={`${testID}-toggle`}
         onPress={() => setOpen((current) => !current)}
-        style={({ pressed }) => [styles.head, tv && styles.headTv, { opacity: pressed ? 0.8 : 1 }]}
+        style={({ pressed }) => [styles.head, tvHead, { opacity: pressed ? 0.8 : 1 }]}
       >
-        <View style={[styles.sample, tv && styles.sampleTv, { backgroundColor: value }]} />
+        <View style={[styles.sample, tvSample, { backgroundColor: value }]} />
         <View style={styles.copy}>
-          <Text style={[styles.label, tv && styles.labelTv]}>{label}</Text>
-          <Text style={[styles.current, tv && styles.currentTv]}>{value}</Text>
+          <Text style={[styles.label, tvLabel]}>{label}</Text>
+          <Text style={[styles.current, tvCurrent]} numberOfLines={1}>{value}</Text>
         </View>
-        <Text style={[styles.action, tv && styles.actionTv]}>{open ? 'Close' : 'Change'}</Text>
+        <Text style={[styles.action, tvAction]}>{open ? 'Close' : 'Change'}</Text>
       </TvFocusPressable>
       {open ? (
         <View style={styles.editor}>
