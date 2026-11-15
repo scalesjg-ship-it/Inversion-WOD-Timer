@@ -12,7 +12,7 @@ export function TvMenuCell({
   onLayout,
   children,
 }: {
-  basis: string;
+  basis: number | string;
   frame: Pick<TvHomeLayout, 'gutterX' | 'gutterTop' | 'gutterBottom'>;
   onLayout?: (event: LayoutChangeEvent) => void;
   children: (events: { onFocus: () => void; onBlur: () => void }) => ReactNode;

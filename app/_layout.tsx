@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { Image, Platform, View } from 'react-native';
 import 'react-native-reanimated';
 
 import { BrandingProvider, useBranding } from '@/src/branding/BrandingProvider';
@@ -44,7 +45,21 @@ function RootGate({ fontsLoaded }: { fontsLoaded: boolean }) {
     }
   }, [fontsLoaded, ready]);
 
-  if (!fontsLoaded || !ready) return null;
+  if (!fontsLoaded || !ready) {
+    // iPhone keeps the native splash (null). TV draws the same mark centered in the window
+    // so a Fire OS splash that sits left of center is covered as soon as JS runs.
+    if (Platform.isTV !== true) return null;
+    return (
+      <View style={{ flex: 1, backgroundColor: '#07080A', alignItems: 'center', justifyContent: 'center' }}>
+        <Image
+          source={require('../assets/images/splash-icon.png')}
+          resizeMode="contain"
+          style={{ width: '100%', height: '100%' }}
+          accessibilityIgnoresInvertColors
+        />
+      </View>
+    );
+  }
 
   return (
     <>

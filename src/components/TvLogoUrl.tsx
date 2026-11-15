@@ -6,7 +6,6 @@ import { prepareLogo } from '@/src/branding/logo';
 import { parseLogoUrl } from '@/src/branding/logoUrl';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT } from '@/src/tv/layout';
 
 export function TvLogoUrl({ onStored }: { onStored: (uri: string) => Promise<void> }) {
   const [text, setText] = useState('');
@@ -73,29 +72,29 @@ const styles = StyleSheet.create({
   label: {
     color: chrome.muted,
     fontFamily: 'OswaldMedium',
-    fontSize: 32,
-    letterSpacing: 2,
+    fontSize: 16,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   help: {
     color: chrome.muted,
-    fontSize: TV_BODY_FONT,
-    lineHeight: TV_BODY_FONT + 8,
+    fontSize: 16,
+    lineHeight: 20,
   },
   input: {
-    minHeight: 84,
-    borderRadius: 18,
-    borderWidth: 4,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 2,
     borderColor: chrome.line,
     backgroundColor: chrome.surface,
     color: chrome.text,
-    paddingHorizontal: 18,
-    fontSize: 32,
+    paddingHorizontal: 12,
+    fontSize: 20,
     fontFamily: 'Oswald',
   },
   button: {
     alignSelf: 'flex-start',
-    minHeight: 88,
+    minHeight: 44,
     minWidth: 280,
     paddingHorizontal: 28,
     borderRadius: 18,
@@ -112,7 +111,7 @@ const styles = StyleSheet.create({
   },
   status: {
     color: chrome.text,
-    fontSize: TV_BODY_FONT,
-    lineHeight: TV_BODY_FONT + 8,
+    fontSize: 16,
+    lineHeight: 20,
   },
 });

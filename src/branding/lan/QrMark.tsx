@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { moduleRuns, qrModules } from './qrMatrix';
 
-const TARGET_PX = 360;
-
 export function QrMark({ value }: { value: string }) {
+  const { height } = useWindowDimensions();
+  const target = Math.round(Math.min(112, Math.max(72, height * 0.1)));
   const matrix = useMemo(() => qrModules(value), [value]);
-  const module = Math.max(8, Math.floor(TARGET_PX / Math.max(matrix.length, 1)));
+  const module = Math.max(4, Math.floor(target / Math.max(matrix.length, 1)));
   const side = module * matrix.length;
   return (
     <View

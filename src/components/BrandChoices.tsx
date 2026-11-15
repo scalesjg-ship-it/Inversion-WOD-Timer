@@ -14,7 +14,7 @@ import { TvFocusPressable } from '@/src/components/TvFocus';
 import { Chip } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
 import { TV_FOCUS_BORDER } from '@/src/tv/controls';
-import { tvColumnBasis, tvFocusGutter, tvScale, tvScaled } from '@/src/tv/layout';
+import { tvScaled, type TvHomeLayout } from '@/src/tv/layout';
 
 export function BrandChoices({
   branding,
@@ -27,21 +27,19 @@ export function BrandChoices({
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
-  const scale = tv ? tvScale(width, height) : 1;
-  const columns = tv ? 3 : 2;
-  const gutter = tv ? Math.max(tvFocusGutter(width / columns), Math.round(18 * scale)) : 0;
+  const gutter = tv ? tvScaled(6, width, height) : 0;
   const showTemplates = part === 'all' || part === 'templates';
   const showPalettes = part === 'all' || part === 'palettes';
   return (
     <View style={styles.block}>
       {showTemplates ? (
         <>
-          <Text style={[styles.label, tv && { fontSize: tvScaled(32, width, height), letterSpacing: 2 }]}>Color templates</Text>
-          <Text style={[styles.help, tv && { fontSize: tvScaled(28, width, height), lineHeight: tvScaled(36, width, height) }]}>
-            {tv
-              ? 'One press sets the colors, clock, and logo placement.'
-              : 'One press sets the colors, clock, and logo placement. You can still change any color below.'}
+          <Text style={[styles.label, tv && { color: chrome.muted, fontSize: tvScaled(20, width, height), letterSpacing: 1.2 }]}>Color templates</Text>
+          {tv ? null : (
+          <Text style={styles.help}>
+            One press sets the colors, clock, and logo placement. You can still change any color below.
           </Text>
+          )}
           <View style={[styles.templates, tv && styles.templatesTv]}>
             {BRAND_TEMPLATES.map((template) => (
               <View
@@ -49,8 +47,8 @@ export function BrandChoices({
                 style={
                   tv
                     ? {
-                        width: tvColumnBasis(columns),
-                        maxWidth: tvColumnBasis(columns),
+                        width: '50%',
+                        maxWidth: '50%',
                         padding: gutter,
                       }
                     : styles.templateCell
@@ -58,6 +56,8 @@ export function BrandChoices({
               >
                 <TemplateCard
                   template={template}
+                  frame={null}
+                  compact={tv}
                   selected={templateMatches(branding, template)}
                   onPress={() => {
                     const patch = templatePatch(template);
@@ -71,10 +71,8 @@ export function BrandChoices({
       ) : null}
       {showPalettes ? (
         <>
-          <Text style={[styles.label, tv && { fontSize: tvScaled(32, width, height), letterSpacing: 2 }]}>Color sets</Text>
-          <Text style={[styles.help, tv && { fontSize: tvScaled(28, width, height), lineHeight: tvScaled(36, width, height) }]}>
-            Colors only. The logo placement stays as it is.
-          </Text>
+          <Text style={[styles.label, tv && { color: chrome.muted, fontSize: tvScaled(20, width, height), letterSpacing: 1.2 }]}>Color sets</Text>
+          {tv ? null : <Text style={styles.help}>Colors only. The logo placement stays as it is.</Text>}
           <View style={[styles.chips, tv && styles.chipsTv]}>
             {COLOR_PALETTES.map((palette) => (
               <Chip
@@ -95,10 +93,14 @@ export function BrandChoices({
 
 function TemplateCard({
   template,
+  frame,
+  compact = false,
   selected,
   onPress,
 }: {
   template: BrandTemplate;
+  frame: TvHomeLayout | null;
+  compact?: boolean;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -113,11 +115,16 @@ function TemplateCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        tv && {
-          minHeight: tvScaled(220, width, height),
-          borderRadius: tvScaled(20, width, height),
-          padding: tvScaled(18, width, height),
-        },
+        compact
+          ? {
+              minHeight: tvScaled(36, width, height),
+              height: tvScaled(36, width, height),
+              borderRadius: 12,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              gap: 2,
+            }
+          : null,
         {
           width: '100%',
           borderColor: chrome.line,
@@ -128,19 +135,30 @@ function TemplateCard({
     >
       {selected ? <View pointerEvents="none" style={[styles.innerRing, tv && styles.innerRingTv]} /> : null}
       <View style={styles.cardTop}>
-        <Text style={[styles.cardName, tv && { fontSize: tvScaled(40, width, height) }]} numberOfLines={1}>
+        <Text
+          style={[
+            styles.cardName,
+            { color: chrome.text, backgroundColor: 'transparent' },
+            compact ? { fontSize: tvScaled(18, width, height) } : null,
+          ]}
+          numberOfLines={1}
+        >
           {template.name}
         </Text>
         {selected ? <Text style={[styles.mark, tv && styles.markTv]}>✓</Text> : null}
       </View>
-      <View style={styles.dots}>
-        <View style={[styles.dot, { backgroundColor: palette?.digitColor ?? chrome.text }]} />
-        <View style={[styles.dot, { backgroundColor: palette?.backgroundColor ?? chrome.bg }]} />
-        <View style={[styles.dot, { backgroundColor: palette?.uiColor ?? chrome.text }]} />
-      </View>
-      <Text style={[styles.blurb, tv && { fontSize: tvScaled(28, width, height), lineHeight: tvScaled(36, width, height) }]} numberOfLines={3}>
+      {compact ? null : (
+        <View style={styles.dots}>
+          <View style={[styles.dot, { backgroundColor: palette?.digitColor ?? chrome.text }]} />
+          <View style={[styles.dot, { backgroundColor: palette?.backgroundColor ?? chrome.bg }]} />
+          <View style={[styles.dot, { backgroundColor: palette?.uiColor ?? chrome.text }]} />
+        </View>
+      )}
+      {compact ? null : (
+      <Text style={[styles.blurb, { color: chrome.muted }]} numberOfLines={3}>
         {template.blurb}
       </Text>
+      )}
     </TvFocusPressable>
   );
 }
@@ -176,8 +194,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chipsTv: {
-    flexDirection: 'column',
-    flexWrap: 'nowrap',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   templates: {
     flexDirection: 'row',

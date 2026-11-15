@@ -27,14 +27,23 @@ export const TV_REF_HEIGHT = 1080;
 export const TV_SAFE_HORIZONTAL = 60;
 export const TV_SAFE_VERTICAL = 80;
 
+/**
+ * Television overscan eats about 5% of each edge. The safe box is at least
+ * this fraction of the window, and never smaller than the 1080p HIG inset
+ * scaled with that window.
+ */
+export const TV_OVERSCAN = 0.05;
+
 /** Couch-readable type at 1080p. Card titles stay inside the 48–60pt range. */
 export const TV_MENU_FONT = 52;
 export const TV_TITLE_FONT = 76;
 export const TV_SECTION_FONT = 32;
 export const TV_BODY_FONT = 36;
 
-/** How many menu rows are fitted on screen. The rest scroll. */
-export const TV_VISIBLE_ROWS = 1;
+/**
+ * Every menu row is fitted on screen. A later row must not start below the fold.
+ * Focus gutters still keep a scaled card inside its cell.
+ */
 
 export function tvScale(width: number, height: number): number {
   const safeWidth = width > 0 ? width : TV_REF_WIDTH;
@@ -48,9 +57,12 @@ export function tvScaled(at1080: number, width: number, height: number): number 
 
 export function tvSafeBox(tv: boolean, width = TV_REF_WIDTH, height = TV_REF_HEIGHT): { horizontal: number; vertical: number } {
   if (!tv) return { horizontal: 0, vertical: 0 };
+  const safeWidth = width > 0 ? width : TV_REF_WIDTH;
+  const safeHeight = height > 0 ? height : TV_REF_HEIGHT;
+  const scale = tvScale(safeWidth, safeHeight);
   return {
-    horizontal: tvScaled(TV_SAFE_HORIZONTAL, width, height),
-    vertical: tvScaled(TV_SAFE_VERTICAL, width, height),
+    horizontal: Math.max(Math.round(safeWidth * TV_OVERSCAN), Math.round(TV_SAFE_HORIZONTAL * scale)),
+    vertical: Math.max(Math.round(safeHeight * TV_OVERSCAN), Math.round(TV_SAFE_VERTICAL * scale)),
   };
 }
 
@@ -147,6 +159,8 @@ export interface TvHomeLayout {
   gutterX: number;
   gutterTop: number;
   gutterBottom: number;
+  /** Outer width of one cell, including the focus gutter. Rows of these stay inside the safe box. */
+  cellWidth: number;
   gymSize: number;
   gymLine: number;
   wordmarkSize: number;
@@ -229,6 +243,8 @@ export interface TvMenuOptions {
   header?: 'home' | 'none';
   /** Apply the 1080p overscan box. Turn off when the parent already padded. */
   insets?: boolean;
+  /** Reserve a body-sized hint under the grid. Home menus do. A bare grid does not. */
+  hint?: boolean;
   /**
    * Full window height. Type and overscan follow the window, not the shorter
    * scene left above the tab bar. Defaults to `screenHeight`.
@@ -236,14 +252,18 @@ export interface TvMenuOptions {
   windowHeight?: number;
 }
 
-function readMenuOptions(reservedOrOptions: number | TvMenuOptions | undefined): Required<Pick<TvMenuOptions, 'reservedBottom' | 'header' | 'insets'>> & { windowHeight?: number } {
+function readMenuOptions(
+  reservedOrOptions: number | TvMenuOptions | undefined,
+): Required<Pick<TvMenuOptions, 'reservedBottom' | 'header' | 'insets' | 'hint'>> & { windowHeight?: number } {
   if (typeof reservedOrOptions === 'number') {
-    return { reservedBottom: reservedOrOptions, header: 'home', insets: true };
+    return { reservedBottom: reservedOrOptions, header: 'home', insets: true, hint: true };
   }
+  const header = reservedOrOptions?.header ?? 'home';
   return {
     reservedBottom: reservedOrOptions?.reservedBottom ?? 0,
-    header: reservedOrOptions?.header ?? 'home',
+    header,
     insets: reservedOrOptions?.insets !== false,
+    hint: reservedOrOptions?.hint ?? header === 'home',
     windowHeight: reservedOrOptions?.windowHeight,
   };
 }
@@ -261,9 +281,14 @@ export function tvMenuSceneHeight(measuredHeight: number, windowHeight: number, 
 }
 
 /**
- * Sizes a TV menu so one row of large cards fills the scene above the tab bar.
- * Later rows start at the fold and scroll into view. Cell gutters hold the focus scale.
+ * Sizes a TV menu so every card in the set sits on one screen, inside the safe area.
+ * Cell gutters hold the focus scale, so a focused card cannot cover its neighbor or leave the cell.
  * `screenHeight` is the scene, not the full window, when the tab bar is already outside it.
+ *
+ * Type and overscan follow the window in dp. A Fire TV often reports 960×540 or 1280×720
+ * for a 1080p panel, and a 4K panel often reports 1920×1080 or 960×540. Scaling against
+ * 1920×1080 keeps the same physical size; card height comes from dividing the leftover
+ * scene by the row count, not from stretching one row to the bezel.
  */
 export function tvHomeLayout(
   screenWidth: number,
@@ -278,31 +303,34 @@ export function tvHomeLayout(
   const safe = tvSafeBox(true, screenWidth, scaleHeight);
   const columns = tvMenuColumns(screenWidth, count);
   const rows = Math.max(1, Math.ceil(count / columns));
-  const visibleRows = Math.min(TV_VISIBLE_ROWS, rows);
+  const visibleRows = rows;
   const padHorizontal = options.insets ? safe.horizontal : 0;
   const padTop = options.insets ? safe.vertical : 0;
   const contentWidth = Math.max(1, screenWidth - padHorizontal * 2);
-  const stackGap = Math.max(8, Math.round(12 * scale));
+  const stackGap = Math.max(4, Math.round(8 * scale));
   const lineExtra = Math.max(2, Math.round(4 * scale));
   const wordmarkSize = options.header === 'home' ? Math.max(1, Math.round(22 * scale)) : 0;
-  const gymSize = options.header === 'home' ? Math.max(1, Math.round(48 * scale)) : 0;
+  const gymSize = options.header === 'home' ? Math.max(1, Math.round(40 * scale)) : 0;
   const sectionSize = options.header === 'home' ? Math.max(1, Math.round(TV_SECTION_FONT * scale)) : 0;
-  const hintSize = Math.max(1, Math.round(26 * scale));
-  const wordmarkLine = wordmarkSize + lineExtra;
-  const gymLine = gymSize + lineExtra;
-  const sectionLine = sectionSize + lineExtra;
-  const hintLine = hintSize + lineExtra;
+  const hintSize = Math.max(1, Math.round(TV_BODY_FONT * scale));
+  const wordmarkLine = wordmarkSize === 0 ? 0 : wordmarkSize + lineExtra;
+  const gymLine = gymSize === 0 ? 0 : gymSize + lineExtra;
+  const sectionLine = sectionSize === 0 ? 0 : sectionSize + lineExtra;
+  const hintLine = options.hint ? hintSize + lineExtra : 0;
   const headerHeight = options.header === 'home'
     ? padTop + wordmarkLine + stackGap + gymLine + stackGap + sectionLine + stackGap
     : padTop;
+  // Gap before the hint, the hint line, and the content bottom padding. Matches the home screen.
+  const hintBlock = options.hint ? stackGap + hintLine + stackGap : 0;
   const viewportHeight = Math.max(0, screenHeight);
-  const room = Math.max(1, viewportHeight - headerHeight - Math.max(0, options.reservedBottom));
-  const rowHeight = Math.floor(room / visibleRows);
-  const cellWidth = contentWidth / columns;
-  const gutterX = Math.max(tvFocusGutter(cellWidth), Math.round(18 * scale));
+  const room = Math.max(rows, viewportHeight - headerHeight - hintBlock - Math.max(0, options.reservedBottom));
+  const rowHeight = Math.max(1, Math.floor(room / rows));
+  const cellWidth = Math.max(1, Math.floor(contentWidth / columns));
+  let gutterX = Math.max(tvFocusGutter(cellWidth), Math.round(12 * scale));
+  if (gutterX * 2 >= cellWidth) gutterX = Math.max(0, Math.floor((cellWidth - 1) / 2));
   const focusY = tvFocusGutter(rowHeight);
-  let gutterTop = Math.max(focusY, Math.round(12 * scale));
-  let gutterBottom = options.insets ? Math.max(gutterTop, safe.vertical) : gutterTop;
+  let gutterTop = Math.max(focusY, Math.round(8 * scale));
+  let gutterBottom = gutterTop;
   if (gutterTop + gutterBottom >= rowHeight) {
     const budget = Math.max(0, rowHeight - 1);
     const share = Math.max(1, gutterTop + gutterBottom);
@@ -312,7 +340,7 @@ export function tvHomeLayout(
   const cardHeight = Math.max(1, rowHeight - gutterTop - gutterBottom);
   const cardWidth = Math.max(1, cellWidth - gutterX * 2);
   const copy = tvCardCopy(cardHeight, scale);
-  const contentHeight = headerHeight + rows * rowHeight + Math.max(0, options.reservedBottom);
+  const contentHeight = headerHeight + rows * rowHeight + hintBlock + Math.max(0, options.reservedBottom);
   return {
     columns,
     rows,
@@ -323,6 +351,7 @@ export function tvHomeLayout(
     gutterX,
     gutterTop,
     gutterBottom,
+    cellWidth,
     gymSize,
     gymLine,
     wordmarkSize,

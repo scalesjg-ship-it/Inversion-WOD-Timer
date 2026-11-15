@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   headTv: {
-    minHeight: 96,
+    minHeight: 36,
     borderRadius: 20,
     borderWidth: 4,
     paddingHorizontal: 18,
@@ -205,9 +205,9 @@ const styles = StyleSheet.create({
     borderColor: chrome.line,
   },
   sampleTv: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
   },
   copy: {
     flex: 1,
@@ -220,7 +220,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   labelTv: {
-    fontSize: 28,
+    color: chrome.muted,
+    fontSize: 16,
   },
   current: {
     color: chrome.text,
@@ -228,7 +229,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   currentTv: {
-    fontSize: 32,
+    color: chrome.text,
+    fontSize: 18,
   },
   action: {
     color: chrome.text,
@@ -236,7 +238,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   actionTv: {
-    fontSize: 28,
+    color: chrome.text,
+    fontSize: 16,
   },
   hex: {
     color: chrome.text,

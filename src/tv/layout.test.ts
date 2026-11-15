@@ -4,6 +4,7 @@ import { TV_FOCUS_SCALE, tvTabBarHeight } from './controls';
 import {
   TV_BODY_FONT,
   TV_MENU_FONT,
+  TV_OVERSCAN,
   TV_SAFE_HORIZONTAL,
   TV_SAFE_VERTICAL,
   TV_SECTION_FONT,
@@ -35,10 +36,15 @@ describe('TV layout', () => {
     expect(isTenFootLayout(1280, 720, true)).toBe(true);
   });
 
-  it('insets a real TV by the 1080p overscan box and doubles it at 4K', () => {
-    expect(tvSafeBox(true)).toEqual({ horizontal: TV_SAFE_HORIZONTAL, vertical: TV_SAFE_VERTICAL });
-    expect(tvSafeBox(true, 1920, 1080)).toEqual({ horizontal: 60, vertical: 80 });
-    expect(tvSafeBox(true, 3840, 2160)).toEqual({ horizontal: 120, vertical: 160 });
+  it('insets a real TV by at least 5% and keeps the 1080p HIG floor', () => {
+    expect(tvSafeBox(true)).toEqual({
+      horizontal: Math.max(Math.round(1920 * TV_OVERSCAN), TV_SAFE_HORIZONTAL),
+      vertical: Math.max(Math.round(1080 * TV_OVERSCAN), TV_SAFE_VERTICAL),
+    });
+    expect(tvSafeBox(true, 1920, 1080)).toEqual({ horizontal: 96, vertical: 80 });
+    expect(tvSafeBox(true, 3840, 2160)).toEqual({ horizontal: 192, vertical: 160 });
+    expect(tvSafeBox(true, 960, 540)).toEqual({ horizontal: 48, vertical: 40 });
+    expect(tvSafeBox(true, 1280, 720).horizontal).toBeGreaterThanOrEqual(Math.round(1280 * TV_OVERSCAN));
     expect(tvSafeBox(false)).toEqual({ horizontal: 0, vertical: 0 });
     expect(TV_MENU_FONT).toBeGreaterThanOrEqual(48);
     expect(TV_MENU_FONT).toBeLessThanOrEqual(60);
@@ -92,31 +98,39 @@ describe('TV layout', () => {
     }
   });
 
-  it('shows one row of three large conditioning cards above the tab bar at 1080p and 4K', () => {
-    const hdWindow = scene(1920, 1080);
-    const uhdWindow = scene(3840, 2160);
-    const hd = tvHomeLayout(hdWindow.width, hdWindow.height, 6, { windowHeight: hdWindow.windowHeight });
-    const uhd = tvHomeLayout(uhdWindow.width, uhdWindow.height, 6, { windowHeight: uhdWindow.windowHeight });
+  it('fits every conditioning card on one screen at Fire TV, Android TV, and tvOS sizes', () => {
+    const windows = [
+      scene(960, 540),
+      scene(1280, 720),
+      scene(1920, 1080),
+      scene(3840, 2160),
+    ];
+    const layouts = windows.map((window) => tvHomeLayout(window.width, window.height, 6, { windowHeight: window.windowHeight }));
+    const [fire, hd720, hd, uhd] = layouts;
+    if (!fire || !hd720 || !hd || !uhd) throw new Error('missing layout');
 
-    for (const layout of [hd, uhd]) {
+    for (const [layout, window] of layouts.map((layout, index) => [layout, windows[index]] as const)) {
+      if (!window) throw new Error('missing window');
       expect(layout.columns).toBe(3);
       expect(layout.rows).toBe(2);
-      expect(layout.visibleRows).toBe(1);
-      expect(layout.scrolls).toBe(true);
-      expect(layout.headerHeight + layout.rowHeight).toBeLessThanOrEqual(layout.viewportHeight + 1);
-      expect(layout.contentHeight).toBeGreaterThan(layout.viewportHeight);
+      expect(layout.visibleRows).toBe(layout.rows);
+      expect(layout.scrolls).toBe(false);
+      expect(layout.contentHeight).toBeLessThanOrEqual(layout.viewportHeight + 1);
+      expect(layout.padHorizontal).toBeGreaterThanOrEqual(Math.round(window.width * TV_OVERSCAN) - 1);
+      expect(layout.cellWidth * layout.columns).toBeLessThanOrEqual(window.width - layout.padHorizontal * 2 + 1);
+      expect(layout.cardWidth * TV_FOCUS_SCALE).toBeLessThanOrEqual(layout.cellWidth + 1);
+      const ringInset = (layout.cellWidth - layout.cardWidth * TV_FOCUS_SCALE) / 2;
+      expect(layout.padHorizontal + ringInset).toBeGreaterThanOrEqual(Math.round(window.width * TV_OVERSCAN) - 2);
+      expect(layout.hintSize).toBeGreaterThanOrEqual(Math.round(TV_BODY_FONT * Math.min(window.width / 1920, window.height / 1080)) - 1);
       expect(tvColumnBasis(layout.columns)).toBe('33.3333%');
-      const textBlock = layout.titleSize + 4 + (layout.detailSize + 4) * layout.detailLines + 12;
-      expect(textBlock).toBeLessThanOrEqual(layout.cardHeight + layout.titleSize);
     }
 
-    expect(hd.titleSize).toBeGreaterThanOrEqual(48);
-    expect(hd.detailSize).toBeGreaterThanOrEqual(29);
-    expect(hd.gutterBottom).toBeGreaterThanOrEqual(TV_SAFE_VERTICAL);
-    expect(uhd.titleSize).toBeGreaterThanOrEqual(hd.titleSize * 2 - 1);
-    expect(uhd.detailSize).toBeGreaterThanOrEqual(hd.detailSize * 2 - 1);
+    expect(hd.titleSize).toBeGreaterThanOrEqual(28);
+    expect(hd.detailSize).toBeGreaterThanOrEqual(18);
+    expect(uhd.titleSize).toBeGreaterThanOrEqual(hd.titleSize * 2 - 2);
     expect(uhd.cardHeight).toBeGreaterThan(hd.cardHeight * 1.8);
-    expect(uhd.gutterX).toBeGreaterThanOrEqual(hd.gutterX * 2 - 2);
+    expect(fire.scrolls).toBe(false);
+    expect(hd720.scrolls).toBe(false);
   });
 
   it('keeps a focused card inside its cell so it cannot cover the neighbor', () => {
@@ -137,16 +151,22 @@ describe('TV layout', () => {
     expect(tvMenuSceneHeight(0, 2160)).toBe(2160 - tvTabBarHeight(2160));
   });
 
-  it('fits two large round cards above the fold and scrolls the other pair', () => {
-    for (const window of [scene(1920, 1080), scene(1280, 720), scene(960, 540)]) {
-      const layout = tvHomeLayout(window.width, window.height, 4, { windowHeight: window.windowHeight, reservedBottom: 0 });
+  it('fits all four round cards inside the safe area without scrolling', () => {
+    for (const window of [scene(1920, 1080), scene(1280, 720), scene(960, 540), scene(3840, 2160)]) {
+      const layout = tvHomeLayout(window.width, window.height, 4, {
+        windowHeight: window.windowHeight,
+        header: 'none',
+        insets: false,
+        hint: false,
+      });
       expect(tvMenuColumns(window.width, 4)).toBe(2);
       expect(layout.columns).toBe(2);
       expect(layout.rows).toBe(2);
-      expect(layout.visibleRows).toBe(1);
-      expect(layout.headerHeight + layout.rowHeight).toBeLessThanOrEqual(layout.viewportHeight + 1);
-      expect(layout.scrolls).toBe(true);
-      expect(layout.cardHeight).toBeGreaterThan(1);
+      expect(layout.visibleRows).toBe(2);
+      expect(layout.scrolls).toBe(false);
+      expect(layout.padHorizontal).toBe(0);
+      expect(layout.cardWidth * TV_FOCUS_SCALE).toBeLessThanOrEqual(layout.cellWidth + 1);
+      expect(layout.cellWidth * layout.columns).toBeLessThanOrEqual(window.width + 1);
     }
   });
 

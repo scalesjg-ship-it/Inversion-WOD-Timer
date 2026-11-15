@@ -104,13 +104,13 @@ const styles = StyleSheet.create({
   headline: {
     color: chrome.text,
     fontFamily: 'Oswald',
-    fontSize: 36,
-    lineHeight: 42,
+    fontSize: 22,
+    lineHeight: 26,
   },
   help: {
     color: chrome.muted,
-    fontSize: 28,
-    lineHeight: 36,
+    fontSize: 16,
+    lineHeight: 20,
   },
   saved: {
     color: chrome.text,

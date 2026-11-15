@@ -61,7 +61,9 @@ export function TvFocusPressable({
       style={(state) => {
         const focused = Boolean(state.focused) || pointer.focused;
         const base = typeof style === 'function' ? style({ pressed: state.pressed, focused }) : style;
-        return [base, focusChrome(tv, focused, tv ? TV_FOCUS_RING : accent, options)];
+        // Transparent first so a TV theme fill cannot paint a band behind the label.
+        // A caller background, such as a card surface, still wins because it comes next.
+        return [{ backgroundColor: 'transparent' }, base, focusChrome(tv, focused, tv ? TV_FOCUS_RING : accent, options)];
       }}
     >
       {children}

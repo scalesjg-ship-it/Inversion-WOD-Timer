@@ -10,7 +10,7 @@ import { TvFocusPressable } from '@/src/components/TvFocus';
 import { TvMenuCell } from '@/src/components/TvMenuCell';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
-import { isTenFootLayout, tvColumnBasis, tvFocusGutter, tvSafeInset, type TvHomeLayout } from '@/src/tv/layout';
+import { isTenFootLayout, tvFocusGutter, tvSafeInset, type TvHomeLayout } from '@/src/tv/layout';
 import { useTvMenuFrame } from '@/src/tv/useTvMenuFrame';
 import { scrollOffsetForFocus } from '@/src/tv/scroll';
 import { modeTitle } from '@/src/timer/labels';
@@ -93,6 +93,7 @@ export default function WodScreen() {
       <ScrollView
         ref={scrollRef}
         style={tv ? styles.scrollTv : undefined}
+        scrollEnabled={!tv || (presets != null && presets.length > 0)}
         scrollEventThrottle={16}
         onLayout={(event) => {
           viewportHeight.current = event.nativeEvent.layout.height;
@@ -153,7 +154,7 @@ export default function WodScreen() {
             tv && home ? (
               <TvMenuCell
                 key={item.mode}
-                basis={tvColumnBasis(home.columns)}
+                basis={home.cellWidth}
                 frame={home}
                 onLayout={(event) => {
                   cardLocal.current[item.mode] = {
