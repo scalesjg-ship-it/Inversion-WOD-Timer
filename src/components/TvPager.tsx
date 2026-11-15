@@ -9,9 +9,12 @@ import { TV_TITLE_FONT, tvSafeBox, tvScale, tvScaled } from '@/src/tv/layout';
 export function TvPager({
   pages,
   accent,
+  inset = true,
 }: {
   pages: { key: string; label: string; content: ReactNode }[];
   accent: string;
+  /** Parent already applied the safe box. */
+  inset?: boolean;
 }) {
   const [index, setIndex] = useState(0);
   const { width, height } = useWindowDimensions();
@@ -21,10 +24,10 @@ export function TvPager({
   if (!page) return null;
   const title = tvScaled(TV_TITLE_FONT, width, height);
   return (
-    <View style={[styles.pager, { paddingHorizontal: safe.horizontal, paddingTop: safe.vertical, gap: Math.round(16 * scale) }]}>
+    <View style={[styles.pager, inset ? { paddingHorizontal: safe.horizontal, paddingTop: safe.vertical } : null, { gap: Math.round(12 * scale) }]}>
       <Text style={[styles.title, { fontSize: title, lineHeight: title + Math.round(8 * scale) }]}>{page.label}</Text>
       <View style={styles.body}>{page.content}</View>
-      <View style={[styles.nav, { gap: Math.round(20 * scale), paddingBottom: safe.vertical }]}>
+      <View style={[styles.nav, { gap: Math.round(20 * scale), paddingBottom: inset ? safe.vertical : Math.round(8 * scale) }]}>
         <View style={styles.navButton}>
           <BigButton
             label="Previous"

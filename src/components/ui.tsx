@@ -33,14 +33,24 @@ export function BigButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.big,
-        tv && scaleTvStyle({ minHeight: 128, borderRadius: 28, paddingHorizontal: 28 }, scale),
+        tv && scaleTvStyle({ minHeight: 72, borderRadius: 18, paddingHorizontal: 36, minWidth: 240 }, scale),
+        tv && { alignSelf: 'center', maxWidth: '100%' },
         solid
           ? { backgroundColor: color }
           : { backgroundColor: 'transparent', borderWidth: 1, borderColor: color },
         { opacity: pressed ? 0.72 : 1 },
       ]}
     >
-      <Text style={[styles.bigLabel, tv && scaleTvStyle({ fontSize: 48, letterSpacing: 2 }, scale), { color: ink }]}>{label}</Text>
+      <Text
+        style={[
+          styles.bigLabel,
+          { backgroundColor: 'transparent' },
+          tv && scaleTvStyle({ fontSize: 32, letterSpacing: 1.2 }, scale),
+          { color: ink },
+        ]}
+      >
+        {label}
+      </Text>
     </TvFocusPressable>
   );
 }
@@ -406,7 +416,7 @@ const styles = StyleSheet.create({
     fontSize: 40,
   },
   backHitTv: {
-    minHeight: 96,
+    minHeight: 64,
     paddingHorizontal: 28,
     borderRadius: 20,
     borderWidth: 4,
@@ -416,7 +426,7 @@ const styles = StyleSheet.create({
     backgroundColor: chrome.surface,
   },
   tvToggle: {
-    minHeight: 116,
+    minHeight: 80,
     borderRadius: 22,
     borderWidth: 4,
     backgroundColor: chrome.surface,

@@ -53,18 +53,26 @@ describe('TV control sizes', () => {
     expect(tabBarControlSize(false)).toMatchObject({ label: 13, icon: 16, barContentHeight: 64 });
   });
 
-  it('makes TV steppers easy to focus and tab labels 10-foot readable', () => {
+  it('makes TV steppers easy to focus and keeps the tab bar inside a shorter 10-foot row', () => {
     const step = stepperControlSize(true);
-    const tab = tabBarControlSize(true);
+    const tab = tabBarControlSize(true, 1080, 1920);
     expect(step.button).toBeGreaterThanOrEqual(96);
     expect(step.glyph).toBeGreaterThanOrEqual(48);
-    expect(tab.label).toBeGreaterThanOrEqual(40);
+    expect(tab.label).toBeGreaterThanOrEqual(36);
+    expect(tab.label).toBeLessThan(48);
     expect(tab.icon).toBeGreaterThanOrEqual(40);
-    expect(tab.itemMinHeight).toBeGreaterThanOrEqual(120);
-    expect(tab.barContentHeight).toBeGreaterThanOrEqual(160);
-    const fourK = tabBarControlSize(true, 2160);
+    expect(tab.itemMinHeight).toBeGreaterThanOrEqual(96);
+    expect(tab.itemMinHeight).toBeLessThan(120);
+    expect(tab.barContentHeight).toBeGreaterThanOrEqual(120);
+    expect(tab.barContentHeight).toBeLessThan(160);
+    expect(tab.paddingHorizontal).toBeGreaterThanOrEqual(Math.round(1920 * 0.05));
+    const fourK = tabBarControlSize(true, 2160, 3840);
     expect(fourK.label).toBeGreaterThanOrEqual(tab.label * 2 - 1);
     expect(fourK.barContentHeight).toBeGreaterThanOrEqual(tab.barContentHeight * 2 - 1);
+    expect(fourK.paddingHorizontal).toBeGreaterThanOrEqual(Math.round(3840 * 0.05));
+    const fire = tabBarControlSize(true, 540, 960);
+    expect(fire.paddingHorizontal).toBeGreaterThanOrEqual(Math.round(960 * 0.05));
+    expect(fire.barContentHeight).toBeLessThan(tab.barContentHeight);
   });
 });
 

@@ -115,19 +115,20 @@ export default function CountdownScreen() {
 
   if (tv) {
     return (
-      <SafeAreaView style={styles.safe} edges={[]}>
+      <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical }]}>
         <View style={styles.header}>
           <HeaderBack testID="countdown-back" onPress={() => router.back()} color={accent} />
-          <Text style={styles.kickerTv}>Americana</Text>
+          <Text style={styles.kickerTv} numberOfLines={1}>Americana</Text>
         </View>
         <TvPager
+          inset={false}
           accent={accent}
           pages={[
             {
               key: 'length',
               label: 'Countdown',
               content: (
-                <ScrollView testID="screen-countdown" contentContainerStyle={styles.tvPage}>
+                <ScrollView scrollEnabled={false} testID="screen-countdown" contentContainerStyle={styles.tvPage}>
                   <Text style={styles.summaryTv}>{formatSeconds(config.workSeconds)}</Text>
                   <View style={styles.field}>
                     <Text style={styles.fieldLabelTv}>Duration</Text>
@@ -142,7 +143,7 @@ export default function CountdownScreen() {
               key: 'adds',
               label: 'Add time',
               content: (
-                <ScrollView contentContainerStyle={styles.tvPage}>
+                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
                   <View style={styles.chips}>
                     <Chip label="+30s" color={accent} selected={false} testID="add-30" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 30))} />
                     <Chip label="+1m" color={accent} selected={false} testID="add-60" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 60))} />
@@ -155,7 +156,7 @@ export default function CountdownScreen() {
               key: 'beeps',
               label: 'Warning beeps',
               content: (
-                <ScrollView contentContainerStyle={styles.tvPage}>
+                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
                   <TimeField label="Lead-in" seconds={leadInSeconds} onChange={(value) => setLeadInSeconds(Math.min(600, value))} testID="lead-in" accent={accent} />
                   <View style={styles.field}>
                     <Text style={styles.fieldLabelTv}>Warning beeps</Text>
@@ -191,14 +192,14 @@ export default function CountdownScreen() {
             {
               key: 'presets',
               label: 'Saved presets',
-              content: <ScrollView contentContainerStyle={styles.tvPage}>{shelf}</ScrollView>,
+              content: <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>{shelf}</ScrollView>,
             },
           ]}
         />
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: box.vertical }]}>
           <BigButton testID="start-countdown" label="Start countdown" color={accent} onPress={() => start(config, runLabel)} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -296,7 +297,7 @@ const styles = StyleSheet.create({
   scrollTv: { flex: 1, alignSelf: 'stretch', marginHorizontal: -TV_SAFE_HORIZONTAL },
   content: { gap: 16, paddingTop: 12, paddingBottom: 24 },
   contentTv: { flexGrow: 1, gap: 14, paddingTop: 8, paddingHorizontal: TV_SAFE_HORIZONTAL },
-  tvPage: { gap: 22, paddingBottom: 12 },
+  tvPage: { gap: 12, paddingBottom: 4 },
   title: { fontFamily: 'Oswald', fontSize: 48, color: chrome.text, lineHeight: 52 },
   titleTv: { fontSize: 56, lineHeight: 64 },
   summary: { color: chrome.muted, fontSize: 16, marginTop: -8 },

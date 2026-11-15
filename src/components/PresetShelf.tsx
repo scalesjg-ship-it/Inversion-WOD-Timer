@@ -390,6 +390,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
     flexWrap: 'wrap',
+    maxWidth: '100%',
   },
   headingActions: {
     flexDirection: 'row',
@@ -538,15 +539,18 @@ const styles = StyleSheet.create({
   },
   /** Border width stays fixed; focus only tints and scales, so tvOS focus does not resize the frame. */
   textButtonBoxedApple: {
-    minHeight: 112,
-    paddingHorizontal: 40,
-    borderRadius: 24,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    minHeight: 72,
+    paddingHorizontal: 22,
+    borderRadius: 18,
     borderWidth: 4,
-    backgroundColor: chrome.surface,
+    backgroundColor: 'transparent',
   },
   textButtonLabelBoxedApple: {
-    fontSize: 44,
-    letterSpacing: 0.6,
+    fontSize: 28,
+    letterSpacing: 0.4,
+    backgroundColor: 'transparent',
   },
   headingActionsApple: {
     gap: 20,

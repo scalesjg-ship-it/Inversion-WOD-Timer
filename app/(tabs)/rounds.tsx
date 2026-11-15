@@ -18,7 +18,6 @@ import {
   TV_MENU_FONT,
   TV_SAFE_HORIZONTAL,
   TV_SECTION_FONT,
-  tvColumnBasis,
   tvSafeBox,
   type TvHomeLayout,
 } from '@/src/tv/layout';
@@ -107,12 +106,16 @@ export default function RoundsScreen() {
               key: 'standards',
               label: 'Choose a round',
               content: (
-                <ScrollView onLayout={menu.onSceneLayout} contentContainerStyle={styles.tvPage}>
+                <ScrollView
+                  scrollEnabled={false}
+                  onLayout={menu.onSceneLayout}
+                  contentContainerStyle={styles.tvGrid}
+                >
                   <View style={styles.presetsTv}>
                     {BUILTIN_PRESETS.map((preset) => (
                       <TvMenuCell
                         key={preset.id}
-                        basis={tvColumnBasis(frame.columns)}
+                        basis={frame.cellWidth}
                         frame={frame}
                       >
                         {(focus) => (
@@ -137,7 +140,7 @@ export default function RoundsScreen() {
               key: 'timing',
               label: 'Round and rest',
               content: (
-                <ScrollView contentContainerStyle={styles.tvPage}>
+                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
                   <TimeField label="Round" seconds={draft.roundSeconds} onChange={(roundSeconds) => edit({ roundSeconds })} testID="round" accent={accent} />
                   <TimeField label="Rest" seconds={draft.restSeconds} onChange={(restSeconds) => edit({ restSeconds })} testID="rest" accent={restColor} />
                   <View style={styles.field}>
@@ -151,7 +154,7 @@ export default function RoundsScreen() {
               key: 'alerts',
               label: 'Warnings',
               content: (
-                <ScrollView contentContainerStyle={styles.tvPage}>
+                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
                   <View style={styles.field}>
                     <Text style={styles.fieldLabelTv}>Warning before the round ends</Text>
                     <View style={styles.chips}>
@@ -190,7 +193,7 @@ export default function RoundsScreen() {
               key: 'saved',
               label: 'Saved presets',
               content: (
-                <ScrollView contentContainerStyle={styles.tvPage}>
+                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
                   <PresetShelf
                     mode="rounds"
                     accent={accent}
@@ -475,10 +478,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
     overflow: 'visible',
   },
+  tvGrid: {
+    flexGrow: 1,
+  },
   tvPage: {
     flexGrow: 1,
-    gap: 20,
-    paddingBottom: 12,
+    gap: 12,
+    paddingBottom: 4,
   },
   preset: {
     width: '48%',

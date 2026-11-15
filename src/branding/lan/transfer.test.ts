@@ -30,6 +30,19 @@ describe('pairing token', () => {
     expect(isPairingToken('')).toBe(false);
     expect(isPairingToken(TOKEN.toUpperCase())).toBe(false);
   });
+
+  it('creates a token when global crypto does not exist', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: undefined });
+    try {
+      const token = createPairingToken();
+      expect(token).toMatch(/^[0-9a-f]{32}$/);
+      expect(isPairingToken(token)).toBe(true);
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, 'crypto', descriptor);
+      else delete (globalThis as { crypto?: Crypto }).crypto;
+    }
+  });
 });
 
 describe('lan address', () => {

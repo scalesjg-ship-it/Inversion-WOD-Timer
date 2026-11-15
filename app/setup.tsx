@@ -149,19 +149,20 @@ function SetupForm({
 
   if (tv) {
     return (
-      <SafeAreaView style={styles.safe} edges={[]}>
+      <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical }]}>
         <View style={styles.header}>
           <HeaderBack onPress={() => router.back()} color={accent} />
-          <Text style={styles.kickerTv}>Americana</Text>
+          <Text style={styles.kickerTv} numberOfLines={1}>Americana</Text>
         </View>
         <TvPager
+          inset={false}
           accent={accent}
           pages={[
             {
               key: 'time',
               label: modeTitle(mode),
               content: (
-                <ScrollView contentContainerStyle={styles.tvPage}>
+                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
                   <Text style={styles.summaryTv}>{summary}</Text>
                   {mode === 'forTime' ? (
                     <TvToggle
@@ -223,7 +224,7 @@ function SetupForm({
               key: 'lead-in',
               label: 'Lead-in',
               content: (
-                <ScrollView contentContainerStyle={styles.tvPage}>
+                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
                   <TimeField
                     label="Lead-in"
                     seconds={leadInSeconds}
@@ -237,14 +238,14 @@ function SetupForm({
             {
               key: 'presets',
               label: 'Saved presets',
-              content: <ScrollView contentContainerStyle={styles.tvPage}>{shelf}</ScrollView>,
+              content: <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>{shelf}</ScrollView>,
             },
           ]}
         />
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: box.vertical }]}>
           <BigButton testID="start-timer" label="Start" color={accent} onPress={() => onStart(config, runLabel)} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -445,8 +446,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   tvPage: {
-    gap: 22,
-    paddingBottom: 12,
+    gap: 12,
+    paddingBottom: 4,
   },
   title: {
     fontFamily: 'Oswald',

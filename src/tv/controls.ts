@@ -125,7 +125,7 @@ export function stepperControlSize(tv: boolean, screenHeight = 1080): StepperMet
   }
   const scale = Math.max(0.6, screenHeight / 1080);
   return {
-    button: Math.round(120 * scale),
+    button: Math.round(96 * scale),
     glyph: Math.round(68 * scale),
     value: Math.round(60 * scale),
     suffix: Math.round(24 * scale),
@@ -137,10 +137,10 @@ export function stepperControlSize(tv: boolean, screenHeight = 1080): StepperMet
 
 /**
  * Phone tab metrics match the existing iPhone tab bar.
- * TV metrics are the 1080p sizes times the window height, so a 4K window doubles them.
- * A 720p TV keeps the shorter bar.
+ * TV metrics scale from 1080p with the window height, and the side inset is 5% of the width
+ * so a 960-wide Fire TV window still clears overscan. A 4K window doubles the type.
  */
-export function tabBarControlSize(tv: boolean, screenHeight = 1080): TabBarMetrics {
+export function tabBarControlSize(tv: boolean, screenHeight = 1080, screenWidth = 0): TabBarMetrics {
   if (!tv) {
     return {
       label: 13,
@@ -153,35 +153,25 @@ export function tabBarControlSize(tv: boolean, screenHeight = 1080): TabBarMetri
       paddingBottom: 0,
     };
   }
-  if (screenHeight < 1000) {
-    const scale = screenHeight / 720;
-    return {
-      label: Math.round(22 * scale),
-      icon: Math.round(26 * scale),
-      itemMinHeight: Math.round(68 * scale),
-      barContentHeight: Math.round(96 * scale),
-      gap: Math.round(10 * scale),
-      paddingHorizontal: Math.round(24 * scale),
-      paddingTop: Math.round(12 * scale),
-      paddingBottom: Math.round(12 * scale),
-    };
-  }
-  const scale = screenHeight / 1080;
+  const height = screenHeight > 0 ? screenHeight : 1080;
+  const width = screenWidth > 0 ? screenWidth : Math.round(height * (16 / 9));
+  const scale = height / 1080;
+  const paddingHorizontal = Math.max(Math.round(width * 0.05), Math.round(60 * (width / 1920)));
   return {
-    label: Math.round(48 * scale),
-    icon: Math.round(56 * scale),
-    itemMinHeight: Math.round(132 * scale),
-    barContentHeight: Math.round(176 * scale),
-    gap: Math.round(28 * scale),
-    paddingHorizontal: Math.round(60 * scale),
-    paddingTop: Math.round(18 * scale),
-    paddingBottom: Math.round(16 * scale),
+    label: Math.max(16, Math.round(40 * scale)),
+    icon: Math.max(18, Math.round(44 * scale)),
+    itemMinHeight: Math.max(48, Math.round(104 * scale)),
+    barContentHeight: Math.max(64, Math.round(132 * scale)),
+    gap: Math.max(8, Math.round(16 * scale)),
+    paddingHorizontal,
+    paddingTop: Math.max(6, Math.round(12 * scale)),
+    paddingBottom: Math.max(6, Math.round(10 * scale)),
   };
 }
 
 /** Height of the TV tab bar, including its own padding. */
-export function tvTabBarHeight(screenHeight: number, bottomInset = 0): number {
-  const tab = tabBarControlSize(true, screenHeight);
+export function tvTabBarHeight(screenHeight: number, bottomInset = 0, screenWidth = 0): number {
+  const tab = tabBarControlSize(true, screenHeight, screenWidth);
   return tab.paddingTop + tab.barContentHeight + Math.max(bottomInset, tab.paddingBottom);
 }
 

@@ -1,6 +1,7 @@
 import { NativeModules } from 'react-native';
 
 import { isReachableLanIPv4 } from './address';
+import { encodeUtf8 } from './bytes';
 import { encodeHtmlResponse, HttpAccumulator } from './http';
 import { messagePage } from './page';
 import type { LogoTransferSession } from './session';
@@ -177,7 +178,7 @@ function serveConnection(socket: ConnectedSocket, session: LogoTransferSession):
 }
 
 function asBytes(data: Uint8Array | string): Uint8Array {
-  if (typeof data === 'string') return new TextEncoder().encode(data);
+  if (typeof data === 'string') return encodeUtf8(data);
   const copy = new Uint8Array(data.byteLength);
   copy.set(data);
   return copy;

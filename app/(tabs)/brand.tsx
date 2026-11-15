@@ -115,7 +115,7 @@ export default function BrandScreen() {
               key: 'name',
               label: 'Gym',
               content: (
-                <ScrollView contentContainerStyle={styles.tvPage} keyboardShouldPersistTaps="handled">
+                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage} keyboardShouldPersistTaps="handled">
                   <Text style={[styles.lede, styles.ledeTv]}>
                     Your gym name, colors, and logo stay on this device.
                   </Text>
@@ -146,7 +146,7 @@ export default function BrandScreen() {
               key: 'templates',
               label: 'Looks',
               content: (
-                <ScrollView contentContainerStyle={styles.tvPage}>
+                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
                   <BrandChoices branding={branding} part="templates" onChange={(patch) => void update(patch)} />
                 </ScrollView>
               ),
@@ -155,7 +155,7 @@ export default function BrandScreen() {
               key: 'palettes',
               label: 'Color sets',
               content: (
-                <ScrollView contentContainerStyle={styles.tvPage}>
+                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
                   <BrandChoices branding={branding} part="palettes" onChange={(patch) => void update(patch)} />
                 </ScrollView>
               ),
@@ -164,7 +164,7 @@ export default function BrandScreen() {
               key: 'colors',
               label: 'Colors',
               content: (
-                <ScrollView contentContainerStyle={styles.tvPage}>
+                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
                   <ColorPicker label="Work" testID="color-work" value={branding.workColor} onChange={(workColor) => void update({ workColor })} />
                   <ColorPicker label="Rest" testID="color-rest" value={branding.restColor} onChange={(restColor) => void update({ restColor })} />
                   <ColorPicker label="Lead-in" testID="color-lead" value={branding.leadInColor} onChange={(leadInColor) => void update({ leadInColor })} />
@@ -179,7 +179,7 @@ export default function BrandScreen() {
               key: 'logo',
               label: 'Logo',
               content: (
-                <ScrollView contentContainerStyle={styles.tvPage} keyboardShouldPersistTaps="handled">
+                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage} keyboardShouldPersistTaps="handled">
                   <TvLogoTransfer branding={branding} update={update} accent={accent} />
                   <TvLogoUrl onStored={async (logoUri) => update({ logoUri })} />
                   {branding.logoUri ? (
@@ -415,8 +415,8 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
   tvPage: {
-    gap: 16,
-    paddingBottom: 24,
+    gap: 10,
+    paddingBottom: 4,
   },
   wordmarkTv: {
     fontSize: 32,
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
     lineHeight: TV_BODY_FONT + 8,
   },
   previewTv: {
-    height: 200,
+    height: 160,
     borderRadius: 20,
   },
   previewClockTv: {
@@ -516,8 +516,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Oswald',
   },
   inputTv: {
-    minHeight: 84,
-    fontSize: 36,
+    minHeight: 64,
+    fontSize: 28,
     borderRadius: 18,
   },
   chips: {

@@ -9,8 +9,8 @@ import { tabBarControlSize } from '@/src/tv/controls';
 type TvTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
 export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }: TvTabBarProps) {
-  const { height } = useWindowDimensions();
-  const metrics = tabBarControlSize(true, height);
+  const { width, height } = useWindowDimensions();
+  const metrics = tabBarControlSize(true, height, width);
   const focusedRoute = state.routes[state.index];
   const focusedOptions = focusedRoute ? descriptors[focusedRoute.key]?.options : undefined;
   const active = colorString(focusedOptions?.tabBarActiveTintColor, chrome.text);
@@ -19,7 +19,7 @@ export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }:
   return (
     <View
       accessibilityRole="tablist"
-      style={[
+        style={[
         styles.bar,
         {
           gap: metrics.gap,
@@ -27,6 +27,7 @@ export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }:
           paddingTop: metrics.paddingTop,
           paddingBottom: Math.max(insets.bottom, metrics.paddingBottom),
           minHeight: metrics.paddingTop + metrics.barContentHeight + Math.max(insets.bottom, metrics.paddingBottom),
+          width: '100%',
         },
       ]}
     >
@@ -58,13 +59,14 @@ export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }:
                 minHeight: metrics.itemMinHeight,
                 opacity: pressed ? 0.82 : 1,
                 borderColor: 'transparent',
+                backgroundColor: 'transparent',
               },
             ]}
           >
-            <Text style={[styles.icon, { color, fontSize: metrics.icon, lineHeight: metrics.icon + 6 }]}>
+            <Text style={[styles.icon, styles.clear, { color, fontSize: metrics.icon, lineHeight: metrics.icon + 4 }]}>
               {label.slice(0, 1).toUpperCase()}
             </Text>
-            <Text style={[styles.label, { color, fontSize: metrics.label }]}>{label}</Text>
+            <Text style={[styles.label, styles.clear, { color, fontSize: metrics.label }]}>{label}</Text>
           </TvFocusPressable>
         );
       })}
@@ -86,11 +88,13 @@ const styles = StyleSheet.create({
   },
   item: {
     flex: 1,
+    minWidth: 0,
     borderRadius: 24,
     borderWidth: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 2,
+    backgroundColor: 'transparent',
   },
   icon: {
     fontFamily: 'Oswald',
@@ -98,5 +102,8 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: 'OswaldMedium',
     letterSpacing: 1,
+  },
+  clear: {
+    backgroundColor: 'transparent',
   },
 });

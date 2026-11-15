@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   headTv: {
-    minHeight: 96,
+    minHeight: 64,
     borderRadius: 20,
     borderWidth: 4,
     paddingHorizontal: 18,

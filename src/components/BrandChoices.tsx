@@ -13,8 +13,8 @@ import type { Branding } from '@/src/branding/types';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { Chip } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
-import { TV_FOCUS_BORDER } from '@/src/tv/controls';
-import { tvColumnBasis, tvFocusGutter, tvScale, tvScaled } from '@/src/tv/layout';
+import { TV_FOCUS_BORDER, tvTabBarHeight } from '@/src/tv/controls';
+import { tvHomeLayout, tvSafeBox, tvScaled, type TvHomeLayout } from '@/src/tv/layout';
 
 export function BrandChoices({
   branding,
@@ -27,9 +27,18 @@ export function BrandChoices({
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
-  const scale = tv ? tvScale(width, height) : 1;
-  const columns = tv ? 3 : 2;
-  const gutter = tv ? Math.max(tvFocusGutter(width / columns), Math.round(18 * scale)) : 0;
+  const safe = tvSafeBox(tv, width, height);
+  const inner = Math.max(1, width - safe.horizontal * 2);
+  const scene = Math.max(1, height - (tv ? tvTabBarHeight(height, 0, width) : 0) - tvScaled(420, width, height));
+  const fitted = tv
+    ? tvHomeLayout(inner, scene, Math.max(1, BRAND_TEMPLATES.length), {
+        header: 'none',
+        insets: false,
+        hint: false,
+        windowHeight: height,
+      })
+    : null;
+  const gutter = tv && fitted ? fitted.gutterX : 0;
   const showTemplates = part === 'all' || part === 'templates';
   const showPalettes = part === 'all' || part === 'palettes';
   return (
@@ -49,8 +58,8 @@ export function BrandChoices({
                 style={
                   tv
                     ? {
-                        width: tvColumnBasis(columns),
-                        maxWidth: tvColumnBasis(columns),
+                        width: fitted?.cellWidth ?? inner / 3,
+                        maxWidth: fitted?.cellWidth ?? inner / 3,
                         padding: gutter,
                       }
                     : styles.templateCell
@@ -58,6 +67,7 @@ export function BrandChoices({
               >
                 <TemplateCard
                   template={template}
+                  frame={fitted}
                   selected={templateMatches(branding, template)}
                   onPress={() => {
                     const patch = templatePatch(template);
@@ -95,10 +105,12 @@ export function BrandChoices({
 
 function TemplateCard({
   template,
+  frame,
   selected,
   onPress,
 }: {
   template: BrandTemplate;
+  frame: TvHomeLayout | null;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -113,11 +125,14 @@ function TemplateCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        tv && {
-          minHeight: tvScaled(220, width, height),
-          borderRadius: tvScaled(20, width, height),
-          padding: tvScaled(18, width, height),
-        },
+        tv && frame
+          ? {
+              height: frame.cardHeight,
+              minHeight: frame.cardHeight,
+              borderRadius: tvScaled(16, width, height),
+              padding: tvScaled(10, width, height),
+            }
+          : null,
         {
           width: '100%',
           borderColor: chrome.line,
@@ -128,7 +143,7 @@ function TemplateCard({
     >
       {selected ? <View pointerEvents="none" style={[styles.innerRing, tv && styles.innerRingTv]} /> : null}
       <View style={styles.cardTop}>
-        <Text style={[styles.cardName, tv && { fontSize: tvScaled(40, width, height) }]} numberOfLines={1}>
+        <Text style={[styles.cardName, tv && frame ? { fontSize: frame.titleSize, backgroundColor: 'transparent' } : null]} numberOfLines={1}>
           {template.name}
         </Text>
         {selected ? <Text style={[styles.mark, tv && styles.markTv]}>✓</Text> : null}
@@ -138,7 +153,13 @@ function TemplateCard({
         <View style={[styles.dot, { backgroundColor: palette?.backgroundColor ?? chrome.bg }]} />
         <View style={[styles.dot, { backgroundColor: palette?.uiColor ?? chrome.text }]} />
       </View>
-      <Text style={[styles.blurb, tv && { fontSize: tvScaled(28, width, height), lineHeight: tvScaled(36, width, height) }]} numberOfLines={3}>
+      <Text
+        style={[
+          styles.blurb,
+          tv && frame ? { fontSize: frame.detailSize, lineHeight: frame.detailSize + 4, backgroundColor: 'transparent' } : null,
+        ]}
+        numberOfLines={frame ? frame.detailLines : 3}
+      >
         {template.blurb}
       </Text>
     </TvFocusPressable>
@@ -176,8 +197,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chipsTv: {
-    flexDirection: 'column',
-    flexWrap: 'nowrap',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   templates: {
     flexDirection: 'row',

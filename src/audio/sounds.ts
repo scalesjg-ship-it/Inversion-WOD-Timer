@@ -4,12 +4,16 @@ import { Platform } from 'react-native';
 
 import { soundsForCues, type Cue, type SoundName } from '@/src/timer/engine';
 import { allowsDeviceHaptics } from '@/src/tv/controls';
+import bell from '../../assets/sounds/bell.wav';
+import start from '../../assets/sounds/start.wav';
+import tick from '../../assets/sounds/tick.wav';
+import warning from '../../assets/sounds/warning.wav';
 
 const sources: Record<SoundName, number> = {
-  tick: require('../../assets/sounds/tick.wav'),
-  warning: require('../../assets/sounds/warning.wav'),
-  start: require('../../assets/sounds/start.wav'),
-  bell: require('../../assets/sounds/bell.wav'),
+  tick,
+  warning,
+  start,
+  bell,
 };
 
 const players = new Map<SoundName, AudioPlayer>();
