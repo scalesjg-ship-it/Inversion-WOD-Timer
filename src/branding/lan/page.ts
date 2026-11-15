@@ -1,4 +1,5 @@
 import type { BrandColors } from '../types';
+import { uploadClientScript } from './uploadClient';
 
 export type PageDefaults = {
   gymName: string;
@@ -17,12 +18,15 @@ input, select, button { width: 100%; font: inherit; color: #F4F7FB; background: 
 input[type="color"] { height: 54px; padding: 8px; }
 input[type="file"] { padding: 12px; }
 button { background: #FF4D2E; color: #07080A; font-weight: 700; border: 0; margin-top: 20px; }
+button:disabled { opacity: 0.55; }
+#note { min-height: 1.4em; color: #FFB020; }
+#note.ok, p.ok { color: #06210F; background: #B6F5C8; border-radius: 14px; padding: 16px 18px; font-size: 22px; line-height: 1.35; font-weight: 700; }
+#note.err { color: #FFB020; }
 .check { display: flex; align-items: center; gap: 10px; text-transform: none; letter-spacing: 0; font-size: 17px; color: #F4F7FB; }
 .check input { width: auto; }
 .colors { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
 details { margin-top: 8px; }
 summary { cursor: pointer; color: #F4F7FB; }
-#note { min-height: 1.4em; color: #FFB020; }
 `.trim();
 
 export function formPage(token: string, defaults: PageDefaults): string {
@@ -43,11 +47,11 @@ export function formPage(token: string, defaults: PageDefaults): string {
     .join('');
   return document(
     'Send a logo',
-    `<h1>Send a logo</h1>
-<p>This page is served by the TV on your Wi-Fi. The photo goes to that TV and is not sent to a server on the internet.</p>
+    `<h1 id="title">Send a logo</h1>
+<p id="intro">This page is served by the TV on your Wi-Fi. Choose a photo from your camera roll. A large photo is resized on this phone, then sent only to this TV.</p>
 <form method="post" action="/?t=${escapeHtml(token)}" enctype="multipart/form-data">
 <input type="hidden" name="t" value="${escapeHtml(token)}">
-<label>Logo<input type="file" name="logo" accept="image/jpeg,image/png,image/heic,image/heif,.jpg,.jpeg,.png,.heic,.heif" required></label>
+<label>Photo from your camera roll<input type="file" name="logo" accept="image/*" required></label>
 <label>Gym name, optional<input name="gymName" maxlength="48" value="${escapeHtml(defaults.gymName)}" autocomplete="off"></label>
 <label>Placement
 <select name="placement">
@@ -62,24 +66,16 @@ export function formPage(token: string, defaults: PageDefaults): string {
 <label class="check"><input type="checkbox" name="updateColors" value="on"> Update colors on the TV</label>
 <div class="colors">${colorFields}</div>
 </details>
-<p id="note"></p>
-<button type="submit">Send</button>
+<button type="submit">Send to the TV</button>
 </form>
-<script>
-document.querySelector('form').addEventListener('submit', function (event) {
-  var input = document.querySelector('input[type=file]');
-  var file = input && input.files && input.files[0];
-  if (file && file.size > 10485760) {
-    event.preventDefault();
-    document.getElementById('note').textContent = 'Use a photo under 10 MB.';
-  }
-});
-</script>`,
+<p id="note" role="status" aria-live="assertive"></p>
+<script>${uploadClientScript}</script>`,
   );
 }
 
-export function messagePage(title: string, message: string): string {
-  return document(title, `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p>`);
+export function messagePage(title: string, message: string, tone: 'plain' | 'success' = 'plain'): string {
+  const paragraph = tone === 'success' ? `<p class="ok">${escapeHtml(message)}</p>` : `<p>${escapeHtml(message)}</p>`;
+  return document(title, `<h1>${escapeHtml(title)}</h1>${paragraph}`);
 }
 
 export function escapeHtml(value: string): string {

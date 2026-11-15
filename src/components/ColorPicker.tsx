@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { hexToHue, hsvToHex, inkOn, normalizeHex, sameHex } from '@/src/branding/color';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
 import { TV_FOCUS_BORDER } from '@/src/tv/controls';
+import { fitTvStyle, tvColorRowBox } from '@/src/tv/layout';
 
 const HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
 const VALUES = [1, 0.78, 0.55, 0.32];
@@ -15,11 +16,14 @@ export function ColorPicker({
   value,
   onChange,
   testID,
+  compact = false,
 }: {
   label: string;
   value: string;
   onChange: (hex: string) => void;
   testID: string;
+  /** One line of label and hex, for the 960×540 color grid. */
+  compact?: boolean;
 }) {
   const [text, setText] = useState(value);
   const [tracked, setTracked] = useState(value);
@@ -30,6 +34,13 @@ export function ColorPicker({
   }
   const hue = hexToHue(value);
   const tv = Platform.isTV === true;
+  const { width, height } = useWindowDimensions();
+  const row = compact ? tvColorRowBox(width, height) : null;
+  const tvHead = tv && !row ? fitTvStyle(styles.headTv, width, height) : null;
+  const tvSample = tv && !row ? fitTvStyle(styles.sampleTv, width, height) : null;
+  const tvLabel = tv && !row ? fitTvStyle(styles.labelTv, width, height) : null;
+  const tvCurrent = tv && !row ? fitTvStyle(styles.currentTv, width, height) : null;
+  const tvAction = tv && !row ? fitTvStyle(styles.actionTv, width, height) : null;
 
   const commit = (next: string) => {
     const parsed = normalizeHex(next);
@@ -42,21 +53,60 @@ export function ColorPicker({
   };
 
   return (
-    <View style={styles.block} testID={testID}>
+    <View style={row ? styles.blockTight : tv ? fitTvStyle(styles.block, width, height) : styles.block} testID={testID}>
       <TvFocusPressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         accessibilityLabel={`${label}, ${value}. ${open ? 'Close colors' : 'Change color'}`}
         testID={`${testID}-toggle`}
         onPress={() => setOpen((current) => !current)}
-        style={({ pressed }) => [styles.head, tv && styles.headTv, { opacity: pressed ? 0.8 : 1 }]}
+        style={({ pressed }) => [
+          styles.head,
+          tvHead,
+          row
+            ? {
+                minHeight: row.height,
+                height: row.height,
+                gap: 6,
+                paddingHorizontal: 8,
+                paddingVertical: row.padY,
+                borderRadius: 10,
+                justifyContent: 'center',
+              }
+            : null,
+          { opacity: pressed ? 0.8 : 1 },
+        ]}
       >
-        <View style={[styles.sample, tv && styles.sampleTv, { backgroundColor: value }]} />
-        <View style={styles.copy}>
-          <Text style={[styles.label, tv && styles.labelTv]}>{label}</Text>
-          <Text style={[styles.current, tv && styles.currentTv]}>{value}</Text>
-        </View>
-        <Text style={[styles.action, tv && styles.actionTv]}>{open ? 'Close' : 'Change'}</Text>
+        <View
+          style={[
+            styles.sample,
+            tvSample,
+            row ? { width: row.sample, height: row.sample, borderRadius: 4 } : null,
+            { backgroundColor: value },
+          ]}
+        />
+        {row ? (
+          <Text
+            testID={`${testID}-value`}
+            style={{
+              flex: 1,
+              color: chrome.text,
+              fontFamily: 'Oswald',
+              fontSize: row.fontSize,
+              lineHeight: row.lineHeight,
+              includeFontPadding: false,
+            }}
+            numberOfLines={1}
+          >
+            {`${label} ${value}`}
+          </Text>
+        ) : (
+          <View style={styles.copy}>
+            <Text style={[styles.label, tvLabel]}>{label}</Text>
+            <Text style={[styles.current, tvCurrent]} numberOfLines={1}>{value}</Text>
+          </View>
+        )}
+        {row ? null : <Text style={[styles.action, tvAction]}>{open ? 'Close' : 'Change'}</Text>}
       </TvFocusPressable>
       {open ? (
         <View style={styles.editor}>
@@ -176,6 +226,10 @@ const styles = StyleSheet.create({
   block: {
     gap: 8,
     paddingVertical: 4,
+  },
+  blockTight: {
+    gap: 0,
+    paddingVertical: 0,
   },
   editor: {
     gap: 8,

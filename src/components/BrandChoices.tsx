@@ -13,8 +13,7 @@ import type { Branding } from '@/src/branding/types';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { Chip } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
-import { TV_FOCUS_BORDER } from '@/src/tv/controls';
-import { tvScaled, type TvHomeLayout } from '@/src/tv/layout';
+import { fitTvStyle, tvScaled, tvTemplateLabelBox, type TvHomeLayout } from '@/src/tv/layout';
 
 export function BrandChoices({
   branding,
@@ -31,10 +30,10 @@ export function BrandChoices({
   const showTemplates = part === 'all' || part === 'templates';
   const showPalettes = part === 'all' || part === 'palettes';
   return (
-    <View style={styles.block}>
+    <View style={tv ? fitTvStyle(styles.block, width, height) : styles.block}>
       {showTemplates ? (
         <>
-          <Text style={[styles.label, tv && { color: chrome.muted, fontSize: tvScaled(20, width, height), letterSpacing: 1.2 }]}>Color templates</Text>
+          <Text style={[tv ? fitTvStyle(styles.label, width, height) : styles.label, tv && { color: chrome.muted, fontSize: tvScaled(20, width, height), letterSpacing: 1.2 }]}>Color templates</Text>
           {tv ? null : (
           <Text style={styles.help}>
             One press sets the colors, clock, and logo placement. You can still change any color below.
@@ -71,7 +70,7 @@ export function BrandChoices({
       ) : null}
       {showPalettes ? (
         <>
-          <Text style={[styles.label, tv && { color: chrome.muted, fontSize: tvScaled(20, width, height), letterSpacing: 1.2 }]}>Color sets</Text>
+          <Text style={[tv ? fitTvStyle(styles.label, width, height) : styles.label, tv && { color: chrome.muted, fontSize: tvScaled(20, width, height), letterSpacing: 1.2 }]}>Color sets</Text>
           {tv ? null : <Text style={styles.help}>Colors only. The logo placement stays as it is.</Text>}
           <View style={[styles.chips, tv && styles.chipsTv]}>
             {COLOR_PALETTES.map((palette) => (
@@ -106,6 +105,7 @@ function TemplateCard({
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
+  const box = compact ? tvTemplateLabelBox(width, height) : null;
   const palette = COLOR_PALETTES.find((item) => item.id === template.paletteId);
   return (
     <TvFocusPressable
@@ -115,37 +115,57 @@ function TemplateCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        compact
+        box
           ? {
-              minHeight: tvScaled(36, width, height),
-              height: tvScaled(36, width, height),
-              borderRadius: 12,
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-              gap: 2,
+              minHeight: box.height,
+              height: box.height,
+              borderRadius: tvScaled(10, width, height),
+              padding: 0,
+              paddingTop: box.padY,
+              paddingBottom: box.padY,
+              paddingHorizontal: box.padX,
+              gap: 0,
+              justifyContent: 'center',
             }
           : null,
         {
           width: '100%',
           borderColor: chrome.line,
           opacity: pressed ? 0.8 : 1,
-          borderWidth: tv ? TV_FOCUS_BORDER : 1,
+          borderWidth: box ? box.border : tv ? tvScaled(5, width, height) : 1,
         },
       ]}
     >
-      {selected ? <View pointerEvents="none" style={[styles.innerRing, tv && styles.innerRingTv]} /> : null}
-      <View style={styles.cardTop}>
+      {selected && !box ? <View pointerEvents="none" style={[styles.innerRing, tv && styles.innerRingTv]} /> : null}
+      <View style={[styles.cardTop, box ? { height: box.lineHeight, alignItems: 'center' } : null]}>
         <Text
+          testID={`template-name-${template.id}`}
           style={[
             styles.cardName,
             { color: chrome.text, backgroundColor: 'transparent' },
-            compact ? { fontSize: tvScaled(18, width, height) } : null,
+            box
+              ? {
+                  fontSize: box.fontSize,
+                  lineHeight: box.lineHeight,
+                  includeFontPadding: false,
+                }
+              : null,
           ]}
           numberOfLines={1}
         >
           {template.name}
         </Text>
-        {selected ? <Text style={[styles.mark, tv && styles.markTv]}>✓</Text> : null}
+        {selected ? (
+          <Text
+            style={[
+              styles.mark,
+              tv && !box ? styles.markTv : null,
+              box ? { fontSize: box.fontSize, lineHeight: box.lineHeight } : null,
+            ]}
+          >
+            ✓
+          </Text>
+        ) : null}
       </View>
       {compact ? null : (
         <View style={styles.dots}>

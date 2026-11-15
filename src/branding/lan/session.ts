@@ -67,7 +67,7 @@ export class LogoTransferSession {
     this.used = true;
     try {
       await this.onUpload(decision.upload);
-      return page(200, 'Sent', 'The TV has the logo. You can close this page.');
+      return page(200, 'Logo saved', 'The TV has the logo. You can close this page.', 'success');
     } catch (error) {
       this.used = false;
       const message =
@@ -85,6 +85,6 @@ export class LogoTransferSession {
   }
 }
 
-function page(status: number, title: string, message: string): TransferResult {
-  return { status, html: messagePage(title, message) };
+function page(status: number, title: string, message: string, tone: 'plain' | 'success' = 'plain'): TransferResult {
+  return { status, html: messagePage(title, message, tone) };
 }

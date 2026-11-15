@@ -1,4 +1,4 @@
-import { TV_FOCUS_SCALE, tvTabBarHeight } from './controls';
+import { TV_FOCUS_BORDER, TV_FOCUS_SCALE, tvTabBarHeight } from './controls';
 
 /** 1080p and larger, or a real TV runtime. iPad widths stay on the phone layout. */
 export function isTenFootLayout(width: number, height: number, tvRuntime: boolean): boolean {
@@ -55,6 +55,46 @@ export function tvScaled(at1080: number, width: number, height: number): number 
   return Math.max(1, Math.round(at1080 * tvScale(width, height)));
 }
 
+/** 1080p styles stay as written. A 960×540 Fire TV window gets the same proportions. */
+export function fitTvStyle<T extends Record<string, unknown>>(style: T, width: number, height: number): T {
+  const scale = tvScale(width, height);
+  return scale === 1 ? style : scaleTvStyle(style, scale);
+}
+
+/**
+ * 960×540 is the Fire TV dp frame. Two columns of color cards then run under the tab bar.
+ * A third column keeps Accent on screen.
+ */
+export function tvColorGridTight(width: number, height: number): boolean {
+  return tvScale(width, height) <= 0.55;
+}
+
+export interface TvColorRowBox {
+  fontSize: number;
+  lineHeight: number;
+  border: number;
+  padY: number;
+  sample: number;
+  /** Border box. Label and hex share one centered line. */
+  height: number;
+}
+
+/** One-line color card used when `tvColorGridTight` is true. The hex stays inside the card. */
+export function tvColorRowBox(width: number, height: number): TvColorRowBox {
+  const fontSize = tvScaled(13, width, height);
+  const lineHeight = Math.max(fontSize + 1, Math.ceil(fontSize * CLOCK_LINE_HEIGHT_RATIO));
+  const border = tvScaled(TV_FOCUS_BORDER, width, height);
+  const padY = Math.max(1, tvScaled(1, width, height));
+  return {
+    fontSize,
+    lineHeight,
+    border,
+    padY,
+    sample: lineHeight,
+    height: lineHeight + padY * 2 + border * 2,
+  };
+}
+
 export function tvSafeBox(tv: boolean, width = TV_REF_WIDTH, height = TV_REF_HEIGHT): { horizontal: number; vertical: number } {
   if (!tv) return { horizontal: 0, vertical: 0 };
   const safeWidth = width > 0 ? width : TV_REF_WIDTH;
@@ -109,6 +149,37 @@ export function scaleTvStyle<T extends Record<string, unknown>>(style: T, scale:
  * A shorter line box clips the digits on iOS.
  */
 export const CLOCK_LINE_HEIGHT_RATIO = 1.5;
+
+export interface TvTemplateLabelBox {
+  fontSize: number;
+  lineHeight: number;
+  border: number;
+  padX: number;
+  padY: number;
+  /** Border box. The label line sits in the middle, clear of the border and padding. */
+  height: number;
+}
+
+/**
+ * Compact template card for the TV Brand tab.
+ * The height is the Oswald line, the vertical padding, and the focus border,
+ * so the name is fully visible and centered at 1080p and at 960×540.
+ */
+export function tvTemplateLabelBox(width: number, height: number): TvTemplateLabelBox {
+  const fontSize = tvScaled(16, width, height);
+  const lineHeight = Math.max(fontSize + 1, Math.ceil(fontSize * CLOCK_LINE_HEIGHT_RATIO));
+  const border = tvScaled(TV_FOCUS_BORDER, width, height);
+  const padY = Math.max(1, tvScaled(2, width, height));
+  const padX = tvScaled(8, width, height);
+  return {
+    fontSize,
+    lineHeight,
+    border,
+    padX,
+    padY,
+    height: lineHeight + padY * 2 + border * 2,
+  };
+}
 
 /** Widest Oswald Bold digit is 0.55em. Extra room covers rasterization. */
 const DIGIT_EM = 0.58;

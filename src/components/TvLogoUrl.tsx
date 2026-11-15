@@ -1,16 +1,26 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { downloadLogo } from '@/src/branding/downloadLogo';
 import { prepareLogo } from '@/src/branding/logo';
 import { parseLogoUrl } from '@/src/branding/logoUrl';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
+import { fitTvStyle } from '@/src/tv/layout';
 
 export function TvLogoUrl({ onStored }: { onStored: (uri: string) => Promise<void> }) {
   const [text, setText] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const { width, height } = useWindowDimensions();
+  const block = fitTvStyle(styles.block, width, height);
+  const row = fitTvStyle(styles.row, width, height);
+  const label = fitTvStyle(styles.label, width, height);
+  const help = fitTvStyle(styles.help, width, height);
+  const input = fitTvStyle(styles.input, width, height);
+  const button = fitTvStyle(styles.button, width, height);
+  const buttonLabel = fitTvStyle(styles.buttonLabel, width, height);
+  const statusStyle = fitTvStyle(styles.status, width, height);
 
   const load = async () => {
     if (!parseLogoUrl(text)) {
@@ -32,32 +42,37 @@ export function TvLogoUrl({ onStored }: { onStored: (uri: string) => Promise<voi
   };
 
   return (
-    <View style={styles.block} testID="tv-logo-url">
-      <Text style={styles.label}>Logo link</Text>
-      <Text style={styles.help}>Paste an https image address. It is downloaded and kept on this TV.</Text>
-      <TvTextField
-        testID="logo-url"
-        value={text}
-        onChangeText={setText}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="url"
-        placeholder="https://"
-        placeholderTextColor={chrome.muted}
-        style={styles.input}
-      />
-      <TvFocusPressable
-        accessibilityRole="button"
-        accessibilityState={{ disabled: busy }}
-        disabled={busy}
-        testID="logo-url-load"
-        onPress={() => void load()}
-        style={({ pressed }) => [styles.button, { opacity: busy ? 0.5 : pressed ? 0.8 : 1 }]}
-      >
-        <Text style={styles.buttonLabel}>{busy ? 'Saving…' : 'Save logo'}</Text>
-      </TvFocusPressable>
+    <View style={block} testID="tv-logo-url">
+      <Text style={label}>Logo link</Text>
+      <Text style={help} numberOfLines={2}>
+        Paste an https image address. It is downloaded and kept on this TV.
+      </Text>
+      <View style={row}>
+        <TvTextField
+          testID="logo-url"
+          value={text}
+          onChangeText={setText}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          placeholder="https://"
+          placeholderTextColor={chrome.muted}
+          style={input}
+        />
+        <TvFocusPressable
+          accessibilityRole="button"
+          accessibilityLabel="Save logo"
+          accessibilityState={{ disabled: busy }}
+          disabled={busy}
+          testID="logo-url-load"
+          onPress={() => void load()}
+          style={({ pressed }) => [button, { opacity: busy ? 0.5 : pressed ? 0.8 : 1 }]}
+        >
+          <Text style={buttonLabel}>{busy ? 'Saving…' : 'Save'}</Text>
+        </TvFocusPressable>
+      </View>
       {status ? (
-        <Text style={styles.status} testID="logo-url-status">
+        <Text style={statusStyle} testID="logo-url-status">
           {status}
         </Text>
       ) : null}
@@ -67,7 +82,12 @@ export function TvLogoUrl({ onStored }: { onStored: (uri: string) => Promise<voi
 
 const styles = StyleSheet.create({
   block: {
-    gap: 12,
+    gap: 6,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   label: {
     color: chrome.muted,
@@ -82,6 +102,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   input: {
+    flex: 1,
+    minWidth: 0,
     minHeight: 44,
     borderRadius: 12,
     borderWidth: 2,
@@ -89,15 +111,15 @@ const styles = StyleSheet.create({
     backgroundColor: chrome.surface,
     color: chrome.text,
     paddingHorizontal: 12,
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: 'Oswald',
   },
   button: {
-    alignSelf: 'flex-start',
-    minHeight: 44,
-    minWidth: 280,
-    paddingHorizontal: 28,
-    borderRadius: 18,
+    flexShrink: 0,
+    minHeight: 48,
+    minWidth: 112,
+    paddingHorizontal: 16,
+    borderRadius: 14,
     borderWidth: 4,
     borderColor: chrome.line,
     backgroundColor: chrome.surface,
@@ -107,7 +129,7 @@ const styles = StyleSheet.create({
   buttonLabel: {
     color: chrome.text,
     fontFamily: 'OswaldMedium',
-    fontSize: 32,
+    fontSize: 22,
   },
   status: {
     color: chrome.text,
