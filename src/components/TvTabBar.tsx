@@ -1,8 +1,9 @@
 import { Tabs } from 'expo-router';
-import type { ComponentProps } from 'react';
+import { useEffect, type ComponentProps } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { TvFocusPressable } from '@/src/components/TvFocus';
+import { TvTabUpGuide, tvTabItemProps, useTvTabFocus } from '@/src/components/TvTabFocus';
 import { chrome } from '@/src/theme/chrome';
 import { tabBarControlSize } from '@/src/tv/controls';
 
@@ -11,6 +12,10 @@ type TvTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar'
 export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }: TvTabBarProps) {
   const { width, height } = useWindowDimensions();
   const metrics = tabBarControlSize(true, height, width);
+  const tabFocus = useTvTabFocus();
+  useEffect(() => {
+    tabFocus?.reportSelected(state.index);
+  }, [state.index, tabFocus]);
   const focusedRoute = state.routes[state.index];
   const focusedOptions = focusedRoute ? descriptors[focusedRoute.key]?.options : undefined;
   const active = colorString(focusedOptions?.tabBarActiveTintColor, chrome.text);
@@ -31,6 +36,7 @@ export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }:
         },
       ]}
     >
+      <TvTabUpGuide height={metrics.paddingTop} />
       {state.routes.map((route, index) => {
         const selected = index === state.index;
         const options = descriptors[route.key]?.options;
@@ -45,13 +51,21 @@ export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }:
           });
           if (!selected && !event.defaultPrevented) navigateToTab(route.key);
         };
+        const links = tvTabItemProps(true, index, tabFocus?.tabTags ?? [], tabFocus?.upTag ?? null);
         return (
           <TvFocusPressable
             key={route.key}
+            onHost={(node) => tabFocus?.bindTab(index, node)}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={label}
             testID={options?.tabBarButtonTestID}
+            trackTabContent={false}
+            focusable
+            nextFocusLeft={links.nextFocusLeft}
+            nextFocusRight={links.nextFocusRight}
+            nextFocusDown={links.nextFocusDown}
+            nextFocusUp={links.nextFocusUp}
             onPress={onPress}
             style={({ pressed }) => [
               styles.item,

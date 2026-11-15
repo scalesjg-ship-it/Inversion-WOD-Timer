@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { TvTabBar } from '@/src/components/TvTabBar';
+import { TvTabFocusProvider } from '@/src/components/TvTabFocus';
 import { chrome } from '@/src/theme/chrome';
 
 const TAB_BAR_CONTENT_HEIGHT = 64;
@@ -19,7 +20,7 @@ export default function TabLayout() {
   // navigation bar. iOS and TV keep the existing bar.
   const androidPhone = Platform.OS === 'android' && !tv;
 
-  return (
+  const navigator = (
     <Tabs
       {...(tv ? { tabBar: (props) => <TvTabBar {...props} /> } : {})}
       screenOptions={{
@@ -66,6 +67,10 @@ export default function TabLayout() {
       />
     </Tabs>
   );
+
+  // The phone tab bar is the default one. Only the TV bar needs the focus bridge.
+  if (!tv) return navigator;
+  return <TvTabFocusProvider>{navigator}</TvTabFocusProvider>;
 }
 
 function TabMark({ color, label }: { color: TextStyle['color']; label: string }) {

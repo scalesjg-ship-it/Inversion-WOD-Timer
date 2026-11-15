@@ -23,7 +23,7 @@
     },
     "android": {
       "package": "com.garrettscales.americana",
-      "versionCode": 8,
+      "versionCode": 9,
       "adaptiveIcon": {
         "backgroundColor": "#07080A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

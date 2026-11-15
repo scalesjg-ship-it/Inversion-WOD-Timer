@@ -23,6 +23,7 @@ import { ColorPicker } from '@/src/components/ColorPicker';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
 import { RouteErrorBoundary } from '@/src/components/RouteErrorBoundary';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
+import { TvTabDownBridge, useTvTabFocus } from '@/src/components/TvTabFocus';
 import { TvLogoUrl } from '@/src/components/TvLogoUrl';
 import { Chip, TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
@@ -45,6 +46,7 @@ export default function BrandScreen() {
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   const { width, height } = useWindowDimensions();
   const tv = Platform.isTV === true;
+  const tabFocus = useTvTabFocus();
   const box = tvSafeBox(tv, width, height);
   const labelStyle = [styles.fieldLabel, tv && styles.fieldLabelTv];
 
@@ -157,6 +159,7 @@ export default function BrandScreen() {
           <TvFocusPressable
             accessibilityRole="button"
             testID="reset-brand"
+            focusDown={tabFocus?.downTag ?? null}
             onPress={confirmReset}
             style={({ pressed }) => [fitTvStyle(styles.reset, width, height), pressed ? { opacity: 0.75 } : null]}
           >
@@ -178,19 +181,21 @@ export default function BrandScreen() {
                 ['Background', 'color-background', branding.backgroundColor, (backgroundColor: string) => update({ backgroundColor })],
                 ['Accent', 'color-ui', branding.uiColor, (uiColor: string) => update({ uiColor })],
               ] as const
-            ).map(([label, testID, value, onChange]) => (
+            ).map(([label, testID, value, onChange], index, colors) => (
               <View key={testID} style={tvColorGridTight(width, height) ? styles.colorCellTight : styles.colorCell}>
                 <ColorPicker
                   label={label}
                   testID={testID}
                   value={value}
                   compact={tvColorGridTight(width, height)}
+                  focusDown={index === colors.length - 1 ? tabFocus?.downTag ?? null : null}
                   onChange={(next) => void onChange(next)}
                 />
               </View>
             ))}
           </View>
         </View>
+        <TvTabDownBridge />
       </View>
     );
   }
