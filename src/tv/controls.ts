@@ -118,20 +118,27 @@ export function tintHex(color: string, alpha: number): string {
   return `rgba(${red},${green},${blue},${alpha})`;
 }
 
-/** Phone stepper metrics match the existing iPhone stylesheet. TV sizes scale from 1080p. */
-export function stepperControlSize(tv: boolean, screenHeight = 1080): StepperMetrics {
+/** Phone stepper metrics match the existing iPhone stylesheet. TV sizes scale from 1080p. Compact rows fit a whole setup on one screen. */
+export function stepperControlSize(tv: boolean, screenHeight = 1080, compact = false): StepperMetrics {
   if (!tv) {
     return { button: 52, glyph: 32, value: 32, suffix: 12, gap: 8, radius: 14, valueMinWidth: 56 };
   }
   const scale = Math.max(0.6, screenHeight / 1080);
+  const buttonBasis = compact ? 56 : 96;
+  const glyphBasis = compact ? 36 : 68;
+  const valueBasis = compact ? 32 : 60;
+  const suffixBasis = compact ? 14 : 24;
+  const gapBasis = compact ? 8 : 22;
+  const radiusBasis = compact ? 14 : 28;
+  const valueWidthBasis = compact ? 48 : 108;
   return {
-    button: Math.round(96 * scale),
-    glyph: Math.round(68 * scale),
-    value: Math.round(60 * scale),
-    suffix: Math.round(24 * scale),
-    gap: Math.round(22 * scale),
-    radius: Math.round(28 * scale),
-    valueMinWidth: Math.round(108 * scale),
+    button: Math.round(buttonBasis * scale),
+    glyph: Math.round(glyphBasis * scale),
+    value: Math.round(valueBasis * scale),
+    suffix: Math.round(suffixBasis * scale),
+    gap: Math.round(gapBasis * scale),
+    radius: Math.round(radiusBasis * scale),
+    valueMinWidth: Math.round(valueWidthBasis * scale),
   };
 }
 

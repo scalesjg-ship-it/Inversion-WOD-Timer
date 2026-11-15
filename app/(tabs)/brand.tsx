@@ -24,7 +24,6 @@ import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
 import { RouteErrorBoundary } from '@/src/components/RouteErrorBoundary';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { TvLogoUrl } from '@/src/components/TvLogoUrl';
-import { TvPager } from '@/src/components/TvPager';
 import { Chip, TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
 import { TV_BODY_FONT, TV_SECTION_FONT, tvSafeBox } from '@/src/tv/layout';
@@ -107,126 +106,77 @@ export default function BrandScreen() {
 
   if (tv) {
     return (
-      <SafeAreaView style={styles.safe} edges={[]} testID="screen-brand">
-        <TvPager
-          accent={accent}
-          pages={[
-            {
-              key: 'name',
-              label: 'Gym',
-              content: (
-                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage} keyboardShouldPersistTaps="handled">
-                  <Text style={[styles.lede, styles.ledeTv]}>
-                    Your gym name, colors, and logo stay on this device.
-                  </Text>
-                  <View
-                    testID="brand-preview"
-                    style={[styles.preview, styles.previewTv, { backgroundColor: branding.backgroundColor }]}
-                    onLayout={(event) => {
-                      const next = event.nativeEvent.layout;
-                      setFrame({ width: next.width, height: next.height });
-                    }}
-                  >
-                    <LogoBackdrop branding={branding} width={frame.width} height={frame.height} />
-                    <View style={styles.previewTop}>
-                      <Text style={styles.previewGym} numberOfLines={1}>{branding.gymName}</Text>
-                      <CornerLogo branding={branding} size={42} />
-                    </View>
-                    <Text style={[styles.previewClock, styles.previewClockTv, { color: digits, fontFamily: clockFontFamily(branding.clockWeight) }]}>
-                      05:00
-                    </Text>
-                    <Text style={[styles.previewPhase, { color: readableDigitColor(branding.workColor, branding.backgroundColor) }]}>Work</Text>
-                  </View>
-                  <Text style={labelStyle}>Gym name</Text>
-                  <GymNameField value={branding.gymName} onCommit={(gymName) => void update({ gymName })} />
-                </ScrollView>
-              ),
-            },
-            {
-              key: 'templates',
-              label: 'Looks',
-              content: (
-                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
-                  <BrandChoices branding={branding} part="templates" onChange={(patch) => void update(patch)} />
-                </ScrollView>
-              ),
-            },
-            {
-              key: 'palettes',
-              label: 'Color sets',
-              content: (
-                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
-                  <BrandChoices branding={branding} part="palettes" onChange={(patch) => void update(patch)} />
-                </ScrollView>
-              ),
-            },
-            {
-              key: 'colors',
-              label: 'Colors',
-              content: (
-                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
-                  <ColorPicker label="Work" testID="color-work" value={branding.workColor} onChange={(workColor) => void update({ workColor })} />
-                  <ColorPicker label="Rest" testID="color-rest" value={branding.restColor} onChange={(restColor) => void update({ restColor })} />
-                  <ColorPicker label="Lead-in" testID="color-lead" value={branding.leadInColor} onChange={(leadInColor) => void update({ leadInColor })} />
-                  <ColorPicker label="Warning" testID="color-warning" value={branding.warningColor} onChange={(warningColor) => void update({ warningColor })} />
-                  <ColorPicker label="Digits" testID="color-digits" value={branding.digitColor} onChange={(digitColor) => void update({ digitColor })} />
-                  <ColorPicker label="Background" testID="color-background" value={branding.backgroundColor} onChange={(backgroundColor) => void update({ backgroundColor })} />
-                  <ColorPicker label="Accent" testID="color-ui" value={branding.uiColor} onChange={(uiColor) => void update({ uiColor })} />
-                </ScrollView>
-              ),
-            },
-            {
-              key: 'logo',
-              label: 'Logo',
-              content: (
-                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage} keyboardShouldPersistTaps="handled">
-                  <TvLogoTransfer branding={branding} update={update} accent={accent} />
-                  <TvLogoUrl onStored={async (logoUri) => update({ logoUri })} />
-                  {branding.logoUri ? (
-                    <TvFocusPressable
-                      accent={accent}
-                      accessibilityRole="button"
-                      testID="remove-logo"
-                      onPress={() => void update({ logoUri: null })}
-                      style={({ pressed }) => [styles.linkHitTv, pressed ? { opacity: 0.75 } : null]}
-                    >
-                      <Text style={[styles.link, styles.linkTv, { color: accent }]}>Remove logo</Text>
-                    </TvFocusPressable>
-                  ) : null}
-                  <View style={styles.chips}>
-                    {PLACEMENTS.map((placement) => (
-                      <Chip
-                        key={placement.id}
-                        label={placement.label}
-                        color={accent}
-                        selected={branding.logoPlacement === placement.id}
-                        onPress={() => void update({ logoPlacement: placement.id })}
-                        testID={`placement-${placement.id}`}
-                      />
-                    ))}
-                  </View>
-                  <TvToggle
-                    label="Blur the full-bleed logo"
-                    value={branding.logoBlur}
-                    onValueChange={(logoBlur) => void update({ logoBlur })}
-                    disabled={branding.logoPlacement !== 'fullBleed'}
-                    testID="logo-blur"
-                    accent={accent}
-                  />
-                  <TvFocusPressable
-                    accessibilityRole="button"
-                    testID="reset-brand"
-                    onPress={confirmReset}
-                    style={({ pressed }) => [styles.reset, styles.resetTv, pressed ? { opacity: 0.75 } : null]}
-                  >
-                    <Text style={[styles.resetLabel, styles.resetLabelTv]}>Reset to Inversion</Text>
-                  </TvFocusPressable>
-                </ScrollView>
-              ),
-            },
-          ]}
-        />
-      </SafeAreaView>
+      <View style={[styles.safe, styles.tvColumns, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical, paddingBottom: box.vertical }]} testID="screen-brand">
+        <View style={styles.tvColumn}>
+          <Text style={[styles.lede, styles.ledeTv, { color: chrome.muted }]}>
+            Your gym name, colors, and logo stay on this device.
+          </Text>
+          <View
+            testID="brand-preview"
+            style={[styles.preview, styles.previewTv, { backgroundColor: branding.backgroundColor }]}
+            onLayout={(event) => {
+              const next = event.nativeEvent.layout;
+              setFrame({ width: next.width, height: next.height });
+            }}
+          >
+            <LogoBackdrop branding={branding} width={frame.width} height={frame.height} />
+            <View style={styles.previewTop}>
+              <Text style={[styles.previewGym, { color: chrome.text }]} numberOfLines={1}>{branding.gymName}</Text>
+              <CornerLogo branding={branding} size={28} />
+            </View>
+            <Text style={[styles.previewClock, styles.previewClockTv, { color: digits, fontFamily: clockFontFamily(branding.clockWeight) }]}>
+              05:00
+            </Text>
+            <Text style={[styles.previewPhase, { color: readableDigitColor(branding.workColor, branding.backgroundColor) }]}>Work</Text>
+          </View>
+          <Text style={[labelStyle, { color: chrome.muted }]}>Gym name</Text>
+          <GymNameField value={branding.gymName} onCommit={(gymName) => void update({ gymName })} />
+          <TvLogoTransfer branding={branding} update={update} accent={accent} />
+          <TvLogoUrl onStored={async (logoUri) => update({ logoUri })} />
+          <View style={styles.chips}>
+            {PLACEMENTS.map((placement) => (
+              <Chip
+                key={placement.id}
+                label={placement.label}
+                color={accent}
+                selected={branding.logoPlacement === placement.id}
+                onPress={() => void update({ logoPlacement: placement.id })}
+                testID={`placement-${placement.id}`}
+              />
+            ))}
+          </View>
+          <TvToggle
+            label="Blur the full-bleed logo"
+            value={branding.logoBlur}
+            onValueChange={(logoBlur) => void update({ logoBlur })}
+            disabled={branding.logoPlacement !== 'fullBleed'}
+            testID="logo-blur"
+            accent={accent}
+          />
+          <TvFocusPressable
+            accessibilityRole="button"
+            testID="reset-brand"
+            onPress={confirmReset}
+            style={({ pressed }) => [styles.reset, pressed ? { opacity: 0.75 } : null]}
+          >
+            <Text style={[styles.resetLabel, { color: '#FF8A7A' }]}>Reset to Inversion</Text>
+          </TvFocusPressable>
+        </View>
+        <View style={styles.tvColumn}>
+          <BrandChoices branding={branding} part="templates" onChange={(patch) => void update(patch)} />
+          <BrandChoices branding={branding} part="palettes" onChange={(patch) => void update(patch)} />
+          <Text style={[styles.fieldLabel, styles.fieldLabelTv, { color: chrome.muted }]}>Colors</Text>
+          <View style={styles.colorGrid}>
+            <View style={styles.colorCell}><ColorPicker label="Work" testID="color-work" value={branding.workColor} onChange={(workColor) => void update({ workColor })} /></View>
+            <View style={styles.colorCell}><ColorPicker label="Rest" testID="color-rest" value={branding.restColor} onChange={(restColor) => void update({ restColor })} /></View>
+            <View style={styles.colorCell}><ColorPicker label="Lead-in" testID="color-lead" value={branding.leadInColor} onChange={(leadInColor) => void update({ leadInColor })} /></View>
+            <View style={styles.colorCell}><ColorPicker label="Warning" testID="color-warning" value={branding.warningColor} onChange={(warningColor) => void update({ warningColor })} /></View>
+            <View style={styles.colorCell}><ColorPicker label="Digits" testID="color-digits" value={branding.digitColor} onChange={(digitColor) => void update({ digitColor })} /></View>
+            <View style={styles.colorCell}><ColorPicker label="Background" testID="color-background" value={branding.backgroundColor} onChange={(backgroundColor) => void update({ backgroundColor })} /></View>
+            <View style={styles.colorCell}><ColorPicker label="Accent" testID="color-ui" value={branding.uiColor} onChange={(uiColor) => void update({ uiColor })} /></View>
+          </View>
+        </View>
+      </View>
     );
   }
 
@@ -426,16 +376,35 @@ const styles = StyleSheet.create({
     lineHeight: 64,
   },
   ledeTv: {
-    fontSize: TV_BODY_FONT,
-    lineHeight: TV_BODY_FONT + 8,
+    color: chrome.muted,
+    fontSize: 18,
+    lineHeight: 24,
+  },
+  tvColumns: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 28,
+  },
+  tvColumn: {
+    flex: 1,
+    gap: 4,
+  },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  colorCell: {
+    width: '50%',
+    paddingRight: 8,
+    paddingBottom: 4,
   },
   previewTv: {
-    height: 160,
+    height: 88,
     borderRadius: 20,
   },
   previewClockTv: {
-    fontSize: 84,
-    lineHeight: 96,
+    fontSize: 40,
+    lineHeight: 46,
   },
   wordmark: {
     fontFamily: 'OswaldMedium',

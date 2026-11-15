@@ -8,8 +8,6 @@ import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
 import { TvFocusPressable } from '@/src/components/TvFocus';
-import { TvMenuCell } from '@/src/components/TvMenuCell';
-import { TvPager } from '@/src/components/TvPager';
 import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
@@ -17,11 +15,11 @@ import {
   TV_BODY_FONT,
   TV_MENU_FONT,
   TV_SAFE_HORIZONTAL,
-  TV_SECTION_FONT,
+  tvFocusGutter,
   tvSafeBox,
+  tvScaled,
   type TvHomeLayout,
 } from '@/src/tv/layout';
-import { useTvMenuFrame } from '@/src/tv/useTvMenuFrame';
 import { formatSeconds } from '@/src/timer/format';
 import { BUILTIN_PRESETS, configFromPreset, type RoundPreset } from '@/src/timer/presets';
 import { listPresets, type SavedPreset } from '@/src/timer/presetStorage';
@@ -54,7 +52,6 @@ export default function RoundsScreen() {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
   const box = tvSafeBox(tv, width, height);
-  const menu = useTvMenuFrame(BUILTIN_PRESETS.length, { header: 'none', insets: false });
   const restColor = readableDigitColor(branding.restColor, branding.backgroundColor);
   const [draft, setDraft] = useState<RoundPreset>(BUILTIN_PRESETS[0]);
   const [selectedId, setSelectedId] = useState(BUILTIN_PRESETS[0].id);
@@ -96,123 +93,78 @@ export default function RoundsScreen() {
   const builtInSelected = BUILTIN_PRESETS.some((preset) => preset.id === selectedId);
 
   if (tv) {
-    const frame = menu.frame;
+    const columns = BUILTIN_PRESETS.length <= 4 ? 2 : 4;
+    const inner = Math.max(1, width - box.horizontal * 2);
+    const cell = Math.floor(inner / columns);
+    const gutter = Math.max(tvFocusGutter(cell), tvScaled(12, width, height));
+    const titleSize = tvScaled(44, width, height);
+    const detailSize = tvScaled(28, width, height);
+    const cardHeight = titleSize + detailSize + tvScaled(20, width, height);
     return (
-      <SafeAreaView style={styles.safe} edges={[]}>
-        <TvPager
-          accent={accent}
-          pages={[
-            {
-              key: 'standards',
-              label: 'Choose a round',
-              content: (
-                <ScrollView
-                  scrollEnabled={false}
-                  onLayout={menu.onSceneLayout}
-                  contentContainerStyle={styles.tvGrid}
-                >
-                  <View style={styles.presetsTv}>
-                    {BUILTIN_PRESETS.map((preset) => (
-                      <TvMenuCell
-                        key={preset.id}
-                        basis={frame.cellWidth}
-                        frame={frame}
-                      >
-                        {(focus) => (
-                          <StandardCard
-                            preset={preset}
-                            accent={accent}
-                            selected={selectedId === preset.id}
-                            onPress={() => apply(preset)}
-                            tv
-                            frame={frame}
-                            onFocus={focus.onFocus}
-                            onBlur={focus.onBlur}
-                          />
-                        )}
-                      </TvMenuCell>
-                    ))}
-                  </View>
-                </ScrollView>
-              ),
-            },
-            {
-              key: 'timing',
-              label: 'Round and rest',
-              content: (
-                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
-                  <TimeField label="Round" seconds={draft.roundSeconds} onChange={(roundSeconds) => edit({ roundSeconds })} testID="round" accent={accent} />
-                  <TimeField label="Rest" seconds={draft.restSeconds} onChange={(restSeconds) => edit({ restSeconds })} testID="rest" accent={restColor} />
-                  <View style={styles.field}>
-                    <Text style={styles.fieldLabelTv}>Rounds</Text>
-                    <NumberStepper value={draft.rounds} min={1} max={99} suffix="rds" testID="round-count" accent={accent} onChange={(rounds) => edit({ rounds })} />
-                  </View>
-                </ScrollView>
-              ),
-            },
-            {
-              key: 'alerts',
-              label: 'Warnings',
-              content: (
-                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
-                  <View style={styles.field}>
-                    <Text style={styles.fieldLabelTv}>Warning before the round ends</Text>
-                    <View style={styles.chips}>
-                      {WARNING_CHOICES.map((seconds) => (
-                        <Chip
-                          key={seconds}
-                          label={seconds === 0 ? 'Off' : `${seconds}s`}
-                          selected={draft.warningSeconds === seconds}
-                          onPress={() => edit({ warningSeconds: seconds })}
-                          color={accent}
-                          testID={`warning-${seconds}`}
-                        />
-                      ))}
-                    </View>
-                    <NumberStepper
-                      value={draft.warningSeconds}
-                      min={0}
-                      max={Math.max(0, draft.roundSeconds - 1)}
-                      suffix="sec"
-                      testID="warning"
-                      accent={accent}
-                      onChange={(warningSeconds) => edit({ warningSeconds })}
-                    />
-                  </View>
-                  <TimeField
-                    label="Lead-in"
-                    seconds={draft.leadInSeconds}
-                    onChange={(leadInSeconds) => edit({ leadInSeconds: Math.min(600, leadInSeconds) })}
-                    testID="lead-in"
-                    accent={accent}
-                  />
-                </ScrollView>
-              ),
-            },
-            {
-              key: 'saved',
-              label: 'Saved presets',
-              content: (
-                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
-                  <PresetShelf
-                    mode="rounds"
-                    accent={accent}
-                    config={configFromPreset(draft)}
-                    selectedId={selectedId}
-                    nameHint={builtInSelected ? draft.name : undefined}
-                    onLoad={applySaved}
-                    onStart={(preset) => start(preset.config, preset.name)}
-                    onClearSelection={() => apply(BUILTIN_PRESETS[0])}
-                  />
-                </ScrollView>
-              ),
-            },
-          ]}
-        />
-        <View style={styles.footer}>
+      <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical }]}>
+        <Text style={[styles.title, { fontSize: tvScaled(40, width, height), lineHeight: tvScaled(46, width, height) }]}>Rounds</Text>
+        <View style={styles.presetsTv}>
+          {BUILTIN_PRESETS.map((preset) => (
+            <View key={preset.id} style={{ width: cell, paddingHorizontal: gutter, paddingVertical: tvScaled(8, width, height) }}>
+              <StandardCard
+                preset={preset}
+                accent={accent}
+                selected={selectedId === preset.id}
+                onPress={() => apply(preset)}
+                tv
+                frame={null}
+                titleSize={titleSize}
+                detailSize={detailSize}
+                cardHeight={cardHeight}
+              />
+            </View>
+          ))}
+        </View>
+        <View style={styles.tvStack}>
+          <View style={styles.editorRow}>
+            <View style={styles.editorCell}>
+              <TimeField compact label="Round" seconds={draft.roundSeconds} onChange={(roundSeconds) => edit({ roundSeconds })} testID="round" accent={accent} />
+            </View>
+            <View style={styles.editorCell}>
+              <TimeField compact label="Rest" seconds={draft.restSeconds} onChange={(restSeconds) => edit({ restSeconds })} testID="rest" accent={restColor} />
+            </View>
+          </View>
+          <View style={styles.editorRow}>
+            <View style={[styles.editorCell, styles.field]}>
+              <Text style={[styles.fieldLabel, styles.fieldLabelTv]}>Rounds</Text>
+              <NumberStepper compact value={draft.rounds} min={1} max={99} suffix="rds" testID="round-count" accent={accent} onChange={(rounds) => edit({ rounds })} />
+            </View>
+            <View style={styles.editorCell}>
+              <TimeField
+                compact
+                label="Lead-in"
+                seconds={draft.leadInSeconds}
+                onChange={(leadInSeconds) => edit({ leadInSeconds: Math.min(600, leadInSeconds) })}
+                testID="lead-in"
+                accent={accent}
+              />
+            </View>
+          </View>
+          <View style={styles.field}>
+            <Text style={[styles.fieldLabel, styles.fieldLabelTv]}>Warning</Text>
+            <View style={styles.chips}>
+              {WARNING_CHOICES.map((seconds) => (
+                <Chip
+                  key={seconds}
+                  label={seconds === 0 ? 'Off' : `${seconds}s`}
+                  selected={draft.warningSeconds === seconds}
+                  onPress={() => edit({ warningSeconds: seconds })}
+                  color={accent}
+                  testID={`warning-${seconds}`}
+                />
+              ))}
+            </View>
+          </View>
+        </View>
+        <View style={[styles.footer, { paddingBottom: box.vertical }]}>
           <BigButton testID="start-rounds" label="Start rounds" color={accent} onPress={() => start()} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -342,6 +294,9 @@ function StandardCard({
   onPress,
   tv,
   frame,
+  titleSize = 0,
+  detailSize = 0,
+  cardHeight = 0,
   onFocus,
   onBlur,
 }: {
@@ -351,6 +306,9 @@ function StandardCard({
   onPress: () => void;
   tv: boolean;
   frame: TvHomeLayout | null;
+  titleSize?: number;
+  detailSize?: number;
+  cardHeight?: number;
   onFocus?: () => void;
   onBlur?: () => void;
 }) {
@@ -377,6 +335,9 @@ function StandardCard({
               borderRadius: 16,
             }
           : null,
+        cardHeight > 0
+          ? { width: '100%', height: cardHeight, minHeight: cardHeight, padding: 12, borderRadius: 16 }
+          : null,
         { borderColor: selected && !tv ? accent : chrome.line },
       ]}
     >
@@ -386,6 +347,7 @@ function StandardCard({
             styles.presetName,
             tv && !frame && styles.presetNameTv,
             frame ? { fontSize: frame.titleSize, lineHeight: frame.titleSize + 2 } : null,
+            titleSize > 0 ? { fontSize: titleSize, lineHeight: titleSize + 4, color: chrome.text, backgroundColor: 'transparent' } : null,
           ]}
           numberOfLines={1}
         >
@@ -400,6 +362,7 @@ function StandardCard({
           styles.presetMeta,
           tv && !frame && styles.presetMetaTv,
           frame ? { fontSize: frame.detailSize, lineHeight: frame.detailSize + 4 } : null,
+          detailSize > 0 ? { fontSize: detailSize, lineHeight: detailSize + 6, color: chrome.muted, backgroundColor: 'transparent' } : null,
         ]}
         numberOfLines={frame ? frame.detailLines : 2}
       >
@@ -541,8 +504,20 @@ const styles = StyleSheet.create({
     fontFamily: 'OswaldMedium',
   },
   fieldLabelTv: {
-    fontSize: TV_SECTION_FONT,
-    letterSpacing: 2,
+    color: chrome.muted,
+    fontSize: 20,
+    letterSpacing: 1.2,
+  },
+  tvStack: {
+    gap: 8,
+    marginTop: 4,
+  },
+  editorRow: {
+    flexDirection: 'row',
+    gap: 20,
+  },
+  editorCell: {
+    flex: 1,
   },
   chips: {
     flexDirection: 'row',

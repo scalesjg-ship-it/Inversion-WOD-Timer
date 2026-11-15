@@ -5,7 +5,7 @@ import { moduleRuns, qrModules } from './qrMatrix';
 
 export function QrMark({ value }: { value: string }) {
   const { height } = useWindowDimensions();
-  const target = Math.round(Math.min(220, Math.max(140, height * 0.2)));
+  const target = Math.round(Math.min(112, Math.max(72, height * 0.1)));
   const matrix = useMemo(() => qrModules(value), [value]);
   const module = Math.max(4, Math.floor(target / Math.max(matrix.length, 1)));
   const side = module * matrix.length;

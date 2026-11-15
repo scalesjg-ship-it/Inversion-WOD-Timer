@@ -7,11 +7,10 @@ import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
-import { TvPager } from '@/src/components/TvPager';
 import { BigButton, Chip, HeaderBack, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, tvSafeBox } from '@/src/tv/layout';
+import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, tvSafeBox, tvScaled } from '@/src/tv/layout';
 import {
   WARNING_MARK_CHOICES,
   addCountdownSeconds,
@@ -114,88 +113,63 @@ export default function CountdownScreen() {
   );
 
   if (tv) {
+    const titleSize = tvScaled(40, width, height);
     return (
-      <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical }]}>
+      <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical }]} testID="screen-countdown">
         <View style={styles.header}>
           <HeaderBack testID="countdown-back" onPress={() => router.back()} color={accent} />
-          <Text style={styles.kickerTv} numberOfLines={1}>Americana</Text>
+          <Text style={[styles.kicker, styles.kickerTv]} numberOfLines={1}>Americana</Text>
         </View>
-        <TvPager
-          inset={false}
-          accent={accent}
-          pages={[
-            {
-              key: 'length',
-              label: 'Countdown',
-              content: (
-                <ScrollView scrollEnabled={false} testID="screen-countdown" contentContainerStyle={styles.tvPage}>
-                  <Text style={styles.summaryTv}>{formatSeconds(config.workSeconds)}</Text>
-                  <View style={styles.field}>
-                    <Text style={styles.fieldLabelTv}>Duration</Text>
-                    <NumberStepper value={hours} min={0} max={23} suffix="hr" testID="countdown-hours" accent={accent} onChange={(value) => applyDuration(joinDuration(value, minutes, seconds))} />
-                    <NumberStepper value={minutes} min={0} max={59} suffix="min" testID="countdown-minutes" accent={accent} onChange={(value) => applyDuration(joinDuration(hours, value, seconds))} />
-                    <NumberStepper value={seconds} min={0} max={59} suffix="sec" testID="countdown-seconds" accent={accent} onChange={(value) => applyDuration(joinDuration(hours, minutes, value))} />
-                  </View>
-                </ScrollView>
-              ),
-            },
-            {
-              key: 'adds',
-              label: 'Add time',
-              content: (
-                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
-                  <View style={styles.chips}>
-                    <Chip label="+30s" color={accent} selected={false} testID="add-30" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 30))} />
-                    <Chip label="+1m" color={accent} selected={false} testID="add-60" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 60))} />
-                    <Chip label="+5m" color={accent} selected={false} testID="add-300" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 300))} />
-                  </View>
-                </ScrollView>
-              ),
-            },
-            {
-              key: 'beeps',
-              label: 'Warning beeps',
-              content: (
-                <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>
-                  <TimeField label="Lead-in" seconds={leadInSeconds} onChange={(value) => setLeadInSeconds(Math.min(600, value))} testID="lead-in" accent={accent} />
-                  <View style={styles.field}>
-                    <Text style={styles.fieldLabelTv}>Warning beeps</Text>
-                    <View style={styles.chips}>
-                      {WARNING_MARK_CHOICES.map((choice) => (
-                        <Chip
-                          key={choice.id}
-                          label={choice.label}
-                          color={accent}
-                          selected={marks.includes(choice.seconds)}
-                          testID={`mark-${choice.id}`}
-                          onPress={() => {
-                            setMarks((current) =>
-                              current.includes(choice.seconds)
-                                ? current.filter((mark) => mark !== choice.seconds)
-                                : [...current, choice.seconds].sort((left, right) => right - left),
-                            );
-                          }}
-                        />
-                      ))}
-                      <Chip
-                        label="Last 3s"
-                        color={accent}
-                        selected={finalBeepsEnabled(marks)}
-                        testID="mark-final"
-                        onPress={() => setMarks((current) => withFinalBeeps(current, !finalBeepsEnabled(current), durationSeconds))}
-                      />
-                    </View>
-                  </View>
-                </ScrollView>
-              ),
-            },
-            {
-              key: 'presets',
-              label: 'Saved presets',
-              content: <ScrollView scrollEnabled={false} contentContainerStyle={styles.tvPage}>{shelf}</ScrollView>,
-            },
-          ]}
-        />
+        <Text style={[styles.title, { fontSize: titleSize, lineHeight: titleSize + 6 }]}>Countdown</Text>
+        <Text style={[styles.summary, styles.summaryTv]}>
+          {formatSeconds(config.workSeconds)}
+          {config.leadInSeconds > 0 ? ` · ${config.leadInSeconds}s lead-in` : ' · no lead-in'}
+        </Text>
+        <View style={styles.tvStack}>
+          <View style={styles.field}>
+            <Text style={[styles.fieldLabel, styles.fieldLabelTv]}>Duration</Text>
+            <View style={styles.durationRow}>
+              <NumberStepper compact value={hours} min={0} max={23} suffix="hr" testID="countdown-hours" accent={accent} onChange={(value) => applyDuration(joinDuration(value, minutes, seconds))} />
+              <NumberStepper compact value={minutes} min={0} max={59} suffix="min" testID="countdown-minutes" accent={accent} onChange={(value) => applyDuration(joinDuration(hours, value, seconds))} />
+              <NumberStepper compact value={seconds} min={0} max={59} suffix="sec" testID="countdown-seconds" accent={accent} onChange={(value) => applyDuration(joinDuration(hours, minutes, value))} />
+            </View>
+          </View>
+          <View style={styles.chips}>
+            <Chip label="+30s" color={accent} selected={false} testID="add-30" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 30))} />
+            <Chip label="+1m" color={accent} selected={false} testID="add-60" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 60))} />
+            <Chip label="+5m" color={accent} selected={false} testID="add-300" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 300))} />
+          </View>
+          <TimeField compact label="Lead-in" seconds={leadInSeconds} onChange={(value) => setLeadInSeconds(Math.min(600, value))} testID="lead-in" accent={accent} />
+          <View style={styles.field}>
+            <Text style={[styles.fieldLabel, styles.fieldLabelTv]}>Warning beeps</Text>
+            <View style={styles.chips}>
+              {WARNING_MARK_CHOICES.map((choice) => (
+                <Chip
+                  key={choice.id}
+                  label={choice.label}
+                  color={accent}
+                  selected={marks.includes(choice.seconds)}
+                  testID={`mark-${choice.id}`}
+                  onPress={() => {
+                    setMarks((current) =>
+                      current.includes(choice.seconds)
+                        ? current.filter((mark) => mark !== choice.seconds)
+                        : [...current, choice.seconds].sort((left, right) => right - left),
+                    );
+                  }}
+                />
+              ))}
+              <Chip
+                label="Last 3s"
+                color={accent}
+                selected={finalBeepsEnabled(marks)}
+                testID="mark-final"
+                onPress={() => setMarks((current) => withFinalBeeps(current, !finalBeepsEnabled(current), durationSeconds))}
+              />
+            </View>
+          </View>
+          {shelf}
+        </View>
         <View style={[styles.footer, { paddingBottom: box.vertical }]}>
           <BigButton testID="start-countdown" label="Start countdown" color={accent} onPress={() => start(config, runLabel)} />
         </View>
@@ -291,7 +265,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: chrome.bg, paddingHorizontal: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 },
   kicker: { color: chrome.muted, fontFamily: 'OswaldMedium', letterSpacing: 2, textTransform: 'uppercase', fontSize: 13 },
-  kickerTv: { fontSize: TV_SECTION_FONT },
+  kickerTv: { color: chrome.text, fontSize: TV_SECTION_FONT },
+  tvStack: { flex: 1, justifyContent: 'space-evenly' },
+  durationRow: { flexDirection: 'row', gap: 16 },
   // The scroll view reaches the screen edge so a focused control's 1.08 scale is not clipped;
   // the content pads back in to the safe margin.
   scrollTv: { flex: 1, alignSelf: 'stretch', marginHorizontal: -TV_SAFE_HORIZONTAL },
@@ -301,10 +277,10 @@ const styles = StyleSheet.create({
   title: { fontFamily: 'Oswald', fontSize: 48, color: chrome.text, lineHeight: 52 },
   titleTv: { fontSize: 56, lineHeight: 64 },
   summary: { color: chrome.muted, fontSize: 16, marginTop: -8 },
-  summaryTv: { fontSize: TV_BODY_FONT, lineHeight: TV_BODY_FONT + 8 },
+  summaryTv: { color: chrome.muted, fontSize: TV_BODY_FONT, lineHeight: TV_BODY_FONT + 8 },
   field: { gap: 10 },
   fieldLabel: { color: chrome.muted, fontFamily: 'OswaldMedium', fontSize: 13, letterSpacing: 1.4, textTransform: 'uppercase' },
-  fieldLabelTv: { fontSize: TV_SECTION_FONT, letterSpacing: 2 },
+  fieldLabelTv: { color: chrome.muted, fontSize: 20, letterSpacing: 1.2 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   footer: { paddingVertical: 12 },
 });

@@ -63,6 +63,7 @@ export function NumberStepper({
   suffix,
   testID,
   accent,
+  compact = false,
 }: {
   value: number;
   onChange: (value: number) => void;
@@ -71,10 +72,12 @@ export function NumberStepper({
   suffix: string;
   testID: string;
   accent: string;
+  /** Shorter TV row so a whole setup fits on one screen. Phones ignore it. */
+  compact?: boolean;
 }) {
   const tv = Platform.isTV === true;
   const { height } = useWindowDimensions();
-  const size = stepperControlSize(tv, tv ? height : 1080);
+  const size = stepperControlSize(tv, tv ? height : 1080, tv && compact);
   const [text, setText] = useState(String(value));
   const [tracked, setTracked] = useState(value);
   if (value !== tracked) {
@@ -163,21 +166,24 @@ export function TimeField({
   onChange,
   testID,
   accent,
+  compact = false,
 }: {
   label: string;
   seconds: number;
   onChange: (seconds: number) => void;
   testID: string;
   accent: string;
+  compact?: boolean;
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
   const scale = tv ? tvScale(width, height) : 1;
+  const labelSize = compact ? 20 : 32;
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   return (
     <View style={styles.field}>
-      <Text style={[styles.fieldLabel, tv && scaleTvStyle({ fontSize: 32, letterSpacing: 2 }, scale)]}>{label}</Text>
+      <Text style={[styles.fieldLabel, { color: chrome.muted }, tv && scaleTvStyle({ fontSize: labelSize, letterSpacing: compact ? 1.2 : 2 }, scale)]}>{label}</Text>
       <View style={[styles.fieldRow, tv && styles.fieldRowTv]}>
         <NumberStepper
           value={minutes}
@@ -186,6 +192,7 @@ export function TimeField({
           suffix="min"
           testID={`${testID}-minutes`}
           accent={accent}
+          compact={compact}
           onChange={(next) => onChange(next * 60 + remainder)}
         />
         <NumberStepper
@@ -195,6 +202,7 @@ export function TimeField({
           suffix="sec"
           testID={`${testID}-seconds`}
           accent={accent}
+          compact={compact}
           onChange={(next) => onChange(minutes * 60 + next)}
         />
       </View>
@@ -227,14 +235,14 @@ export function Chip({
       onPress={onPress}
       style={() => [
         styles.chip,
-        tv && scaleTvStyle({ minHeight: 88, paddingHorizontal: 28, paddingVertical: 18, borderWidth: 4 }, scale),
+        tv && scaleTvStyle({ minHeight: 52, paddingHorizontal: 16, paddingVertical: 8, borderWidth: 3 }, scale),
         {
           borderColor: selected ? color : chrome.line,
           backgroundColor: selected ? `${color}22` : chrome.surface,
         },
       ]}
     >
-      <Text style={[styles.chipLabel, tv && scaleTvStyle({ fontSize: 32 }, scale), { color: selected ? chrome.text : chrome.muted }]}>
+      <Text style={[styles.chipLabel, { backgroundColor: 'transparent' }, tv && scaleTvStyle({ fontSize: 22 }, scale), { color: selected ? chrome.text : chrome.muted }]}>
         {selected ? `✓  ${label}` : label}
       </Text>
     </TvFocusPressable>
@@ -375,8 +383,9 @@ const styles = StyleSheet.create({
     fontFamily: 'OswaldMedium',
   },
   fieldLabelTv: {
-    fontSize: 32,
-    letterSpacing: 2,
+    color: chrome.text,
+    fontSize: 22,
+    letterSpacing: 1,
   },
   fieldRow: {
     flexDirection: 'row',
@@ -426,7 +435,7 @@ const styles = StyleSheet.create({
     backgroundColor: chrome.surface,
   },
   tvToggle: {
-    minHeight: 80,
+    minHeight: 52,
     borderRadius: 22,
     borderWidth: 4,
     backgroundColor: chrome.surface,
@@ -442,13 +451,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tvToggleHelp: {
-    color: chrome.text,
-    fontSize: 28,
-    lineHeight: 36,
+    color: chrome.muted,
+    fontSize: 16,
+    lineHeight: 20,
   },
   tvToggleValue: {
     fontFamily: 'Oswald',
-    fontSize: 48,
-    letterSpacing: 0.6,
+    fontSize: 22,
+    letterSpacing: 0.4,
   },
 });
