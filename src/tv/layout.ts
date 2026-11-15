@@ -61,6 +61,40 @@ export function fitTvStyle<T extends Record<string, unknown>>(style: T, width: n
   return scale === 1 ? style : scaleTvStyle(style, scale);
 }
 
+/**
+ * 960×540 is the Fire TV dp frame. Two columns of color cards then run under the tab bar.
+ * A third column keeps Accent on screen.
+ */
+export function tvColorGridTight(width: number, height: number): boolean {
+  return tvScale(width, height) <= 0.55;
+}
+
+export interface TvColorRowBox {
+  fontSize: number;
+  lineHeight: number;
+  border: number;
+  padY: number;
+  sample: number;
+  /** Border box. Label and hex share one centered line. */
+  height: number;
+}
+
+/** One-line color card used when `tvColorGridTight` is true. The hex stays inside the card. */
+export function tvColorRowBox(width: number, height: number): TvColorRowBox {
+  const fontSize = tvScaled(13, width, height);
+  const lineHeight = Math.max(fontSize + 1, Math.ceil(fontSize * CLOCK_LINE_HEIGHT_RATIO));
+  const border = tvScaled(TV_FOCUS_BORDER, width, height);
+  const padY = Math.max(1, tvScaled(1, width, height));
+  return {
+    fontSize,
+    lineHeight,
+    border,
+    padY,
+    sample: lineHeight,
+    height: lineHeight + padY * 2 + border * 2,
+  };
+}
+
 export function tvSafeBox(tv: boolean, width = TV_REF_WIDTH, height = TV_REF_HEIGHT): { horizontal: number; vertical: number } {
   if (!tv) return { horizontal: 0, vertical: 0 };
   const safeWidth = width > 0 ? width : TV_REF_WIDTH;

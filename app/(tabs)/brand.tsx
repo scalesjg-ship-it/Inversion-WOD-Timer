@@ -26,7 +26,7 @@ import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { TvLogoUrl } from '@/src/components/TvLogoUrl';
 import { Chip, TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_SECTION_FONT, fitTvStyle, tvSafeBox } from '@/src/tv/layout';
+import { TV_BODY_FONT, TV_SECTION_FONT, fitTvStyle, tvColorGridTight, tvSafeBox, tvScaled } from '@/src/tv/layout';
 
 export function ErrorBoundary(props: { error: Error; retry: () => Promise<void> }) {
   return <RouteErrorBoundary {...props} />;
@@ -167,14 +167,28 @@ export default function BrandScreen() {
           <BrandChoices branding={branding} part="templates" onChange={(patch) => void update(patch)} />
           <BrandChoices branding={branding} part="palettes" onChange={(patch) => void update(patch)} />
           <Text style={[fitTvStyle(styles.fieldLabel, width, height), fitTvStyle(styles.fieldLabelTv, width, height), { color: chrome.muted }]}>Colors</Text>
-          <View style={styles.colorGrid}>
-            <View style={styles.colorCell}><ColorPicker label="Work" testID="color-work" value={branding.workColor} onChange={(workColor) => void update({ workColor })} /></View>
-            <View style={styles.colorCell}><ColorPicker label="Rest" testID="color-rest" value={branding.restColor} onChange={(restColor) => void update({ restColor })} /></View>
-            <View style={styles.colorCell}><ColorPicker label="Lead-in" testID="color-lead" value={branding.leadInColor} onChange={(leadInColor) => void update({ leadInColor })} /></View>
-            <View style={styles.colorCell}><ColorPicker label="Warning" testID="color-warning" value={branding.warningColor} onChange={(warningColor) => void update({ warningColor })} /></View>
-            <View style={styles.colorCell}><ColorPicker label="Digits" testID="color-digits" value={branding.digitColor} onChange={(digitColor) => void update({ digitColor })} /></View>
-            <View style={styles.colorCell}><ColorPicker label="Background" testID="color-background" value={branding.backgroundColor} onChange={(backgroundColor) => void update({ backgroundColor })} /></View>
-            <View style={styles.colorCell}><ColorPicker label="Accent" testID="color-ui" value={branding.uiColor} onChange={(uiColor) => void update({ uiColor })} /></View>
+          <View style={[styles.colorGrid, tvColorGridTight(width, height) && { gap: tvScaled(4, width, height) }]}>
+            {(
+              [
+                ['Work', 'color-work', branding.workColor, (workColor: string) => update({ workColor })],
+                ['Rest', 'color-rest', branding.restColor, (restColor: string) => update({ restColor })],
+                ['Lead-in', 'color-lead', branding.leadInColor, (leadInColor: string) => update({ leadInColor })],
+                ['Warning', 'color-warning', branding.warningColor, (warningColor: string) => update({ warningColor })],
+                ['Digits', 'color-digits', branding.digitColor, (digitColor: string) => update({ digitColor })],
+                ['Background', 'color-background', branding.backgroundColor, (backgroundColor: string) => update({ backgroundColor })],
+                ['Accent', 'color-ui', branding.uiColor, (uiColor: string) => update({ uiColor })],
+              ] as const
+            ).map(([label, testID, value, onChange]) => (
+              <View key={testID} style={tvColorGridTight(width, height) ? styles.colorCellTight : styles.colorCell}>
+                <ColorPicker
+                  label={label}
+                  testID={testID}
+                  value={value}
+                  compact={tvColorGridTight(width, height)}
+                  onChange={(next) => void onChange(next)}
+                />
+              </View>
+            ))}
           </View>
         </View>
       </View>
@@ -399,6 +413,10 @@ const styles = StyleSheet.create({
     width: '50%',
     paddingRight: 8,
     paddingBottom: 4,
+  },
+  colorCellTight: {
+    width: '33.33%',
+    maxWidth: '33.33%',
   },
   previewTv: {
     height: 88,

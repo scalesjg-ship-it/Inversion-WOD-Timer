@@ -23,6 +23,8 @@ import {
   tvSafeBox,
   tvSafeInset,
   tvTemplateLabelBox,
+  tvColorGridTight,
+  tvColorRowBox,
 } from './layout';
 
 function scene(width: number, height: number) {
@@ -212,6 +214,16 @@ describe('TV layout', () => {
     expect(fire.fontSize).toBe(8);
     expect(fire.height).toBeLessThan(full.height);
     expect(fire.lineHeight).toBeGreaterThanOrEqual(Math.ceil(fire.fontSize * 1.5));
+  });
+
+  it('keeps a one-line color row inside a three-column grid on a 960x540 Fire TV', () => {
+    expect(tvColorGridTight(1920, 1080)).toBe(false);
+    expect(tvColorGridTight(960, 540)).toBe(true);
+    const row = tvColorRowBox(960, 540);
+    const inner = row.height - row.border * 2 - row.padY * 2;
+    expect(inner).toBe(row.lineHeight);
+    expect(row.lineHeight).toBeGreaterThanOrEqual(Math.ceil(row.fontSize * 1.5));
+    expect(row.height).toBeLessThan(tvColorRowBox(1920, 1080).height);
   });
 
   it('sizes card copy from the card and the window scale', () => {

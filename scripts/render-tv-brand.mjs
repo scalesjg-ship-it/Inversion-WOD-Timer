@@ -183,17 +183,28 @@ const metrics = await page.evaluate(() => {
       nameHeight: nameRect?.height ?? 0,
     };
   });
-  const bottoms = [...document.querySelectorAll('[data-testid]')].map((node) => node.getBoundingClientRect().bottom);
+  const colors = [...document.querySelectorAll('[data-testid$="-value"]')].map((node) => {
+    const rect = node.getBoundingClientRect();
+    return {
+      id: node.getAttribute('data-testid'),
+      text: node.textContent,
+      overflow: node.scrollWidth > node.clientWidth + 1,
+      bottom: rect.bottom,
+    };
+  });
   return {
     qr: box('tv-brand-qr'),
     url: box('tv-logo-pairing-url'),
     urlText: document.querySelector('[data-testid="tv-logo-pairing-url"]')?.textContent ?? '',
     reset: box('reset-brand'),
+    accent: box('color-ui'),
+    accentText: document.querySelector('[data-testid="color-ui-value"], [data-testid="color-ui"]')?.textContent ?? '',
     preview: box('brand-preview'),
     pathLength: path?.getAttribute('d')?.length ?? 0,
     fill: path?.getAttribute('fill') ?? '',
     templates: names,
-    lowest: Math.max(...bottoms),
+    colors,
+    lowest: Math.max(...[...document.querySelectorAll('[data-testid]')].map((node) => node.getBoundingClientRect().bottom)),
     window: { width: window.innerWidth, height: window.innerHeight },
   };
 });
