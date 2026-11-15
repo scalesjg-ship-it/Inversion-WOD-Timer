@@ -131,28 +131,29 @@ export default function BrandScreen() {
           </View>
           <Text style={[labelStyle, { color: chrome.muted }]}>Gym name</Text>
           <GymNameField value={branding.gymName} onCommit={(gymName) => void update({ gymName })} />
-          <TvLogoTransfer branding={branding} update={update} accent={accent} />
-          <TvLogoUrl onStored={async (logoUri) => update({ logoUri })} />
-          <View style={styles.chips}>
-            {PLACEMENTS.map((placement) => (
-              <Chip
-                key={placement.id}
-                label={placement.label}
-                color={accent}
-                selected={branding.logoPlacement === placement.id}
-                onPress={() => void update({ logoPlacement: placement.id })}
-                testID={`placement-${placement.id}`}
-              />
-            ))}
-          </View>
-          <TvToggle
-            label="Blur the full-bleed logo"
-            value={branding.logoBlur}
-            onValueChange={(logoBlur) => void update({ logoBlur })}
-            disabled={branding.logoPlacement !== 'fullBleed'}
-            testID="logo-blur"
-            accent={accent}
-          />
+          <TvLogoTransfer branding={branding} update={update} accent={accent}>
+            <TvLogoUrl onStored={async (logoUri) => update({ logoUri })} />
+            <View style={styles.chips}>
+              {PLACEMENTS.map((placement) => (
+                <Chip
+                  key={placement.id}
+                  label={placement.label}
+                  color={accent}
+                  selected={branding.logoPlacement === placement.id}
+                  onPress={() => void update({ logoPlacement: placement.id })}
+                  testID={`placement-${placement.id}`}
+                />
+              ))}
+            </View>
+            <TvToggle
+              label="Blur the full-bleed logo"
+              value={branding.logoBlur}
+              onValueChange={(logoBlur) => void update({ logoBlur })}
+              disabled={branding.logoPlacement !== 'fullBleed'}
+              testID="logo-blur"
+              accent={accent}
+            />
+          </TvLogoTransfer>
           <TvFocusPressable
             accessibilityRole="button"
             testID="reset-brand"

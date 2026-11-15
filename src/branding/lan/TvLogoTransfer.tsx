@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { TvFocusPressable } from '@/src/components/TvFocus';
@@ -11,24 +12,52 @@ export function TvLogoTransfer({
   branding,
   update,
   accent,
+  children,
 }: {
   branding: Branding;
   update: (patch: Partial<Branding>) => Promise<void>;
   accent: string;
+  children?: ReactNode;
 }) {
   const { phase, restart } = useLogoReceiver(branding, update);
+  const ready = phase.kind === 'ready';
   return (
     <View style={styles.block} testID="tv-logo-transfer">
       <Text style={styles.headline} testID="tv-brand-note">
         Send a logo from your phone
       </Text>
-      <TransferBody phase={phase} accent={accent} restart={restart} />
-      <Text style={styles.help}>
-        The phone and this TV need the same Wi-Fi. The photo goes straight to this TV and is not sent to a server.
-        {branding.logoUri ? ' A new photo replaces the logo saved here.' : ''}
-      </Text>
+      {ready ? (
+        <View style={styles.row}>
+          <QrMark key={phase.url} value={phase.url} />
+          <View style={styles.side}>
+            {phase.saved ? (
+              <Text style={styles.saved} testID="tv-logo-saved">
+                Logo saved on this TV.
+              </Text>
+            ) : null}
+            <Text style={styles.help}>{helpText(branding.logoUri)}</Text>
+            {children}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.stack}>
+          <TransferBody phase={phase} accent={accent} restart={restart} />
+          {children}
+        </View>
+      )}
+      {ready ? (
+        <Text selectable style={styles.url} testID="tv-logo-pairing-url">
+          {phase.url}
+        </Text>
+      ) : null}
     </View>
   );
+}
+
+function helpText(logoUri: string | null): string {
+  const base =
+    'Scan the code with the phone camera. The phone and this TV need the same Wi-Fi. The photo goes straight to this TV and is not sent to a server.';
+  return logoUri ? `${base} A new photo replaces the logo saved here.` : base;
 }
 
 function TransferBody({
@@ -36,37 +65,23 @@ function TransferBody({
   accent,
   restart,
 }: {
-  phase: ReceiverPhase;
+  phase: Exclude<ReceiverPhase, { kind: 'ready' }>;
   accent: string;
   restart: () => void;
 }) {
   switch (phase.kind) {
     case 'starting':
       return <Text style={styles.help}>Opening a link on this network…</Text>;
-    case 'ready':
-      return (
-        <View style={styles.ready}>
-          <QrMark value={phase.url} />
-          {phase.saved ? (
-            <Text style={styles.saved} testID="tv-logo-saved">
-              Logo saved on this TV.
-            </Text>
-          ) : null}
-          <Text selectable style={styles.url}>
-            {phase.url}
-          </Text>
-        </View>
-      );
     case 'expired':
       return (
-        <View style={styles.ready}>
+        <View style={styles.stack}>
           <Text style={styles.help}>This link expired. Start a new one to send a logo.</Text>
           <RestartButton accent={accent} label="New code" onPress={restart} />
         </View>
       );
     case 'error':
       return (
-        <View style={styles.ready}>
+        <View style={styles.stack}>
           <Text style={styles.help}>{phase.message}</Text>
           <RestartButton accent={accent} label="Try again" onPress={restart} />
         </View>
@@ -95,39 +110,48 @@ function RestartButton({ accent, label, onPress }: { accent: string; label: stri
 
 const styles = StyleSheet.create({
   block: {
-    gap: 12,
-    marginTop: 4,
+    gap: 8,
+    marginTop: 2,
   },
-  ready: {
-    gap: 12,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+  },
+  stack: {
+    gap: 8,
+  },
+  side: {
+    flex: 1,
+    minWidth: 0,
+    gap: 8,
   },
   headline: {
     color: chrome.text,
     fontFamily: 'Oswald',
-    fontSize: 22,
-    lineHeight: 26,
+    fontSize: 28,
+    lineHeight: 34,
   },
   help: {
     color: chrome.muted,
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 18,
+    lineHeight: 24,
   },
   saved: {
     color: chrome.text,
     fontFamily: 'OswaldMedium',
-    fontSize: 18,
-    textAlign: 'center',
+    fontSize: 20,
   },
   url: {
-    color: chrome.muted,
-    fontSize: 14,
-    lineHeight: 20,
+    color: chrome.text,
+    fontSize: 16,
+    lineHeight: 22,
     textAlign: 'center',
   },
   button: {
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
     minWidth: 280,
-    minHeight: 88,
+    minHeight: 64,
     paddingHorizontal: 28,
     borderRadius: 18,
     borderWidth: 4,
@@ -138,6 +162,6 @@ const styles = StyleSheet.create({
   buttonLabel: {
     color: chrome.text,
     fontFamily: 'OswaldMedium',
-    fontSize: 32,
+    fontSize: 28,
   },
 });

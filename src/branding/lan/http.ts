@@ -106,7 +106,7 @@ export function encodeHtmlResponse(status: number, html: string): Uint8Array {
     'Connection: close',
     'Cache-Control: no-store',
     'Referrer-Policy: no-referrer',
-    "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'self'; base-uri 'none'",
+    "Content-Security-Policy: default-src 'none'; img-src blob:; connect-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'self'; base-uri 'none'",
     'X-Content-Type-Options: nosniff',
     '',
     '',

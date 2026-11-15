@@ -1,3 +1,4 @@
+import jsQR from 'jsqr';
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_BRANDING } from '../types';
@@ -7,7 +8,7 @@ import { applyUploadedLogo } from './applyUpload';
 import { encodeHtmlResponse, HttpAccumulator, type Inbound } from './http';
 import { MAX_IMAGE_BYTES } from './limits';
 import { escapeHtml, formPage } from './page';
-import { moduleRuns, qrModules } from './qrMatrix';
+import { QR_MARK_AT_1080, QR_QUIET_ZONE, moduleRuns, qrMarkSide, qrModules, qrSvgPath } from './qrMatrix';
 import { LogoSaveError, LogoTransferSession } from './session';
 import { createPairingToken, isPairingToken, tokensEqual } from './token';
 import { decideUpload, parseMultipart, sniffImage, type MultipartPart } from './upload';
@@ -70,12 +71,39 @@ describe('lan address', () => {
 });
 
 describe('qr matrix', () => {
-  it('builds a square code with a quiet zone for the pairing url', () => {
-    const matrix = qrModules(pairingUrl('192.168.1.20', 8741, TOKEN));
+  it('encodes the pairing url as the QR payload', () => {
+    const url = pairingUrl('192.168.1.20', 8741, TOKEN);
+    const matrix = qrModules(url);
     expect(matrix.length).toBeGreaterThan(21);
     expect(matrix.every((row) => row.length === matrix.length)).toBe(true);
-    const runs = moduleRuns(matrix[0] ?? []);
+    expect(decodeQr(matrix)).toBe(url);
+    for (let edge = 0; edge < QR_QUIET_ZONE; edge += 1) {
+      expect(matrix[edge]?.every((cell) => cell === false)).toBe(true);
+      expect(matrix[matrix.length - 1 - edge]?.every((cell) => cell === false)).toBe(true);
+    }
+    const runs = moduleRuns(matrix[QR_QUIET_ZONE] ?? []);
     expect(runs.reduce((sum, run) => sum + run.length, 0)).toBe(matrix.length);
+    const darkRuns = matrix.reduce((sum, row) => sum + moduleRuns(row).filter((run) => run.dark).length, 0);
+    expect(qrSvgPath(matrix).split('M').length - 1).toBe(darkRuns);
+    expect(qrMarkSide(QR_MARK_AT_1080, matrix.length)).toBeGreaterThanOrEqual(QR_MARK_AT_1080);
+    expect(qrMarkSide(QR_MARK_AT_1080, matrix.length) % matrix.length).toBe(0);
+  });
+
+  it('regenerates a different code when the pairing token changes', () => {
+    const first = pairingUrl('192.168.1.20', 8741, TOKEN);
+    const next = pairingUrl('192.168.1.20', 8741, 'cd'.repeat(16));
+    const firstMatrix = qrModules(first);
+    const nextMatrix = qrModules(next);
+    expect(decodeQr(firstMatrix)).toBe(first);
+    expect(decodeQr(nextMatrix)).toBe(next);
+    expect(qrSvgPath(firstMatrix)).not.toBe(qrSvgPath(nextMatrix));
+  });
+
+  it('encodes the pairing url when TextEncoder and crypto are missing', () => {
+    const url = pairingUrl('10.1.2.3', 49152, TOKEN);
+    const matrix = withoutWebGlobals(() => qrModules(url));
+    expect(decodeQr(matrix)).toBe(url);
+    expect(qrSvgPath(matrix).length).toBeGreaterThan(0);
   });
 });
 
@@ -166,6 +194,10 @@ describe('logo transfer session', () => {
     expect(page.html).toContain('Send a logo');
     expect(page.html).toContain(`/?t=${TOKEN}`);
     expect(page.html).toContain('name="logo"');
+    expect(page.html).toContain('accept="image/*"');
+    expect(page.html).not.toContain('capture=');
+    expect(page.html).toContain('toBlob');
+    expect(page.html).toContain('The TV has the logo. You can close this page.');
     expect(page.html).not.toMatch(/https?:\/\//);
     expect(escapeHtml('<img src=x>')).toBe('&lt;img src=x&gt;');
     expect(formPage(TOKEN, defaults()).includes(TOKEN)).toBe(true);
@@ -220,6 +252,9 @@ describe('logo transfer session', () => {
     const text = new TextDecoder().decode(bytes);
     expect(text.startsWith('HTTP/1.1 200 OK\r\n')).toBe(true);
     expect(text).toContain('Connection: close');
+    expect(text).toContain('connect-src \'self\'');
+    expect(text).toContain('img-src blob:');
+    expect(text).toContain('class="ok"');
     expect(text).toContain(`Content-Length: ${new TextEncoder().encode(response.html).byteLength}`);
     expect(text).not.toMatch(/https?:\/\//);
   });
@@ -334,6 +369,44 @@ function concat(chunks: Uint8Array[]): Uint8Array {
 
 function textBytes(value: string): Uint8Array {
   return new TextEncoder().encode(value);
+}
+
+function decodeQr(matrix: boolean[][]): string | null {
+  const scale = 4;
+  const count = matrix.length;
+  const size = count * scale;
+  const data = new Uint8ClampedArray(size * size * 4);
+  for (let y = 0; y < count; y += 1) {
+    for (let x = 0; x < count; x += 1) {
+      const dark = matrix[y]?.[x] === true;
+      for (let dy = 0; dy < scale; dy += 1) {
+        for (let dx = 0; dx < scale; dx += 1) {
+          const index = ((y * scale + dy) * size + (x * scale + dx)) * 4;
+          const shade = dark ? 0 : 255;
+          data[index] = shade;
+          data[index + 1] = shade;
+          data[index + 2] = shade;
+          data[index + 3] = 255;
+        }
+      }
+    }
+  }
+  return jsQR(data, size, size)?.data ?? null;
+}
+
+function withoutWebGlobals<T>(read: () => T): T {
+  const textEncoder = Object.getOwnPropertyDescriptor(globalThis, 'TextEncoder');
+  const crypto = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+  Object.defineProperty(globalThis, 'TextEncoder', { configurable: true, value: undefined });
+  Object.defineProperty(globalThis, 'crypto', { configurable: true, value: undefined });
+  try {
+    return read();
+  } finally {
+    if (textEncoder) Object.defineProperty(globalThis, 'TextEncoder', textEncoder);
+    else delete (globalThis as { TextEncoder?: unknown }).TextEncoder;
+    if (crypto) Object.defineProperty(globalThis, 'crypto', crypto);
+    else delete (globalThis as { crypto?: unknown }).crypto;
+  }
 }
 
 function jpeg(): Uint8Array {
