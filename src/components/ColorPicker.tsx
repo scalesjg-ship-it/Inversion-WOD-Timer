@@ -3,6 +3,7 @@ import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-nat
 
 import { hexToHue, hsvToHex, inkOn, normalizeHex, sameHex } from '@/src/branding/color';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
+import type { TvFocusTag } from '@/src/components/TvTabFocus';
 import { chrome } from '@/src/theme/chrome';
 import { TV_FOCUS_BORDER } from '@/src/tv/controls';
 import { fitTvStyle, tvColorRowBox } from '@/src/tv/layout';
@@ -17,6 +18,7 @@ export function ColorPicker({
   onChange,
   testID,
   compact = false,
+  focusDown = null,
 }: {
   label: string;
   value: string;
@@ -24,6 +26,8 @@ export function ColorPicker({
   testID: string;
   /** One line of label and hex, for the 960×540 color grid. */
   compact?: boolean;
+  /** TV only. Down from the closed row, or the last open swatch row, leaves for the tab bar. */
+  focusDown?: TvFocusTag | null;
 }) {
   const [text, setText] = useState(value);
   const [tracked, setTracked] = useState(value);
@@ -59,6 +63,7 @@ export function ColorPicker({
         accessibilityState={{ expanded: open }}
         accessibilityLabel={`${label}, ${value}. ${open ? 'Close colors' : 'Change color'}`}
         testID={`${testID}-toggle`}
+        focusDown={open ? null : focusDown}
         onPress={() => setOpen((current) => !current)}
         style={({ pressed }) => [
           styles.head,
@@ -160,6 +165,7 @@ export function ColorPicker({
                   label={`${label} value ${amount}`}
                   testID={`${testID}-value-${amount}`}
                   wide
+                  focusDown={focusDown}
                   onPress={() => commit(next)}
                 />
               );
@@ -179,6 +185,7 @@ function Swatch({
   wide,
   tall = false,
   onPress,
+  focusDown = null,
 }: {
   color: string;
   selected: boolean;
@@ -187,6 +194,7 @@ function Swatch({
   wide: boolean;
   tall?: boolean;
   onPress: () => void;
+  focusDown?: TvFocusTag | null;
 }) {
   const tv = Platform.isTV === true;
   const ink = inkOn(color);
@@ -198,6 +206,7 @@ function Swatch({
       accessibilityLabel={label}
       accessibilityState={{ selected }}
       testID={testID}
+      focusDown={focusDown}
       onPress={onPress}
       style={() => [
         wide ? styles.value : tall ? styles.hue : styles.chip,

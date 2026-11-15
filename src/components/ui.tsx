@@ -3,6 +3,7 @@ import { Platform, StyleSheet, Text, TextInput, useWindowDimensions, View } from
 
 import { inkOn } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
+import type { TvFocusTag } from '@/src/components/TvTabFocus';
 import { chrome } from '@/src/theme/chrome';
 import { stepperControlSize } from '@/src/tv/controls';
 import { fitTvStyle, scaleTvStyle, tvScale } from '@/src/tv/layout';
@@ -13,12 +14,15 @@ export function BigButton({
   color,
   testID,
   variant = 'solid',
+  focusDown = null,
 }: {
   label: string;
   onPress: () => void;
   color: string;
   testID?: string;
   variant?: 'solid' | 'ghost';
+  /** TV only. Down from this button moves to the tab bar. */
+  focusDown?: TvFocusTag | null;
 }) {
   const solid = variant === 'solid';
   const tv = Platform.isTV === true;
@@ -30,6 +34,7 @@ export function BigButton({
       accent={ink}
       accessibilityRole="button"
       testID={testID}
+      focusDown={focusDown}
       onPress={onPress}
       style={({ pressed }) => [
         styles.big,

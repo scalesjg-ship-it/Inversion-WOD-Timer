@@ -8,9 +8,11 @@ import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { TvMenuCell } from '@/src/components/TvMenuCell';
+import { TvTabDownBridge, useTvTabFocus, type TvFocusTag } from '@/src/components/TvTabFocus';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import { isTenFootLayout, tvFocusGutter, tvSafeInset, type TvHomeLayout } from '@/src/tv/layout';
+import { isTvGridExit } from '@/src/tv/tabFocus';
 import { useTvMenuFrame } from '@/src/tv/useTvMenuFrame';
 import { scrollOffsetForFocus } from '@/src/tv/scroll';
 import { modeTitle } from '@/src/timer/labels';
@@ -49,6 +51,7 @@ export default function WodScreen() {
   const { setSession } = useTimerSession();
   const { width, height } = useWindowDimensions();
   const tv = Platform.isTV === true;
+  const tabFocus = useTvTabFocus();
   const tenFoot = isTenFootLayout(width, height, tv);
   const inset = tvSafeInset(tenFoot);
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
@@ -170,6 +173,13 @@ export default function WodScreen() {
                     preferred={index === 0}
                     tenFoot={false}
                     frame={home}
+                    focusDown={
+                      presets != null && presets.length > 0
+                        ? null
+                        : isTvGridExit(index, MODES.length, home.columns)
+                          ? tabFocus?.downTag ?? null
+                          : null
+                    }
                     onFocus={focus.onFocus}
                     onBlur={focus.onBlur}
                     onReveal={() => {
@@ -217,8 +227,9 @@ export default function WodScreen() {
                 presetListTop.current = event.nativeEvent.layout.y;
               }}
             >
-              {presets.map((preset) => {
+              {presets.map((preset, presetIndex) => {
                 const gutter = home ? tvFocusGutter(width - home.padHorizontal * 2) : 0;
+                const lastPreset = tv && presetIndex === presets.length - 1;
                 return (
                 <View
                   key={preset.id}
@@ -239,6 +250,7 @@ export default function WodScreen() {
                     detailSize={tv && home ? home.detailSize : 0}
                     onOpen={() => openPreset(preset)}
                     onStart={() => startPreset(preset)}
+                    focusDown={lastPreset ? tabFocus?.downTag ?? null : null}
                     onReveal={() => {
                       const local = presetLocal.current[preset.id];
                       if (!local) return;
@@ -255,6 +267,7 @@ export default function WodScreen() {
           Jiu-jitsu, boxing, and sparring rounds are on the Rounds tab.
         </Text>
       </ScrollView>
+      <TvTabDownBridge />
     </SafeAreaView>
   );
 }
@@ -291,6 +304,7 @@ function SavedPresetCard({
   onOpen,
   onStart,
   onReveal,
+  focusDown = null,
 }: {
   preset: SavedPreset;
   accent: string;
@@ -301,6 +315,7 @@ function SavedPresetCard({
   onOpen: () => void;
   onStart: () => void;
   onReveal: () => void;
+  focusDown?: TvFocusTag | null;
 }) {
   const tv = Platform.isTV === true;
   return (
@@ -312,6 +327,7 @@ function SavedPresetCard({
         accessibilityRole="button"
         accessibilityLabel={`${preset.name}, ${modeTitle(preset.mode)}`}
         accessibilityHint="Opens this preset in its setup"
+        focusDown={focusDown}
         onPress={onOpen}
         onFocus={onReveal}
         style={({ pressed }) => [styles.cardBody, { opacity: pressed ? 0.78 : 1 }]}
@@ -341,6 +357,7 @@ function SavedPresetCard({
         testID={`my-preset-start-${preset.id}`}
         accessibilityRole="button"
         accessibilityLabel={`Start ${preset.name}`}
+        focusDown={focusDown}
         onPress={onStart}
         onFocus={onReveal}
         style={({ pressed }) => [styles.start, tenFoot && styles.startTv, { opacity: pressed ? 0.78 : 1 }]}
@@ -360,6 +377,7 @@ function ModeCard({
   onFocus,
   onBlur,
   onReveal,
+  focusDown = null,
 }: {
   item: (typeof MODES)[number];
   accent: string;
@@ -369,6 +387,7 @@ function ModeCard({
   onFocus?: () => void;
   onBlur?: () => void;
   onReveal: () => void;
+  focusDown?: TvFocusTag | null;
 }) {
   const tv = frame !== null;
   return (
@@ -377,6 +396,7 @@ function ModeCard({
       testID={`mode-${item.mode}`}
       accessibilityRole="button"
       accessibilityLabel={modeTitle(item.mode)}
+      focusDown={focusDown}
       hasTVPreferredFocus={preferred}
       onFocus={() => {
         onFocus?.();

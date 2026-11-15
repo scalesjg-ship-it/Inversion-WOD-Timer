@@ -8,6 +8,7 @@ import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
 import { TvFocusPressable } from '@/src/components/TvFocus';
+import { TvTabDownBridge, useTvTabFocus } from '@/src/components/TvTabFocus';
 import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
@@ -50,6 +51,7 @@ export default function RoundsScreen() {
   const { setSession } = useTimerSession();
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
   const tv = Platform.isTV === true;
+  const tabFocus = useTvTabFocus();
   const { width, height } = useWindowDimensions();
   const box = tvSafeBox(tv, width, height);
   const restColor = readableDigitColor(branding.restColor, branding.backgroundColor);
@@ -162,8 +164,15 @@ export default function RoundsScreen() {
           </View>
         </View>
         <View style={[styles.footer, { paddingBottom: box.vertical }]}>
-          <BigButton testID="start-rounds" label="Start rounds" color={accent} onPress={() => start()} />
+          <BigButton
+            testID="start-rounds"
+            label="Start rounds"
+            color={accent}
+            focusDown={tabFocus?.downTag ?? null}
+            onPress={() => start()}
+          />
         </View>
+        <TvTabDownBridge />
       </View>
     );
   }
