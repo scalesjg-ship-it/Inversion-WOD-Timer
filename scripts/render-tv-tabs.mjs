@@ -221,6 +221,7 @@ function shoot(frame) {
 }
 
 for (const frame of frames) {
+  if (process.env.ONLY && !frame.file.includes(process.env.ONLY)) continue;
   const shot = await shoot(frame);
   console.log('wrote', shot);
 }
