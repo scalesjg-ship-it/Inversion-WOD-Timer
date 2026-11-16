@@ -149,37 +149,38 @@ export default function RoundsScreen() {
               />
             </View>
           </View>
-          <View style={styles.field}>
-            <Text style={[styles.fieldLabel, styles.fieldLabelTv]}>Warning</Text>
-            <View style={styles.chips}>
-              {WARNING_CHOICES.map((seconds) => (
-                <Chip
-                  key={seconds}
-                  label={seconds === 0 ? 'Off' : `${seconds}s`}
-                  selected={draft.warningSeconds === seconds}
-                  onPress={() => edit({ warningSeconds: seconds })}
-                  color={accent}
-                  testID={`warning-${seconds}`}
-                />
-              ))}
+          <View style={styles.editorRow}>
+            <View style={[styles.editorCell, styles.warningRow]}>
+              <Text style={[styles.fieldLabel, styles.fieldLabelTv]}>Warning</Text>
+              <View style={styles.chips}>
+                {WARNING_CHOICES.map((seconds) => (
+                  <Chip
+                    key={seconds}
+                    label={seconds === 0 ? 'Off' : `${seconds}s`}
+                    selected={draft.warningSeconds === seconds}
+                    onPress={() => edit({ warningSeconds: seconds })}
+                    color={accent}
+                    testID={`warning-${seconds}`}
+                  />
+                ))}
+              </View>
+            </View>
+            <View style={[styles.editorCell, styles.startCell]}>
+              <BigButton testID="start-rounds" label="Start rounds" color={accent} onPress={() => start()} />
             </View>
           </View>
         </View>
-        <View style={[styles.footer, styles.footerRow, { paddingBottom: Math.max(4, Math.round(box.vertical * 0.25)) }]}>
-          <View style={styles.footerShelf}>
-            <PresetShelf
-              mode="rounds"
-              accent={accent}
-              config={configFromPreset(draft)}
-              selectedId={selectedId}
-              nameHint={builtInSelected ? draft.name : undefined}
-              onLoad={applySaved}
-              onStart={(preset) => start(preset.config, preset.name)}
-              onClearSelection={() => apply(BUILTIN_PRESETS[0])}
-            />
-          </View>
-          <BigButton testID="start-rounds" label="Start rounds" color={accent} onPress={() => start()} />
-        </View>
+        <PresetShelf
+          mode="rounds"
+          accent={accent}
+          config={configFromPreset(draft)}
+          selectedId={selectedId}
+          nameHint={builtInSelected ? draft.name : undefined}
+          onLoad={applySaved}
+          onStart={(preset) => start(preset.config, preset.name)}
+          onClearSelection={() => apply(BUILTIN_PRESETS[0])}
+        />
+        <View style={{ height: Math.max(4, Math.round(box.vertical * 0.25)) }} />
       </View>
     );
   }
@@ -537,6 +538,17 @@ const styles = StyleSheet.create({
   },
   editorCell: {
     flex: 1,
+    minWidth: 0,
+  },
+  warningRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  startCell: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   chips: {
     flexDirection: 'row',
@@ -546,16 +558,5 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: 20,
     paddingVertical: 12,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 16,
-    paddingHorizontal: 0,
-  },
-  footerShelf: {
-    flex: 1,
-    minWidth: 0,
   },
 });

@@ -1,6 +1,8 @@
 import { AppRegistry, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import CountdownScreen from '../app/countdown';
+import SetupScreen from '../app/setup';
 import BrandScreen from '../app/(tabs)/brand';
 import WodScreen from '../app/(tabs)/index';
 import RoundsScreen from '../app/(tabs)/rounds';
@@ -17,25 +19,29 @@ Object.defineProperty(Platform, 'isTV', {
 
 function Screen() {
   const tab = (globalThis as { __TV_TAB__?: string }).__TV_TAB__ ?? 'wod';
-  if (tab === 'rounds') return <RoundsScreen />;
+  if (tab === 'rounds' || tab === 'rounds-confirm') return <RoundsScreen />;
   if (tab === 'brand') return <BrandScreen />;
+  if (tab === 'setup') return <SetupScreen />;
+  if (tab === 'countdown') return <CountdownScreen />;
   return <WodScreen />;
 }
 
 function Frame() {
+  const tab = (globalThis as { __TV_TAB__?: string }).__TV_TAB__ ?? 'wod';
+  const stacked = tab === 'setup' || tab === 'countdown';
   return (
     <SafeAreaProvider>
       <View style={{ flex: 1, backgroundColor: chrome.bg }}>
-      <BrandingProvider>
-        <TimerSessionProvider>
-          <TvTabFocusProvider>
-            <TvTabBar />
-            <View style={{ flex: 1, overflow: 'hidden' }}>
-              <Screen />
-            </View>
-          </TvTabFocusProvider>
-        </TimerSessionProvider>
-      </BrandingProvider>
+        <BrandingProvider>
+          <TimerSessionProvider>
+            <TvTabFocusProvider>
+              {stacked ? null : <TvTabBar />}
+              <View style={{ flex: 1, overflow: 'hidden' }}>
+                <Screen />
+              </View>
+            </TvTabFocusProvider>
+          </TimerSessionProvider>
+        </BrandingProvider>
       </View>
     </SafeAreaProvider>
   );

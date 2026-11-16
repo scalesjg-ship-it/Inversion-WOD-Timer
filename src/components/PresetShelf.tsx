@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Alert, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
@@ -198,10 +198,20 @@ export function PresetShelf({
     }
   };
 
+  const previewConfirm = useRef(false);
+  useEffect(() => {
+    const preview = (globalThis as { __TV_PRESET_PREVIEW__?: string }).__TV_PRESET_PREVIEW__;
+    if (preview !== 'confirm' || previewConfirm.current || presets.length === 0) return;
+    previewConfirm.current = true;
+    setConfirmDeleteId(presets[0].id);
+    onLoad(presets[0]);
+  }, [onLoad, presets]);
+
   if (tv) {
     const rowHeight = Math.max(36, tvScaled(44, width, height));
     const labelSize = Math.max(14, tvScaled(18, width, height));
     const pending = presets.find((preset) => preset.id === confirmDeleteId);
+    const confirming = pending != null && pending.id === selected?.id;
     return (
       <View style={styles.tvWrap} testID={`presets-${mode}`}>
         <View style={styles.tvRow}>
@@ -209,6 +219,58 @@ export function PresetShelf({
           {editor ? null : (
             <TextButton testID="save-preset" label="Save preset" color={accent} tenFoot={false} dense onPress={openCreate} />
           )}
+          {editor ? null : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.tvNames}
+              contentContainerStyle={styles.tvNamesContent}
+            >
+              {presets.length === 0 ? (
+                <Text style={[styles.empty, { fontSize: labelSize }]}>No saved presets yet.</Text>
+              ) : (
+                presets.map((preset) => (
+                  <TextButton
+                    key={preset.id}
+                    testID={`preset-${preset.id}`}
+                    label={preset.name}
+                    accessibilityLabel={`${preset.name}. Loads this preset`}
+                    color={preset.id === selectedId ? accent : chrome.text}
+                    tenFoot={false}
+                    dense
+                    onPress={() => {
+                      setConfirmDeleteId(null);
+                      onLoad(preset);
+                    }}
+                  />
+                ))
+              )}
+              {selected && !confirming ? (
+                <>
+                  <TextButton testID="update-preset" label="Update" color={accent} tenFoot={false} dense onPress={() => void updateSelected()} />
+                  <TextButton testID={`preset-rename-${selected.id}`} label="Rename" color={accent} tenFoot={false} dense onPress={() => openRename(selected)} />
+                  <TextButton
+                    testID={`preset-delete-${selected.id}`}
+                    label="Delete"
+                    color="#FF8A7A"
+                    tenFoot={false}
+                    dense
+                    onPress={() => confirmDelete(selected)}
+                  />
+                </>
+              ) : null}
+            </ScrollView>
+          )}
+          {confirming && selected ? (
+            <TextButton
+              testID="preset-delete-confirm"
+              label="Confirm delete"
+              color="#FF8A7A"
+              tenFoot={false}
+              dense
+              onPress={() => void remove(selected)}
+            />
+          ) : null}
         </View>
         {editor ? (
           <View style={styles.tvRow}>
@@ -256,58 +318,11 @@ export function PresetShelf({
               />
             )}
           </View>
-        ) : (
-          <View style={styles.tvRow}>
-            {presets.length === 0 ? (
-              <Text style={[styles.empty, { fontSize: labelSize }]}>No saved presets yet.</Text>
-            ) : (
-              presets.map((preset) => (
-                <TextButton
-                  key={preset.id}
-                  testID={`preset-${preset.id}`}
-                  label={preset.name}
-                  accessibilityLabel={`${preset.name}. Loads this preset`}
-                  color={preset.id === selectedId ? accent : chrome.text}
-                  tenFoot={false}
-                  dense
-                  onPress={() => {
-                    setConfirmDeleteId(null);
-                    onLoad(preset);
-                  }}
-                />
-              ))
-            )}
-          </View>
-        )}
+        ) : null}
         {notice ? (
           <Text style={[styles.help, { fontSize: labelSize }]} testID="preset-notice">
             {notice}
           </Text>
-        ) : null}
-        {selected && !editor ? (
-          <View style={styles.tvRow}>
-            <TextButton testID="update-preset" label="Update" color={accent} tenFoot={false} dense onPress={() => void updateSelected()} />
-            <TextButton testID={`preset-rename-${selected.id}`} label="Rename" color={accent} tenFoot={false} dense onPress={() => openRename(selected)} />
-            {pending && pending.id === selected.id ? (
-              <TextButton
-                testID="preset-delete-confirm"
-                label="Confirm delete"
-                color="#FF8A7A"
-                tenFoot={false}
-                dense
-                onPress={() => void remove(selected)}
-              />
-            ) : (
-              <TextButton
-                testID={`preset-delete-${selected.id}`}
-                label="Delete"
-                color="#FF8A7A"
-                tenFoot={false}
-                dense
-                onPress={() => confirmDelete(selected)}
-              />
-            )}
-          </View>
         ) : null}
       </View>
     );
@@ -551,10 +566,18 @@ const styles = StyleSheet.create({
   },
   tvRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     alignItems: 'center',
     gap: 8,
     maxWidth: '100%',
+  },
+  tvNames: {
+    flex: 1,
+    minWidth: 0,
+  },
+  tvNamesContent: {
+    alignItems: 'center',
+    gap: 6,
   },
   tvName: {
     flexShrink: 1,

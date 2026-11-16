@@ -11,7 +11,8 @@ export function usePathname(): string {
   return '/';
 }
 
-export function useLocalSearchParams(): Record<string, undefined> {
+export function useLocalSearchParams(): { mode?: string } {
+  if (tabName() === 'setup') return { mode: 'forTime' };
   return {};
 }
 

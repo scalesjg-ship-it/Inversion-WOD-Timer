@@ -105,17 +105,45 @@ await esbuild.build({
 
 const frames = [
   { tab: 'wod', width: 1920, height: 1080, file: 'tv-tab-wod-1920x1080.png' },
-  { tab: 'rounds', width: 1920, height: 1080, file: 'tv-tab-rounds-1920x1080.png' },
+  { tab: 'rounds', width: 1920, height: 1080, file: 'tv-tab-rounds-1920x1080.png', seed: true },
   { tab: 'brand', width: 1920, height: 1080, file: 'tv-tab-brand-1920x1080.png' },
+  { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-fortime-1920x1080.png', seed: true },
+  { tab: 'countdown', width: 1920, height: 1080, file: 'tv-countdown-1920x1080.png', seed: true },
+  { tab: 'rounds-confirm', width: 1920, height: 1080, file: 'tv-rounds-delete-1920x1080.png', seed: true, confirm: true },
   { tab: 'wod', width: 960, height: 540, file: 'tv-tab-wod-960x540.png' },
-  { tab: 'rounds', width: 960, height: 540, file: 'tv-tab-rounds-960x540.png' },
+  { tab: 'rounds', width: 960, height: 540, file: 'tv-tab-rounds-960x540.png', seed: true },
   { tab: 'brand', width: 960, height: 540, file: 'tv-tab-brand-960x540.png' },
+  { tab: 'setup', width: 960, height: 540, file: 'tv-setup-fortime-960x540.png', seed: true },
+  { tab: 'countdown', width: 960, height: 540, file: 'tv-countdown-960x540.png', seed: true },
+  { tab: 'rounds-confirm', width: 960, height: 540, file: 'tv-rounds-delete-960x540.png', seed: true, confirm: true },
 ];
 
 const outDir = '/opt/cursor/artifacts';
 await mkdir(outDir, { recursive: true });
 
-function pageFor(tab, width, height) {
+function presetDocument() {
+  const item = (id, name, mode, config, updatedAt) => ({ id, name, mode, config: { warningMarksSeconds: [], ...config }, updatedAt });
+  return {
+    version: 2,
+    presets: [
+      item('preset-spar', 'Sparring', 'rounds', { mode: 'rounds', leadInSeconds: 10, workSeconds: 180, restSeconds: 60, rounds: 5, warningSeconds: 10 }, 3),
+      item('preset-morning', 'Morning roll', 'rounds', { mode: 'rounds', leadInSeconds: 10, workSeconds: 300, restSeconds: 60, rounds: 6, warningSeconds: 30 }, 2),
+      item('preset-open', 'Open mat', 'rounds', { mode: 'rounds', leadInSeconds: 0, workSeconds: 600, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 1),
+      item('preset-ft12', 'For Time 12', 'forTime', { mode: 'forTime', leadInSeconds: 10, workSeconds: 720, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 6),
+      item('preset-ft20', 'For Time 20', 'forTime', { mode: 'forTime', leadInSeconds: 10, workSeconds: 1200, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 5),
+      item('preset-cap', 'Cap 8', 'forTime', { mode: 'forTime', leadInSeconds: 10, workSeconds: 480, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 4),
+      item('preset-warm', 'Warmup', 'countdown', { mode: 'countdown', leadInSeconds: 5, workSeconds: 180, restSeconds: 0, rounds: 1, warningSeconds: 0, warningMarksSeconds: [60, 10] }, 9),
+      item('preset-cool', 'Cooldown', 'countdown', { mode: 'countdown', leadInSeconds: 0, workSeconds: 120, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 8),
+      item('preset-between', 'Between rounds', 'countdown', { mode: 'countdown', leadInSeconds: 0, workSeconds: 60, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 7),
+    ],
+  };
+}
+
+function pageFor(tab, width, height, seed, confirm) {
+  const storage = seed
+    ? `localStorage.setItem('americana.presets.v1', ${JSON.stringify(JSON.stringify(presetDocument()))});`
+    : `localStorage.removeItem('americana.presets.v1');`;
+  const preview = confirm ? `globalThis.__TV_PRESET_PREVIEW__ = 'confirm';` : `delete globalThis.__TV_PRESET_PREVIEW__;`;
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -128,7 +156,11 @@ function pageFor(tab, width, height) {
 </head>
 <body>
 <div id="root"></div>
-<script>globalThis.__TV_TAB__ = ${JSON.stringify(tab)};</script>
+<script>
+${storage}
+${preview}
+globalThis.__TV_TAB__ = ${JSON.stringify(tab)};
+</script>
 <script src="/bundle.js"></script>
 </body>
 </html>`;
@@ -139,7 +171,7 @@ const server = createServer(async (req, res) => {
   if (url.startsWith('/index.html')) {
     const params = new URL(url, 'http://127.0.0.1').searchParams;
     res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(pageFor(params.get('tab') ?? 'wod', Number(params.get('w') ?? 1920), Number(params.get('h') ?? 1080)));
+    res.end(pageFor(params.get('tab') ?? 'wod', Number(params.get('w') ?? 1920), Number(params.get('h') ?? 1080), params.get('seed') === '1', params.get('confirm') === '1'));
     return;
   }
   if (url === '/bundle.js') {
@@ -167,7 +199,7 @@ const port = address.port;
 
 function shoot(frame) {
   const shot = path.join(outDir, frame.file);
-  const url = `http://127.0.0.1:${port}/index.html?tab=${frame.tab}&w=${frame.width}&h=${frame.height}`;
+  const url = `http://127.0.0.1:${port}/index.html?tab=${frame.tab}&w=${frame.width}&h=${frame.height}&seed=${frame.seed ? 1 : 0}&confirm=${frame.confirm ? 1 : 0}`;
   return new Promise((resolve, reject) => {
     const chrome = spawn(
       '/usr/bin/google-chrome-stable',
