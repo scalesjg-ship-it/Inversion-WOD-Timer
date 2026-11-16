@@ -1,21 +1,19 @@
 /**
  * Focus graph for the TV tab bar.
  *
- * Expo Router lays each tab in a native screen (`Platform.OS` is `ios` on Apple TV,
- * so react-native-screens stays on) and paints the tab bar as the next sibling.
- * The tvOS focus engine does not walk out of that screen into the sibling, and a
- * vertical ScrollView will not consult `nextFocusDown` while it still has a row
- * below. A focus guide along the bottom of the screen is a target the engine can
- * see, and its destinations are the tab items. A second guide in the bar's top
- * padding sends Up back to the last content control. Left and Right stay on the bar.
+ * The bar is the first child of the tab layout, and the open screen is the next
+ * child. Expo Router's Slot renders that screen directly, so both live in one
+ * UIView under the root stack screen. They are not split by a react-native-screens
+ * UIViewController the way `<Tabs>` is.
+ *
+ * Up from the first content row moves to the bar. Left and Right move along it
+ * and stay at the ends. Down from a tab enters the first content control.
+ * Down from the last content control stays put: the bar is above, not below.
  */
 
 export type TvFocusDirection = 'up' | 'down' | 'left' | 'right';
 
-export type TvFocusPlace =
-  | { zone: 'content'; index: number }
-  | { zone: 'bridge' }
-  | { zone: 'tab'; index: number };
+export type TvFocusPlace = { zone: 'content'; index: number } | { zone: 'tab'; index: number };
 
 export interface TvTabLink {
   focusable: true;
@@ -23,10 +21,10 @@ export interface TvTabLink {
   left: number;
   /** Index of the tab focused by Right. The last tab stays put. */
   right: number;
-  /** Down from a tab stays on that tab. */
-  down: number;
-  /** Up from a tab returns to content. */
-  up: 'content';
+  /** Up from a tab stays on that tab. The bar is already at the top. */
+  up: number;
+  /** Down from a tab enters the screen. */
+  down: 'content';
 }
 
 /** Phone controls do not receive TV focus props. Handles are native tags. */
@@ -48,14 +46,14 @@ export function tvDirectionalProps(
   if (!tv) return {};
   return {
     focusable: true,
-    ...(links.left ? { nextFocusLeft: links.left } : {}),
-    ...(links.right ? { nextFocusRight: links.right } : {}),
-    ...(links.down ? { nextFocusDown: links.down } : {}),
-    ...(links.up ? { nextFocusUp: links.up } : {}),
+    ...(links.left != null ? { nextFocusLeft: links.left } : {}),
+    ...(links.right != null ? { nextFocusRight: links.right } : {}),
+    ...(links.down != null ? { nextFocusDown: links.down } : {}),
+    ...(links.up != null ? { nextFocusUp: links.up } : {}),
   };
 }
 
-/** One tab's neighbors. Edges point at themselves so focus does not leave the bar. */
+/** One tab's neighbors. Left, Right, and Up stay on the bar. Down is the screen. */
 export function tvTabLink(index: number, count: number): TvTabLink {
   const last = Math.max(0, count - 1);
   const safe = clampIndex(index, count);
@@ -63,20 +61,22 @@ export function tvTabLink(index: number, count: number): TvTabLink {
     focusable: true,
     left: safe > 0 ? safe - 1 : safe,
     right: safe < last ? safe + 1 : safe,
-    down: safe,
-    up: 'content',
+    up: safe,
+    down: 'content',
   };
 }
 
-/** The bridge lands on the open tab. An empty bar has nowhere to go. */
-export function tvBridgeDestination(count: number, selectedIndex: number): number | null {
-  if (count <= 0) return null;
-  return clampIndex(selectedIndex, count);
+/** WOD, Rounds, Brand. Any other path is the WOD tab. */
+export function tvTabIndex(pathname: string): number {
+  const path = pathname.split('?')[0].replace(/\/+$/, '') || '/';
+  if (path === '/rounds' || path.endsWith('/rounds')) return 1;
+  if (path === '/brand' || path.endsWith('/brand')) return 2;
+  return 0;
 }
 
 /**
- * True for the last row of a wrapping grid. Down from those cells leaves the grid.
- * A later section (presets under the mode grid) means the grid is not the exit.
+ * True for the last row of a wrapping grid.
+ * Down from those cells stays in the grid. The tab bar is reached with Up.
  */
 export function isTvGridExit(index: number, count: number, columns: number): boolean {
   if (count <= 0 || columns <= 0 || index < 0 || index >= count) return false;
@@ -84,31 +84,29 @@ export function isTvGridExit(index: number, count: number, columns: number): boo
   return Math.floor(index / columns) === lastRow;
 }
 
+/** True for the first row. Up from those cells enters the tab bar. */
+export function isTvGridEntrance(index: number, count: number, columns: number): boolean {
+  if (count <= 0 || columns <= 0 || index < 0 || index >= count) return false;
+  return Math.floor(index / columns) === 0;
+}
+
 export interface TvFocusModel {
-  /** Content controls from top to bottom. Down on the last one enters the bridge. */
+  /** Content controls from top to bottom. Up on the first one enters the bar. */
   contentCount: number;
   tabCount: number;
   selectedTab: number;
-  /** Content index Up should restore. Defaults to the first control. */
-  rememberedContent: number;
 }
 
 /**
- * One remote move.
- * The up guide is not its own stop: Up from a tab restores the remembered control
- * in the same move, which is what the guide's destinations do on device.
+ * One remote move inside the shared tab view.
+ * Up from the first control lands on the open tab in the same move.
  */
 export function moveTvFocus(place: TvFocusPlace, direction: TvFocusDirection, model: TvFocusModel): TvFocusPlace {
-  const contentCount = Math.max(0, model.contentCount);
-  const tabCount = Math.max(0, model.tabCount);
-  const remembered = contentCount === 0 ? 0 : clampIndex(model.rememberedContent, contentCount);
   switch (place.zone) {
     case 'content':
-      return leaveContent(place.index, direction, contentCount, tabCount, model.selectedTab);
-    case 'bridge':
-      return moveBridge(direction, contentCount, tabCount, model.selectedTab, remembered);
+      return moveContent(place.index, direction, model);
     case 'tab':
-      return moveTab(place.index, direction, tabCount, remembered, contentCount);
+      return moveTab(place.index, direction, model);
     default: {
       const exhaustive: never = place;
       return exhaustive;
@@ -116,42 +114,40 @@ export function moveTvFocus(place: TvFocusPlace, direction: TvFocusDirection, mo
   }
 }
 
-/** Repeated Down from any content control reaches a tab, when both exist. */
-export function downReachesTab(start: TvFocusPlace, model: TvFocusModel): boolean {
+/** Repeated Up from any content control reaches a tab, when both exist. */
+export function upReachesTab(start: TvFocusPlace, model: TvFocusModel): boolean {
   if (model.tabCount <= 0) return false;
   let place = start;
   const steps = model.contentCount + model.tabCount + 2;
   for (let step = 0; step < steps; step += 1) {
     if (place.zone === 'tab') return true;
-    const next = moveTvFocus(place, 'down', model);
-    if (next.zone === place.zone && next.zone !== 'bridge' && samePlace(next, place)) return false;
+    const next = moveTvFocus(place, 'up', model);
+    if (samePlace(next, place)) return false;
     place = next;
   }
   return place.zone === 'tab';
 }
 
-function leaveContent(
-  index: number,
-  direction: TvFocusDirection,
-  contentCount: number,
-  tabCount: number,
-  selectedTab: number,
-): TvFocusPlace {
-  const next = moveContent(index, direction, contentCount);
-  // The bottom guide redirects in the same move, so one Down from the last control lands on the tab.
-  if (next.zone !== 'bridge' || direction !== 'down') return next;
-  const tab = tvBridgeDestination(tabCount, selectedTab);
-  return tab === null ? next : { zone: 'tab', index: tab };
+/** Down from every tab enters content, when the screen has a control. */
+export function downReachesContent(model: TvFocusModel): boolean {
+  if (model.contentCount <= 0 || model.tabCount <= 0) return false;
+  for (let index = 0; index < model.tabCount; index += 1) {
+    const next = moveTvFocus({ zone: 'tab', index }, 'down', model);
+    if (next.zone !== 'content') return false;
+  }
+  return true;
 }
 
-function moveContent(index: number, direction: TvFocusDirection, contentCount: number): TvFocusPlace {
-  if (contentCount <= 0) return { zone: 'bridge' };
+function moveContent(index: number, direction: TvFocusDirection, model: TvFocusModel): TvFocusPlace {
+  const contentCount = Math.max(0, model.contentCount);
+  if (contentCount <= 0) return tabPlace(model.selectedTab, model.tabCount);
   const safe = clampIndex(index, contentCount);
   switch (direction) {
-    case 'down':
-      return safe < contentCount - 1 ? { zone: 'content', index: safe + 1 } : { zone: 'bridge' };
     case 'up':
-      return { zone: 'content', index: safe > 0 ? safe - 1 : safe };
+      if (safe > 0) return { zone: 'content', index: safe - 1 };
+      return tabPlace(model.selectedTab, model.tabCount);
+    case 'down':
+      return { zone: 'content', index: safe < contentCount - 1 ? safe + 1 : safe };
     case 'left':
     case 'right':
       return { zone: 'content', index: safe };
@@ -162,23 +158,19 @@ function moveContent(index: number, direction: TvFocusDirection, contentCount: n
   }
 }
 
-function moveBridge(
-  direction: TvFocusDirection,
-  contentCount: number,
-  tabCount: number,
-  selectedTab: number,
-  remembered: number,
-): TvFocusPlace {
+function moveTab(index: number, direction: TvFocusDirection, model: TvFocusModel): TvFocusPlace {
+  const tabCount = Math.max(0, model.tabCount);
+  if (tabCount <= 0) return { zone: 'content', index: 0 };
+  const link = tvTabLink(index, tabCount);
   switch (direction) {
-    case 'down': {
-      const tab = tvBridgeDestination(tabCount, selectedTab);
-      return tab === null ? { zone: 'bridge' } : { zone: 'tab', index: tab };
-    }
-    case 'up':
-      return contentCount === 0 ? { zone: 'bridge' } : { zone: 'content', index: remembered };
     case 'left':
+      return { zone: 'tab', index: link.left };
     case 'right':
-      return { zone: 'bridge' };
+      return { zone: 'tab', index: link.right };
+    case 'up':
+      return { zone: 'tab', index: link.up };
+    case 'down':
+      return model.contentCount <= 0 ? { zone: 'tab', index: link.up } : { zone: 'content', index: 0 };
     default: {
       const exhaustive: never = direction;
       return exhaustive;
@@ -186,29 +178,9 @@ function moveBridge(
   }
 }
 
-function moveTab(
-  index: number,
-  direction: TvFocusDirection,
-  tabCount: number,
-  remembered: number,
-  contentCount: number,
-): TvFocusPlace {
-  if (tabCount <= 0) return { zone: 'bridge' };
-  const link = tvTabLink(index, tabCount);
-  switch (direction) {
-    case 'left':
-      return { zone: 'tab', index: link.left };
-    case 'right':
-      return { zone: 'tab', index: link.right };
-    case 'down':
-      return { zone: 'tab', index: link.down };
-    case 'up':
-      return contentCount === 0 ? { zone: 'tab', index: link.down } : { zone: 'content', index: remembered };
-    default: {
-      const exhaustive: never = direction;
-      return exhaustive;
-    }
-  }
+function tabPlace(selectedTab: number, tabCount: number): TvFocusPlace {
+  if (tabCount <= 0) return { zone: 'content', index: 0 };
+  return { zone: 'tab', index: clampIndex(selectedTab, tabCount) };
 }
 
 function clampIndex(index: number, count: number): number {
@@ -219,7 +191,5 @@ function clampIndex(index: number, count: number): number {
 }
 
 function samePlace(left: TvFocusPlace, right: TvFocusPlace): boolean {
-  if (left.zone !== right.zone) return false;
-  if (left.zone === 'bridge' || right.zone === 'bridge') return left.zone === right.zone;
-  return left.index === right.index;
+  return left.zone === right.zone && left.index === right.index;
 }

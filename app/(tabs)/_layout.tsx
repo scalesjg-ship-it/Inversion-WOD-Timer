@@ -1,5 +1,5 @@
-import { Tabs } from 'expo-router';
-import { Platform, Text, type TextStyle } from 'react-native';
+import { Slot, Tabs } from 'expo-router';
+import { Platform, StyleSheet, Text, View, type TextStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
@@ -14,15 +14,27 @@ export default function TabLayout() {
   const { branding } = useBranding();
   const tint = readableDigitColor(branding.uiColor, branding.backgroundColor);
   const insets = useSafeAreaInsets();
-
   const tv = Platform.isTV === true;
-  // Android phone draws edge-to-edge. The fixed 64pt bar would sit under the
-  // navigation bar. iOS and TV keep the existing bar.
-  const androidPhone = Platform.OS === 'android' && !tv;
 
-  const navigator = (
+  if (tv) {
+    return (
+      <TvTabFocusProvider>
+        <View style={styles.tv} collapsable={false}>
+          <TvTabBar />
+          <View style={styles.tvScreen} collapsable={false}>
+            <Slot />
+          </View>
+        </View>
+      </TvTabFocusProvider>
+    );
+  }
+
+  // Android phone draws edge-to-edge. The fixed 64pt bar would sit under the
+  // navigation bar. iOS keeps the existing bar.
+  const androidPhone = Platform.OS === 'android';
+
+  return (
     <Tabs
-      {...(tv ? { tabBar: (props) => <TvTabBar {...props} /> } : {})}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: tint,
@@ -67,12 +79,13 @@ export default function TabLayout() {
       />
     </Tabs>
   );
-
-  // The phone tab bar is the default one. Only the TV bar needs the focus bridge.
-  if (!tv) return navigator;
-  return <TvTabFocusProvider>{navigator}</TvTabFocusProvider>;
 }
 
 function TabMark({ color, label }: { color: TextStyle['color']; label: string }) {
   return <Text style={{ color, fontFamily: 'Oswald', fontSize: 16 }}>{label}</Text>;
 }
+
+const styles = StyleSheet.create({
+  tv: { flex: 1, backgroundColor: chrome.bg },
+  tvScreen: { flex: 1 },
+});

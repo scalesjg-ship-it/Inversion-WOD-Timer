@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Platform,
   Pressable,
@@ -10,7 +10,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { useTvTabFocus, type TvFocusTag } from '@/src/components/TvTabFocus';
+import { type TvFocusTag } from '@/src/components/TvTabFocus';
 import { focusChrome, TV_FOCUS_BORDER, TV_FOCUS_RING, type FocusOptions } from '@/src/tv/controls';
 import { tvScaled } from '@/src/tv/layout';
 import { tvParallaxProps } from '@/src/tv/pressable';
@@ -31,7 +31,7 @@ export function TvFocusPressable({
   onBlur,
   children,
   focusDown = null,
-  trackTabContent = true,
+  focusUp = null,
   onHost,
   ...rest
 }: Omit<PressableProps, 'style' | 'children'> & {
@@ -40,21 +40,21 @@ export function TvFocusPressable({
   scale?: boolean;
   style?: StyleProp<ViewStyle> | FocusStyle;
   children?: ReactNode;
-  /** TV only. Native tag of the tab-bar bridge. Down from this control moves there. */
+  /** TV only. Native tag focused by Down. */
   focusDown?: TvFocusTag | null;
-  /** Tab bar items must not register themselves as the control Up returns to. */
-  trackTabContent?: boolean;
+  /** TV only. Native tag focused by Up. The first row points this at the open tab. */
+  focusUp?: TvFocusTag | null;
   /** Fired when the native host mounts. Stable: not called again on render. */
   onHost?: (node: React.ComponentRef<typeof Pressable> | null) => void;
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
   const pointer = usePointerFocus();
-  const tabFocus = useTvTabFocus();
-  const hostRef = useRef<React.ComponentRef<typeof Pressable> | null>(null);
   const onHostRef = useRef(onHost);
+  useEffect(() => {
+    onHostRef.current = onHost;
+  }, [onHost]);
   const setHost = useCallback((node: React.ComponentRef<typeof Pressable> | null) => {
-    hostRef.current = node;
     onHostRef.current?.(node);
   }, []);
   const options: FocusOptions = {
@@ -67,10 +67,10 @@ export function TvFocusPressable({
     <Pressable
       {...rest}
       {...(tv && focusDown != null ? { nextFocusDown: focusDown, focusable: true as const } : {})}
+      {...(tv && focusUp != null ? { nextFocusUp: focusUp, focusable: true as const } : {})}
       {...(tv ? tvParallaxProps() : {})}
       ref={setHost}
       onFocus={(event) => {
-        if (tv && trackTabContent) tabFocus?.rememberContent(hostRef.current);
         pointer.onFocus?.();
         onFocus?.(event);
       }}
@@ -97,25 +97,18 @@ export function TvTextField({
   style,
   onFocus,
   onBlur,
+  focusUp = null,
   ...rest
-}: TextInputProps & { accent?: string }) {
+}: TextInputProps & { accent?: string; focusUp?: TvFocusTag | null }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
-  const tabFocus = useTvTabFocus();
-  const hostRef = useRef<React.ComponentRef<typeof TextInput> | null>(null);
-  const setHost = useCallback((node: React.ComponentRef<typeof TextInput> | null) => {
-    hostRef.current = node;
-  }, []);
   const [focused, setFocused] = useState(false);
   return (
     <TextInput
       {...rest}
-      ref={setHost}
+      {...(tv && focusUp != null ? { nextFocusUp: focusUp, focusable: true as const } : {})}
       onFocus={(event) => {
-        if (tv) {
-          setFocused(true);
-          tabFocus?.rememberContent(hostRef.current);
-        }
+        if (tv) setFocused(true);
         onFocus?.(event);
       }}
       onBlur={(event) => {

@@ -5,6 +5,7 @@ import { normalizeConfig } from './engine';
 import {
   deletePreset,
   listPresets,
+  loadPreset,
   loadPresets,
   renamePreset,
   savePreset,
@@ -151,6 +152,28 @@ describe('preset store', () => {
     expect((await listPresets('rounds')).map((preset) => preset.id)).toEqual([rounds.preset.id]);
   });
 
+  it('persists every saved preset across a reload', async () => {
+    const first = await savePreset({ name: 'For Time 1', config: config('forTime', { workSeconds: 12 * 60 }), now: 1 });
+    const second = await savePreset({ name: 'For Time 2', config: config('forTime', { workSeconds: 20 * 60 }), now: 2 });
+    if (!first.ok || !second.ok) throw new Error('expected saves');
+
+    const listed = await listPresets('forTime');
+    expect(listed.map((preset) => preset.name)).toEqual(['For Time 2', 'For Time 1']);
+
+    const loaded = await loadPreset(first.preset.id);
+    expect(loaded?.config.workSeconds).toBe(12 * 60);
+    expect(await loadPreset('missing')).toBeNull();
+
+    await deletePreset(second.preset.id);
+    const renamed = await renamePreset(first.preset.id, 'Morning', 3);
+    expect(renamed).toMatchObject({ ok: true, preset: { name: 'Morning' } });
+
+    const again = await loadPresets();
+    expect(again.map((preset) => preset.name)).toEqual(['Morning']);
+    const stored = JSON.parse((await AsyncStorage.getItem(PRESET_STORAGE_KEY)) ?? '') as { presets: { name: string }[] };
+    expect(stored.presets.map((preset) => preset.name)).toEqual(['Morning']);
+  });
+
   it('rejects an empty name and caps the stored length', async () => {
     expect(await savePreset({ name: '   ', config: config('forTime'), now: 1 })).toEqual({ ok: false, reason: 'empty-name' });
     const saved = await savePreset({ name: `  ${'A'.repeat(80)}  `, config: config('forTime', { workSeconds: 12 * 60 }), now: 2 });
@@ -181,6 +204,28 @@ describe('preset migration', () => {
     leadInSeconds: 10,
     builtIn: false,
   };
+
+  it('migrates one legacy preset that was stored as an object', () => {
+    const { presets, migrated } = readStoredPresets(legacyCountdown);
+    expect(migrated).toBe(true);
+    expect(presets).toHaveLength(1);
+    expect(presets[0]).toMatchObject({ id: 'countdown-1', name: 'Warmup', mode: 'countdown' });
+
+    const round = readStoredPresets(legacyRound);
+    expect(round.migrated).toBe(true);
+    expect(round.presets[0]).toMatchObject({ id: 'custom-1', name: 'Sparring', mode: 'rounds', config: { workSeconds: 180 } });
+  });
+
+  it('persists a migrated single preset and loads it again', async () => {
+    await AsyncStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(legacyRound));
+    const loaded = await loadPresets();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]?.name).toBe('Sparring');
+    const again = await loadPreset(loaded[0]?.id ?? '');
+    expect(again?.config).toMatchObject({ mode: 'rounds', rounds: 5, restSeconds: 60 });
+    const stored = JSON.parse((await AsyncStorage.getItem(PRESET_STORAGE_KEY)) ?? '') as { version: number };
+    expect(stored.version).toBe(PRESET_DOCUMENT_VERSION);
+  });
 
   it('converts a legacy array of countdown and round presets', () => {
     const { presets, migrated } = readStoredPresets([legacyRound, legacyCountdown, { nope: true }, 'bad']);

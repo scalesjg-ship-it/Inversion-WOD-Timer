@@ -1,72 +1,89 @@
-import { Tabs } from 'expo-router';
-import { useEffect, type ComponentProps } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { router, usePathname, type Href } from 'expo-router';
+import { useEffect } from 'react';
+import { StyleSheet, Text, TVFocusGuideView, useWindowDimensions, View } from 'react-native';
 
+import { useBranding } from '@/src/branding/BrandingProvider';
+import { readableDigitColor } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
-import { TvTabUpGuide, tvTabItemProps, useTvTabFocus } from '@/src/components/TvTabFocus';
+import { useTvTabFocus } from '@/src/components/TvTabFocus';
 import { chrome } from '@/src/theme/chrome';
 import { tabBarControlSize } from '@/src/tv/controls';
+import { tvDirectionalProps, tvTabIndex, tvTabLink } from '@/src/tv/tabFocus';
 
-type TvTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
+const TABS: { href: Href; title: string; testID: string }[] = [
+  { href: '/', title: 'WOD', testID: 'tab-wod' },
+  { href: '/rounds', title: 'Rounds', testID: 'tab-rounds' },
+  { href: '/brand', title: 'Brand', testID: 'tab-brand' },
+];
 
-export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }: TvTabBarProps) {
+/** react-native-web has no focus guide. Television builds export the real one. */
+const TabGuide = TVFocusGuideView ?? View;
+
+/**
+ * Top tab bar for television. It is a sibling of the screen inside one view,
+ * so the focus engine can move between them. Left and Right stay on the bar.
+ * Down leaves it. Focusing a tab opens that screen.
+ */
+export function TvTabBar() {
+  const pathname = usePathname();
+  const selected = tvTabIndex(pathname);
   const { width, height } = useWindowDimensions();
   const metrics = tabBarControlSize(true, height, width);
+  const { branding } = useBranding();
+  const tint = readableDigitColor(branding.uiColor, branding.backgroundColor);
   const tabFocus = useTvTabFocus();
   useEffect(() => {
-    tabFocus?.reportSelected(state.index);
-  }, [state.index, tabFocus]);
-  const focusedRoute = state.routes[state.index];
-  const focusedOptions = focusedRoute ? descriptors[focusedRoute.key]?.options : undefined;
-  const active = colorString(focusedOptions?.tabBarActiveTintColor, chrome.text);
-  const inactive = colorString(focusedOptions?.tabBarInactiveTintColor, chrome.muted);
+    tabFocus?.reportSelected(selected);
+  }, [selected, tabFocus]);
+
+  const open = (index: number) => {
+    if (index === selected) return;
+    router.navigate(TABS[index].href);
+  };
 
   return (
-    <View
-      accessibilityRole="tablist"
-        style={[
+    <TabGuide
+      trapFocusUp
+      trapFocusLeft
+      trapFocusRight
+      collapsable={false}
+      testID="tv-tab-bar"
+      style={[
         styles.bar,
         {
           gap: metrics.gap,
           paddingHorizontal: metrics.paddingHorizontal,
           paddingTop: metrics.paddingTop,
-          paddingBottom: Math.max(insets.bottom, metrics.paddingBottom),
-          minHeight: metrics.paddingTop + metrics.barContentHeight + Math.max(insets.bottom, metrics.paddingBottom),
+          paddingBottom: metrics.paddingBottom,
+          minHeight: metrics.paddingTop + metrics.barContentHeight + metrics.paddingBottom,
           width: '100%',
         },
       ]}
     >
-      <TvTabUpGuide height={metrics.paddingTop} />
-      {state.routes.map((route, index) => {
-        const selected = index === state.index;
-        const options = descriptors[route.key]?.options;
-        const title = options?.title ?? route.name;
-        const label = typeof title === 'string' ? title : route.name;
-        const color = selected ? active : inactive;
-        const onPress = () => {
-          const event = emitter.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
-          if (!selected && !event.defaultPrevented) navigateToTab(route.key);
-        };
-        const links = tvTabItemProps(true, index, tabFocus?.tabTags ?? [], tabFocus?.upTag ?? null);
+      {TABS.map((tab, index) => {
+        const active = index === selected;
+        const color = active ? tint : chrome.muted;
+        const link = tvTabLink(index, TABS.length);
+        const tags = tabFocus?.tabTags ?? [];
+        const links = tvDirectionalProps(true, {
+          left: tags[link.left],
+          right: tags[link.right],
+          up: tags[link.up],
+        });
         return (
           <TvFocusPressable
-            key={route.key}
+            key={tab.testID}
             onHost={(node) => tabFocus?.bindTab(index, node)}
             accessibilityRole="tab"
-            accessibilityState={{ selected }}
-            accessibilityLabel={label}
-            testID={options?.tabBarButtonTestID}
-            trackTabContent={false}
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={tab.title}
+            testID={tab.testID}
             focusable
             nextFocusLeft={links.nextFocusLeft}
             nextFocusRight={links.nextFocusRight}
-            nextFocusDown={links.nextFocusDown}
             nextFocusUp={links.nextFocusUp}
-            onPress={onPress}
+            onFocus={() => open(index)}
+            onPress={() => open(index)}
             style={({ pressed }) => [
               styles.item,
               {
@@ -78,18 +95,20 @@ export function TvTabBar({ state, descriptors, emitter, navigateToTab, insets }:
             ]}
           >
             <Text style={[styles.icon, styles.clear, { color, fontSize: metrics.icon, lineHeight: metrics.icon + 4 }]}>
-              {label.slice(0, 1).toUpperCase()}
+              {tab.title.slice(0, 1)}
             </Text>
-            <Text style={[styles.label, styles.clear, { color, fontSize: metrics.label }]}>{label}</Text>
+            <Text style={[styles.label, styles.clear, { color, fontSize: metrics.label }]}>{tab.title}</Text>
           </TvFocusPressable>
         );
       })}
-    </View>
+    </TabGuide>
   );
 }
 
-function colorString(color: unknown, fallback: string): string {
-  return typeof color === 'string' ? color : fallback;
+/** The bar's height, so a preview can reserve the same band the shell does. */
+export function tvTabBarBand(width: number, height: number): number {
+  const metrics = tabBarControlSize(true, height, width);
+  return metrics.paddingTop + metrics.barContentHeight + metrics.paddingBottom;
 }
 
 const styles = StyleSheet.create({
@@ -97,8 +116,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
     backgroundColor: chrome.bg,
-    borderTopColor: chrome.line,
-    borderTopWidth: 2,
+    borderBottomColor: chrome.line,
+    borderBottomWidth: 2,
   },
   item: {
     flex: 1,
