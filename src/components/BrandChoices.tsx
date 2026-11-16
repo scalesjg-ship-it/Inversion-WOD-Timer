@@ -19,10 +19,13 @@ export function BrandChoices({
   branding,
   onChange,
   part = 'all',
+  focusUp = null,
 }: {
   branding: Branding;
   onChange: (patch: Partial<Branding>) => void;
   part?: 'all' | 'templates' | 'palettes';
+  /** TV tag of the tab bar. The first template sends Up there. */
+  focusUp?: number | null;
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
@@ -40,7 +43,7 @@ export function BrandChoices({
           </Text>
           )}
           <View style={[styles.templates, tv && styles.templatesTv]}>
-            {BRAND_TEMPLATES.map((template) => (
+            {BRAND_TEMPLATES.map((template, index) => (
               <View
                 key={template.id}
                 style={
@@ -58,6 +61,7 @@ export function BrandChoices({
                   frame={null}
                   compact={tv}
                   selected={templateMatches(branding, template)}
+                  focusUp={index === 0 ? focusUp : null}
                   onPress={() => {
                     const patch = templatePatch(template);
                     if (patch) onChange(patch);
@@ -96,12 +100,14 @@ function TemplateCard({
   compact = false,
   selected,
   onPress,
+  focusUp = null,
 }: {
   template: BrandTemplate;
   frame: TvHomeLayout | null;
   compact?: boolean;
   selected: boolean;
   onPress: () => void;
+  focusUp?: number | null;
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
@@ -112,6 +118,7 @@ function TemplateCard({
       accessibilityRole="button"
       accessibilityState={{ selected }}
       testID={`template-${template.id}`}
+      focusUp={focusUp}
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,

@@ -1,0 +1,195 @@
+import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { readFile, mkdir } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+
+const require = createRequire(import.meta.url);
+const esbuild = require('esbuild');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const extensions = ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js'];
+
+function resolveWithExtension(base) {
+  const webFirst = extensions.filter((ext) => ext.includes('.web.'));
+  const rest = extensions.filter((ext) => !ext.includes('.web.'));
+  for (const ext of [...webFirst, ...rest]) {
+    const candidate = base + ext;
+    if (existsSync(candidate)) return candidate;
+    const indexed = path.join(base, `index${ext}`);
+    if (existsSync(indexed)) return indexed;
+  }
+  return null;
+}
+
+const rnWeb = {
+  name: 'rn-web',
+  setup(build) {
+    build.onResolve({ filter: /^expo-router$/ }, () => ({
+      path: path.join(root, 'scripts/stub-expo-router.tsx'),
+    }));
+    build.onResolve({ filter: /^expo-audio$|^expo-haptics$|^expo-keep-awake$|^expo-notifications$/ }, () => ({
+      path: path.join(root, 'scripts/stub-native-extras.ts'),
+    }));
+    build.onResolve({ filter: /codegenNativeComponent/ }, (args) => {
+      console.log('codegen import from', args.importer);
+      return { path: path.join(root, 'scripts/stub-native-extras.ts') };
+    });
+    build.onResolve({ filter: /^expo-image-picker$/ }, () => ({
+      path: path.join(root, 'scripts/stub-image-picker.ts'),
+    }));
+    build.onResolve({ filter: /^expo-document-picker$/ }, () => ({
+      path: path.join(root, 'scripts/stub-document-picker.ts'),
+    }));
+    build.onResolve({ filter: /^react-native$/ }, () => ({
+      path: require.resolve('react-native-web'),
+    }));
+    build.onResolve({ filter: /useLogoReceiver$/ }, () => ({
+      path: path.join(root, 'scripts/previewLogoReceiver.tsx'),
+    }));
+    build.onResolve({ filter: /^expo-image$/ }, () => ({
+      path: path.join(root, 'scripts/stub-expo-image.tsx'),
+    }));
+    build.onResolve({ filter: /^expo-image-manipulator$/ }, () => ({
+      path: path.join(root, 'scripts/stub-image-manipulator.ts'),
+    }));
+    build.onResolve({ filter: /^expo-file-system$/ }, () => ({
+      path: path.join(root, 'scripts/stub-file-system.ts'),
+    }));
+    build.onResolve({ filter: /^@react-native\/assets-registry\/registry$/ }, () => ({
+      path: path.join(root, 'scripts/stub-asset-registry.ts'),
+    }));
+    build.onResolve({ filter: /^@\// }, (args) => {
+      const resolved = resolveWithExtension(path.join(root, args.path.slice(2)));
+      if (!resolved) return { errors: [{ text: `Cannot resolve ${args.path}` }] };
+      return { path: resolved };
+    });
+    build.onResolve({ filter: /^\./ }, (args) => {
+      if (!args.importer || args.path.endsWith('useLogoReceiver')) return null;
+      const resolved = resolveWithExtension(path.resolve(path.dirname(args.importer), args.path));
+      if (!resolved) return null;
+      const inSvg =
+        resolved.includes(`${path.sep}react-native-svg${path.sep}`) ||
+        args.importer.includes(`${path.sep}react-native-svg${path.sep}`);
+      const inSafeArea =
+        resolved.includes(`${path.sep}react-native-safe-area-context${path.sep}`) ||
+        args.importer.includes(`${path.sep}react-native-safe-area-context${path.sep}`);
+      const inApp =
+        args.importer.startsWith(path.join(root, 'src') + path.sep) ||
+        args.importer.startsWith(path.join(root, 'app') + path.sep) ||
+        args.importer.startsWith(path.join(root, 'scripts') + path.sep);
+      if (inSvg || inSafeArea || inApp) return { path: resolved };
+      return null;
+    });
+  },
+};
+
+const outfile = '/tmp/tv-tabs-bundle.js';
+await esbuild.build({
+  absWorkingDir: root,
+  entryPoints: [path.join(root, 'scripts/tv-tabs-entry.tsx')],
+  bundle: true,
+  format: 'iife',
+  platform: 'browser',
+  target: 'es2020',
+  outfile,
+  jsx: 'automatic',
+  plugins: [rnWeb],
+  define: {
+    'process.env.NODE_ENV': '"development"',
+    __DEV__: 'true',
+  },
+  loader: { '.ttf': 'empty', '.png': 'dataurl', '.wav': 'empty' },
+});
+
+const frames = [
+  { tab: 'wod', width: 1920, height: 1080, file: 'tv-tab-wod-1920x1080.png' },
+  { tab: 'rounds', width: 1920, height: 1080, file: 'tv-tab-rounds-1920x1080.png' },
+  { tab: 'brand', width: 1920, height: 1080, file: 'tv-tab-brand-1920x1080.png' },
+  { tab: 'wod', width: 960, height: 540, file: 'tv-tab-wod-960x540.png' },
+  { tab: 'rounds', width: 960, height: 540, file: 'tv-tab-rounds-960x540.png' },
+  { tab: 'brand', width: 960, height: 540, file: 'tv-tab-brand-960x540.png' },
+];
+
+const outDir = '/opt/cursor/artifacts';
+await mkdir(outDir, { recursive: true });
+
+function pageFor(tab, width, height) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: Oswald; src: url(/assets/fonts/Oswald-Bold.ttf); font-weight: 700; }
+  @font-face { font-family: OswaldMedium; src: url(/assets/fonts/Oswald-Medium.ttf); font-weight: 500; }
+  html, body, #root { margin: 0; width: ${width}px; height: ${height}px; background: #07080A; overflow: hidden; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>globalThis.__TV_TAB__ = ${JSON.stringify(tab)};</script>
+<script src="/bundle.js"></script>
+</body>
+</html>`;
+}
+
+const server = createServer(async (req, res) => {
+  const url = req.url ?? '/';
+  if (url.startsWith('/index.html')) {
+    const params = new URL(url, 'http://127.0.0.1').searchParams;
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(pageFor(params.get('tab') ?? 'wod', Number(params.get('w') ?? 1920), Number(params.get('h') ?? 1080)));
+    return;
+  }
+  if (url === '/bundle.js') {
+    const body = await readFile(outfile);
+    res.writeHead(200, { 'Content-Type': 'text/javascript' });
+    res.end(body);
+    return;
+  }
+  const file = path.join(root, decodeURIComponent(url.split('?')[0]));
+  if (!file.startsWith(root) || !existsSync(file)) {
+    res.writeHead(404);
+    res.end('missing');
+    return;
+  }
+  const body = await readFile(file);
+  const type = file.endsWith('.ttf') ? 'font/ttf' : 'application/octet-stream';
+  res.writeHead(200, { 'Content-Type': type });
+  res.end(body);
+});
+
+await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+const address = server.address();
+if (!address || typeof address === 'string') throw new Error('no port');
+const port = address.port;
+
+function shoot(frame) {
+  const shot = path.join(outDir, frame.file);
+  const url = `http://127.0.0.1:${port}/index.html?tab=${frame.tab}&w=${frame.width}&h=${frame.height}`;
+  return new Promise((resolve, reject) => {
+    const chrome = spawn(
+      '/usr/bin/google-chrome-stable',
+      [
+        '--headless=new',
+        '--disable-gpu',
+        '--no-sandbox',
+        '--hide-scrollbars',
+        '--virtual-time-budget=8000',
+        `--window-size=${frame.width},${frame.height}`,
+        `--screenshot=${shot}`,
+        url,
+      ],
+      { stdio: 'inherit' },
+    );
+    chrome.on('error', reject);
+    chrome.on('exit', (code) => (code === 0 ? resolve(shot) : reject(new Error(`chrome ${code} ${frame.file}`))));
+  });
+}
+
+for (const frame of frames) {
+  const shot = await shoot(frame);
+  console.log('wrote', shot);
+}
+server.close();

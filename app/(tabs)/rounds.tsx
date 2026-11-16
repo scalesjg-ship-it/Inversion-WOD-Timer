@@ -8,7 +8,7 @@ import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
 import { TvFocusPressable } from '@/src/components/TvFocus';
-import { TvTabDownBridge, useTvTabFocus } from '@/src/components/TvTabFocus';
+import { useTvTabFocus } from '@/src/components/TvTabFocus';
 import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
@@ -22,6 +22,7 @@ import {
   type TvHomeLayout,
 } from '@/src/tv/layout';
 import { formatSeconds } from '@/src/timer/format';
+import { isTvGridEntrance } from '@/src/tv/tabFocus';
 import { BUILTIN_PRESETS, configFromPreset, type RoundPreset } from '@/src/timer/presets';
 import { listPresets, type SavedPreset } from '@/src/timer/presetStorage';
 
@@ -99,15 +100,15 @@ export default function RoundsScreen() {
     const inner = Math.max(1, width - box.horizontal * 2);
     const cell = Math.floor(inner / columns);
     const gutter = Math.max(tvFocusGutter(cell), tvScaled(12, width, height));
-    const titleSize = tvScaled(44, width, height);
-    const detailSize = tvScaled(28, width, height);
-    const cardHeight = titleSize + detailSize + tvScaled(20, width, height);
+    const titleSize = tvScaled(36, width, height);
+    const detailSize = tvScaled(22, width, height);
+    const cardHeight = titleSize + detailSize + tvScaled(8, width, height);
     return (
-      <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical }]}>
+      <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: Math.max(4, Math.round(box.vertical * 0.35)) }]}>
         <Text style={[styles.title, { fontSize: tvScaled(40, width, height), lineHeight: tvScaled(46, width, height) }]}>Rounds</Text>
         <View style={styles.presetsTv}>
-          {BUILTIN_PRESETS.map((preset) => (
-            <View key={preset.id} style={{ width: cell, paddingHorizontal: gutter, paddingVertical: tvScaled(8, width, height) }}>
+          {BUILTIN_PRESETS.map((preset, index) => (
+            <View key={preset.id} style={{ width: cell, paddingHorizontal: gutter, paddingVertical: tvScaled(4, width, height) }}>
               <StandardCard
                 preset={preset}
                 accent={accent}
@@ -118,6 +119,7 @@ export default function RoundsScreen() {
                 titleSize={titleSize}
                 detailSize={detailSize}
                 cardHeight={cardHeight}
+                focusUp={isTvGridEntrance(index, BUILTIN_PRESETS.length, columns) ? tabFocus?.upTag ?? null : null}
               />
             </View>
           ))}
@@ -163,16 +165,21 @@ export default function RoundsScreen() {
             </View>
           </View>
         </View>
-        <View style={[styles.footer, { paddingBottom: box.vertical }]}>
-          <BigButton
-            testID="start-rounds"
-            label="Start rounds"
-            color={accent}
-            focusDown={tabFocus?.downTag ?? null}
-            onPress={() => start()}
-          />
+        <View style={[styles.footer, styles.footerRow, { paddingBottom: Math.max(4, Math.round(box.vertical * 0.25)) }]}>
+          <View style={styles.footerShelf}>
+            <PresetShelf
+              mode="rounds"
+              accent={accent}
+              config={configFromPreset(draft)}
+              selectedId={selectedId}
+              nameHint={builtInSelected ? draft.name : undefined}
+              onLoad={applySaved}
+              onStart={(preset) => start(preset.config, preset.name)}
+              onClearSelection={() => apply(BUILTIN_PRESETS[0])}
+            />
+          </View>
+          <BigButton testID="start-rounds" label="Start rounds" color={accent} onPress={() => start()} />
         </View>
-        <TvTabDownBridge />
       </View>
     );
   }
@@ -308,6 +315,7 @@ function StandardCard({
   cardHeight = 0,
   onFocus,
   onBlur,
+  focusUp = null,
 }: {
   preset: RoundPreset;
   accent: string;
@@ -320,6 +328,7 @@ function StandardCard({
   cardHeight?: number;
   onFocus?: () => void;
   onBlur?: () => void;
+  focusUp?: number | null;
 }) {
   return (
     <TvFocusPressable
@@ -327,6 +336,7 @@ function StandardCard({
       testID={`preset-${preset.id}`}
       accessibilityRole="button"
       accessibilityState={{ selected }}
+      focusUp={focusUp}
       onPress={onPress}
       onFocus={onFocus}
       onBlur={onBlur}
@@ -518,8 +528,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   tvStack: {
-    gap: 8,
-    marginTop: 4,
+    gap: 4,
+    marginTop: 0,
   },
   editorRow: {
     flexDirection: 'row',
@@ -536,5 +546,16 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: 20,
     paddingVertical: 12,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    paddingHorizontal: 0,
+  },
+  footerShelf: {
+    flex: 1,
+    minWidth: 0,
   },
 });

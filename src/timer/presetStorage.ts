@@ -43,6 +43,12 @@ export async function listPresets(mode: TimerMode): Promise<SavedPreset[]> {
   return listMode(await loadPresets(), mode);
 }
 
+export async function loadPreset(id: string): Promise<SavedPreset | null> {
+  if (!id) return null;
+  const presets = await loadPresets();
+  return presets.find((preset) => preset.id === id) ?? null;
+}
+
 export async function savePreset(input: {
   name: string;
   config: TimerConfig;

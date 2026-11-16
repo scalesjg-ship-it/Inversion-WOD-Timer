@@ -254,12 +254,14 @@ function collect(items: readonly unknown[]): SavedPreset[] {
 export function readStoredPresets(parsed: unknown): { presets: SavedPreset[]; migrated: boolean } {
   if (parsed == null) return { presets: [], migrated: false };
   if (Array.isArray(parsed)) return { presets: collect(parsed), migrated: true };
-  if (!isRecord(parsed) || parsed.version !== PRESET_DOCUMENT_VERSION || !Array.isArray(parsed.presets)) {
-    return { presets: [], migrated: false };
+  if (isRecord(parsed) && parsed.version === PRESET_DOCUMENT_VERSION && Array.isArray(parsed.presets)) {
+    const presets = collect(parsed.presets);
+    const migrated = JSON.stringify(presets) !== JSON.stringify(parsed.presets);
+    return { presets, migrated };
   }
-  const presets = collect(parsed.presets);
-  const migrated = JSON.stringify(presets) !== JSON.stringify(parsed.presets);
-  return { presets, migrated };
+  const single = migrateItem(parsed, 0);
+  if (single) return { presets: [single], migrated: true };
+  return { presets: [], migrated: false };
 }
 
 export function serializePresetDocument(presets: readonly SavedPreset[]): string {

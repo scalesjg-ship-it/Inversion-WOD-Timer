@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View, type ScrollViewInstance } from 'react-native';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View, type LayoutChangeEvent, type ScrollViewInstance, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { unlockAudio } from '@/src/audio/sounds';
@@ -8,16 +8,19 @@ import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { TvMenuCell } from '@/src/components/TvMenuCell';
-import { TvTabDownBridge, useTvTabFocus, type TvFocusTag } from '@/src/components/TvTabFocus';
+import { useTvTabFocus, type TvFocusTag } from '@/src/components/TvTabFocus';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import { isTenFootLayout, tvFocusGutter, tvSafeInset, type TvHomeLayout } from '@/src/tv/layout';
-import { isTvGridExit } from '@/src/tv/tabFocus';
+import { isTvGridEntrance } from '@/src/tv/tabFocus';
 import { useTvMenuFrame } from '@/src/tv/useTvMenuFrame';
 import { scrollOffsetForFocus } from '@/src/tv/scroll';
 import { modeTitle } from '@/src/timer/labels';
 import { loadPresets, presetSummary, type SavedPreset } from '@/src/timer/presetStorage';
 import type { TimerMode } from '@/src/timer/types';
+
+/** The first visit prefers the For Time card. Later visits leave focus on the tab bar. */
+let wodFocusArmed = true;
 
 const MODES: { mode: TimerMode; detail: string }[] = [
   {
@@ -66,6 +69,7 @@ export default function WodScreen() {
   const presetLocal = useRef<Record<string, { y: number; height: number }>>({});
   const [presets, setPresets] = useState<SavedPreset[] | null>(null);
 
+  const fitted = tv && (presets == null || presets.length === 0);
   const reveal = useCallback((top: number, itemHeight: number) => {
     const next = scrollOffsetForFocus(top, itemHeight, viewportHeight.current, scrollOffset.current);
     if (next === scrollOffset.current) return;
@@ -93,19 +97,19 @@ export default function WodScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={tv ? [] : ['top']}>
-      <ScrollView
-        ref={scrollRef}
-        style={tv ? styles.scrollTv : undefined}
+      <WodFrame
+        fitted={fitted}
+        scrollRef={scrollRef}
         scrollEnabled={!tv || (presets != null && presets.length > 0)}
-        scrollEventThrottle={16}
+        tv={tv}
         onLayout={(event) => {
           viewportHeight.current = event.nativeEvent.layout.height;
           if (tv) menu.onSceneLayout(event);
         }}
-        onScroll={(event) => {
-          scrollOffset.current = event.nativeEvent.contentOffset.y;
+        onScroll={(offset) => {
+          scrollOffset.current = offset;
         }}
-        contentContainerStyle={[
+        contentStyle={[
           styles.content,
           tenFoot && !tv && { paddingHorizontal: inset, paddingBottom: inset },
           tv && home
@@ -117,7 +121,6 @@ export default function WodScreen() {
               }
             : null,
         ]}
-        testID="screen-wod"
       >
         <Text
           style={[
@@ -170,17 +173,16 @@ export default function WodScreen() {
                   <ModeCard
                     item={item}
                     accent={accent}
-                    preferred={index === 0}
+                    preferred={index === 0 && wodFocusArmed}
                     tenFoot={false}
                     frame={home}
-                    focusDown={
-                      presets != null && presets.length > 0
-                        ? null
-                        : isTvGridExit(index, MODES.length, home.columns)
-                          ? tabFocus?.downTag ?? null
-                          : null
+                    focusUp={
+                      isTvGridEntrance(index, MODES.length, home.columns) ? tabFocus?.upTag ?? null : null
                     }
-                    onFocus={focus.onFocus}
+                    onFocus={() => {
+                      if (index === 0) wodFocusArmed = false;
+                      focus.onFocus();
+                    }}
                     onBlur={focus.onBlur}
                     onReveal={() => {
                       const local = cardLocal.current[item.mode];
@@ -227,9 +229,8 @@ export default function WodScreen() {
                 presetListTop.current = event.nativeEvent.layout.y;
               }}
             >
-              {presets.map((preset, presetIndex) => {
+              {presets.map((preset) => {
                 const gutter = home ? tvFocusGutter(width - home.padHorizontal * 2) : 0;
-                const lastPreset = tv && presetIndex === presets.length - 1;
                 return (
                 <View
                   key={preset.id}
@@ -250,7 +251,6 @@ export default function WodScreen() {
                     detailSize={tv && home ? home.detailSize : 0}
                     onOpen={() => openPreset(preset)}
                     onStart={() => startPreset(preset)}
-                    focusDown={lastPreset ? tabFocus?.downTag ?? null : null}
                     onReveal={() => {
                       const local = presetLocal.current[preset.id];
                       if (!local) return;
@@ -266,9 +266,50 @@ export default function WodScreen() {
         <Text style={[styles.hint, tv && home ? { fontSize: home.hintSize, lineHeight: home.hintLine, marginTop: 0 } : null]}>
           Jiu-jitsu, boxing, and sparring rounds are on the Rounds tab.
         </Text>
-      </ScrollView>
-      <TvTabDownBridge />
+      </WodFrame>
     </SafeAreaView>
+  );
+}
+
+function WodFrame({
+  fitted,
+  children,
+  scrollRef,
+  scrollEnabled,
+  tv,
+  onLayout,
+  onScroll,
+  contentStyle,
+}: {
+  fitted: boolean;
+  children: ReactNode;
+  scrollRef: React.RefObject<ScrollViewInstance | null>;
+  scrollEnabled: boolean;
+  tv: boolean;
+  onLayout: (event: LayoutChangeEvent) => void;
+  onScroll: (offset: number) => void;
+  contentStyle: StyleProp<ViewStyle>;
+}) {
+  if (fitted) {
+    return (
+      <View style={[styles.scrollTv, contentStyle]} onLayout={onLayout} testID="screen-wod" collapsable={false}>
+        {children}
+      </View>
+    );
+  }
+  return (
+    <ScrollView
+      ref={scrollRef}
+      style={tv ? styles.scrollTv : undefined}
+      scrollEnabled={scrollEnabled}
+      scrollEventThrottle={16}
+      onLayout={onLayout}
+      onScroll={(event) => onScroll(event.nativeEvent.contentOffset.y)}
+      contentContainerStyle={contentStyle}
+      testID="screen-wod"
+    >
+      {children}
+    </ScrollView>
   );
 }
 
@@ -377,7 +418,7 @@ function ModeCard({
   onFocus,
   onBlur,
   onReveal,
-  focusDown = null,
+  focusUp = null,
 }: {
   item: (typeof MODES)[number];
   accent: string;
@@ -387,7 +428,7 @@ function ModeCard({
   onFocus?: () => void;
   onBlur?: () => void;
   onReveal: () => void;
-  focusDown?: TvFocusTag | null;
+  focusUp?: TvFocusTag | null;
 }) {
   const tv = frame !== null;
   return (
@@ -396,7 +437,7 @@ function ModeCard({
       testID={`mode-${item.mode}`}
       accessibilityRole="button"
       accessibilityLabel={modeTitle(item.mode)}
-      focusDown={focusDown}
+      focusUp={focusUp}
       hasTVPreferredFocus={preferred}
       onFocus={() => {
         onFocus?.();

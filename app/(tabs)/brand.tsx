@@ -23,7 +23,7 @@ import { ColorPicker } from '@/src/components/ColorPicker';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
 import { RouteErrorBoundary } from '@/src/components/RouteErrorBoundary';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
-import { TvTabDownBridge, useTvTabFocus } from '@/src/components/TvTabFocus';
+import { useTvTabFocus } from '@/src/components/TvTabFocus';
 import { TvLogoUrl } from '@/src/components/TvLogoUrl';
 import { Chip, TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
@@ -132,7 +132,7 @@ export default function BrandScreen() {
             <Text style={[styles.previewPhase, { color: readableDigitColor(branding.workColor, branding.backgroundColor) }]}>Work</Text>
           </View>
           <Text style={[fitTvStyle(styles.fieldLabel, width, height), fitTvStyle(styles.fieldLabelTv, width, height), { color: chrome.muted }]}>Gym name</Text>
-          <GymNameField value={branding.gymName} onCommit={(gymName) => void update({ gymName })} />
+          <GymNameField value={branding.gymName} onCommit={(gymName) => void update({ gymName })} focusUp={tabFocus?.upTag ?? null} />
           <TvLogoTransfer branding={branding} update={update} accent={accent}>
             <TvLogoUrl onStored={async (logoUri) => update({ logoUri })} />
             <View style={styles.chips}>
@@ -159,7 +159,6 @@ export default function BrandScreen() {
           <TvFocusPressable
             accessibilityRole="button"
             testID="reset-brand"
-            focusDown={tabFocus?.downTag ?? null}
             onPress={confirmReset}
             style={({ pressed }) => [fitTvStyle(styles.reset, width, height), pressed ? { opacity: 0.75 } : null]}
           >
@@ -167,7 +166,7 @@ export default function BrandScreen() {
           </TvFocusPressable>
         </View>
         <View style={fitTvStyle(styles.tvColumn, width, height)}>
-          <BrandChoices branding={branding} part="templates" onChange={(patch) => void update(patch)} />
+          <BrandChoices branding={branding} part="templates" focusUp={tabFocus?.upTag ?? null} onChange={(patch) => void update(patch)} />
           <BrandChoices branding={branding} part="palettes" onChange={(patch) => void update(patch)} />
           <Text style={[fitTvStyle(styles.fieldLabel, width, height), fitTvStyle(styles.fieldLabelTv, width, height), { color: chrome.muted }]}>Colors</Text>
           <View style={[styles.colorGrid, tvColorGridTight(width, height) && { gap: tvScaled(4, width, height) }]}>
@@ -181,21 +180,19 @@ export default function BrandScreen() {
                 ['Background', 'color-background', branding.backgroundColor, (backgroundColor: string) => update({ backgroundColor })],
                 ['Accent', 'color-ui', branding.uiColor, (uiColor: string) => update({ uiColor })],
               ] as const
-            ).map(([label, testID, value, onChange], index, colors) => (
+            ).map(([label, testID, value, onChange]) => (
               <View key={testID} style={tvColorGridTight(width, height) ? styles.colorCellTight : styles.colorCell}>
                 <ColorPicker
                   label={label}
                   testID={testID}
                   value={value}
                   compact={tvColorGridTight(width, height)}
-                  focusDown={index === colors.length - 1 ? tabFocus?.downTag ?? null : null}
                   onChange={(next) => void onChange(next)}
                 />
               </View>
             ))}
           </View>
         </View>
-        <TvTabDownBridge />
       </View>
     );
   }
@@ -335,7 +332,7 @@ export default function BrandScreen() {
   );
 }
 
-function GymNameField({ value, onCommit }: { value: string; onCommit: (name: string) => void }) {
+function GymNameField({ value, onCommit, focusUp = null }: { value: string; onCommit: (name: string) => void; focusUp?: number | null }) {
   const [text, setText] = useState(value);
   const [tracked, setTracked] = useState(value);
   const { width, height } = useWindowDimensions();
@@ -347,6 +344,7 @@ function GymNameField({ value, onCommit }: { value: string; onCommit: (name: str
   return (
     <TvTextField
       testID="brand-name"
+      focusUp={focusUp}
       value={text}
       onChangeText={setText}
       onEndEditing={() => {
