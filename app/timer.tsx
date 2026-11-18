@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BackHandler, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { BackHandler, Platform, Pressable, StyleSheet, Text, TVEventControl, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
@@ -192,11 +192,16 @@ export default function TimerScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!tv) return undefined;
+      // Without this, tvOS still pops the stack on Menu after JavaScript pauses.
+      TVEventControl.enableTVMenuKey();
       const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
         onTvBackRef.current();
         return true;
       });
-      return () => subscription.remove();
+      return () => {
+        subscription.remove();
+        TVEventControl.disableTVMenuKey();
+      };
     }, [tv]),
   );
 
