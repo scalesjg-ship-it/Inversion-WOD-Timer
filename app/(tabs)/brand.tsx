@@ -110,7 +110,7 @@ export default function BrandScreen() {
     return (
       <View style={[styles.safe, fitTvStyle(styles.tvColumns, width, height), { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical, paddingBottom: box.vertical }]} testID="screen-brand">
         <View style={fitTvStyle(styles.tvColumn, width, height)}>
-          <Text style={[styles.lede, fitTvStyle(styles.ledeTv, width, height), { color: chrome.muted }]}>
+          <Text testID="screen-brand" style={[styles.lede, fitTvStyle(styles.ledeTv, width, height), { color: chrome.muted }]}>
             Your gym name, colors, and logo stay on this device.
           </Text>
           <View

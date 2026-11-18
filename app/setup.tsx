@@ -154,7 +154,7 @@ function SetupForm({
           <HeaderBack onPress={() => router.back()} color={accent} />
           <Text style={[styles.kicker, styles.kickerTv]} numberOfLines={1}>Americana</Text>
         </View>
-        <Text style={[styles.title, { fontSize: titleSize, lineHeight: titleSize + 6 }]}>{modeTitle(mode)}</Text>
+        <Text testID="screen-setup" style={[styles.title, { fontSize: titleSize, lineHeight: titleSize + 6 }]}>{modeTitle(mode)}</Text>
         <Text style={[styles.summary, styles.summaryTv]}>{summary}</Text>
         <View style={styles.tvStack}>
           {mode === 'forTime' ? (

@@ -319,7 +319,7 @@ export default function TimerScreen() {
       <View pointerEvents="none" style={[styles.wash, { backgroundColor: phaseColor }]} />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${phaseLabel(timer.snapshot.phase, config.mode)}, ${clockText}`}
+        accessibilityLabel={`${phaseLabel(timer.snapshot.phase, config.mode)}, ${clockText}${timer.snapshot.paused ? ', Paused' : ''}`}
         testID="timer-face"
         onPress={onClock}
         focusable={false}

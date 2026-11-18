@@ -143,6 +143,7 @@ export default function WodScreen() {
           {branding.gymName}
         </Text>
         <Text
+          testID="screen-wod"
           style={[
             styles.section,
             tv && home ? { fontSize: home.sectionSize, lineHeight: home.sectionLine, marginTop: 0, marginBottom: 0 } : null,

@@ -47,6 +47,7 @@ export function BigButton({
     <TvFocusPressable
       accent={ink}
       accessibilityRole="button"
+      accessibilityLabel={label}
       testID={testID}
       focusDown={focusDown}
       focusUp={focusUp}
