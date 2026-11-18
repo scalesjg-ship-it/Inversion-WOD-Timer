@@ -1,7 +1,7 @@
 const { withInfoPlist } = require('@expo/config-plugins');
 
-/** tvOS build 22. Phone iOS keeps the buildNumber in app.json. */
-const TVOS_BUILD_NUMBER = '22';
+/** tvOS build 23. Phone iOS keeps the buildNumber in app.json. */
+const TVOS_BUILD_NUMBER = '23';
 
 function isTvBuild(env = process.env) {
   const tv = env.EXPO_TV;
@@ -14,7 +14,7 @@ function applyTvBuildNumber(config, env = process.env) {
 }
 
 /**
- * Phone and tvOS share `ios.buildNumber`. This plugin sets CFBundleVersion to 22
+ * Phone and tvOS share `ios.buildNumber`. This plugin sets CFBundleVersion to 23
  * only when EXPO_TV=1, so an iPhone archive still uses the number in app.json.
  */
 function withTvBuildNumber(config) {
