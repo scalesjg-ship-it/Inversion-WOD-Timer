@@ -19,6 +19,7 @@ import { useTimer } from '@/src/timer/useTimer';
 import type { Phase } from '@/src/timer/types';
 import { clockStatusHint } from '@/src/tv/copy';
 import { fitClock, isTenFootLayout, scaleTvStyle, tvClockChrome, tvSafeBox, tvSafeInset, tvScale } from '@/src/tv/layout';
+import { claimPress, type PressClaim } from '@/src/tv/pressClaim';
 import type { RemoteCommand } from '@/src/tv/remoteMap';
 import {
   backStep,
@@ -71,7 +72,9 @@ export default function TimerScreen() {
   const [resetTag, onResetHost] = useTvFocusTag();
   const [confirmResetTag, onConfirmResetHost] = useTvFocusTag();
   const [confirmCancelTag, onConfirmCancelHost] = useTvFocusTag();
-  const leaveGate = useRef(false);
+  const confirmKindRef = useRef(confirmKind);
+  const pressClaim = useRef<PressClaim | null>(null);
+  const leaveArmed = useRef(false);
   const palette = screenColors(branding);
   const phaseColor = phaseInk(timer.snapshot.phase, branding, timer.snapshot.warningActive);
   const digits = palette.digits;
@@ -119,18 +122,26 @@ export default function TimerScreen() {
   }, [preferDialog]);
 
   const onClock = () => {
+    if (tv) return;
     if (timer.snapshot.running || timer.snapshot.paused) timer.toggle();
   };
 
   const closeConfirm = () => {
+    confirmKindRef.current = null;
     setConfirmKind(null);
     setPreferDialog(false);
     setPreferPrimary(true);
   };
 
-  const holdClock = (focusResume: boolean) => {
+  const claim = (kind: 'select' | 'menu') => {
+    const next = claimPress(kind, Date.now(), pressClaim.current);
+    pressClaim.current = next.claim;
+    return next.accept;
+  };
+
+  const pauseOnResume = () => {
     timer.pauseTimer();
-    if (focusResume) setPreferPrimary(true);
+    setPreferPrimary(true);
   };
 
   const exitTimer = () => {
@@ -139,23 +150,27 @@ export default function TimerScreen() {
   };
 
   const onTvBackRef = useRef(() => {});
+  const decideBackRef = useRef(() => {});
   useEffect(() => {
-    onTvBackRef.current = () => {
-      if (leaveGate.current) return;
-      leaveGate.current = true;
-      requestAnimationFrame(() => {
-        leaveGate.current = false;
-      });
+    decideBackRef.current = () => {
+      const snap = timer.readSnapshot();
       const step = backStep({
-        running: timer.snapshot.running,
-        confirming: confirmKind !== null,
+        running: snap.running,
+        paused: snap.paused,
+        confirming: confirmKindRef.current !== null,
+        leaveArmed: leaveArmed.current,
       });
       switch (step) {
         case 'dismiss':
           closeConfirm();
           return;
         case 'pause':
-          holdClock(true);
+          pauseOnResume();
+          leaveArmed.current = true;
+          return;
+        case 'stay':
+          setPreferPrimary(true);
+          leaveArmed.current = true;
           return;
         case 'exit':
           exitTimer();
@@ -165,6 +180,10 @@ export default function TimerScreen() {
           return unexpected;
         }
       }
+    };
+    onTvBackRef.current = () => {
+      if (!claim('menu')) return;
+      decideBackRef.current();
     };
   });
 
@@ -182,11 +201,13 @@ export default function TimerScreen() {
   const onRemote = (command: RemoteCommand) => {
     switch (command.type) {
       case 'toggle':
+        leaveArmed.current = false;
         timer.toggle();
         break;
       case 'confirmReset':
         setPreferPrimary(false);
         setPreferDialog(true);
+        confirmKindRef.current = 'reset';
         setConfirmKind('reset');
         setControlsHeld(true);
         break;
@@ -206,8 +227,16 @@ export default function TimerScreen() {
         setControlsHeld(false);
         closeConfirm();
         break;
-      case 'pause':
-        holdClock(command.focusResume);
+      case 'pause': {
+        if (!claim('select')) break;
+        const snap = timer.readSnapshot();
+        if (!snap.running) break;
+        pauseOnResume();
+        leaveArmed.current = false;
+        break;
+      }
+      case 'menu':
+        onTvBackRef.current();
         break;
       case 'exit':
         if (tv) onTvBackRef.current();
@@ -272,15 +301,17 @@ export default function TimerScreen() {
   };
 
   const pressTransport = (role: TransportRole) => {
-    // Select on a focused control also arrives as a remote event. Both see this
-    // render, so a running clock only pauses and does not also resume or reset.
-    if (timer.snapshot.running) {
-      timer.pauseTimer();
+    if (!claim('select')) return;
+    const snap = timer.readSnapshot();
+    if (snap.running) {
+      pauseOnResume();
+      leaveArmed.current = false;
       return;
     }
+    leaveArmed.current = false;
     switch (role) {
       case 'primary':
-        if (timer.snapshot.phase === 'idle' || timer.snapshot.phase === 'finished') timer.startTimer();
+        if (snap.phase === 'idle' || snap.phase === 'finished') timer.startTimer();
         else timer.toggle();
         return;
       case 'stop':
@@ -477,11 +508,15 @@ export default function TimerScreen() {
                 router.back();
                 return;
               }
-              if (timer.snapshot.running) {
-                holdClock(true);
+              // Select on Back is the same press as the remote select event.
+              if (!claim('select')) return;
+              const snap = timer.readSnapshot();
+              if (snap.running) {
+                pauseOnResume();
+                leaveArmed.current = false;
                 return;
               }
-              onTvBackRef.current();
+              decideBackRef.current();
             }}
             hitSlop={tv ? undefined : 12}
             onHost={tv ? onBackHost : undefined}

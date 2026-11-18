@@ -67,17 +67,18 @@ describe('remote key mapping', () => {
     expect(mapRemoteEvent('right', { ...rounds, mode: 'emom' })).toEqual({ type: 'seek', seconds: 10 });
   });
 
-  it('shows controls with up, pauses a running clock on back, and leaves once it is stopped', () => {
+  it('shows controls with up, and sends television back to the live menu handler', () => {
     expect(mapRemoteEvent('up', hidden)).toEqual({ type: 'showControls' });
     expect(mapRemoteEvent('swipeUp', hidden)).toEqual({ type: 'showControls' });
     expect(mapRemoteEvent('up', shown)).toEqual({ type: 'ignore' });
-    expect(mapRemoteEvent('back', tv)).toEqual({ type: 'pause', focusResume: true });
-    expect(mapRemoteEvent('menu', tv)).toEqual({ type: 'pause', focusResume: true });
-    expect(mapRemoteEvent('select', tv)).toEqual({ type: 'pause', focusResume: false });
+    expect(mapRemoteEvent('back', tv)).toEqual({ type: 'menu' });
+    expect(mapRemoteEvent('menu', tv)).toEqual({ type: 'menu' });
+    expect(mapRemoteEvent('select', tv)).toEqual({ type: 'pause', focusResume: true });
     expect(mapRemoteEvent('playPause', tv)).toEqual({ type: 'toggle' });
-    expect(mapRemoteEvent('back', tvStopped)).toEqual({ type: 'exit' });
-    expect(mapRemoteEvent('menu', tvStopped)).toEqual({ type: 'exit' });
+    expect(mapRemoteEvent('back', tvStopped)).toEqual({ type: 'menu' });
+    expect(mapRemoteEvent('menu', tvStopped)).toEqual({ type: 'menu' });
     expect(mapRemoteEvent('select', tvStopped)).toEqual({ type: 'ignore' });
+    expect(mapRemoteEvent('back', hidden)).toEqual({ type: 'exit' });
   });
 
   it('lets the d-pad move between visible controls instead of seeking', () => {

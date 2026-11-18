@@ -9,7 +9,7 @@ export interface TransportButton {
   variant: 'solid' | 'ghost';
 }
 
-export type BackStep = 'pause' | 'exit' | 'dismiss';
+export type BackStep = 'pause' | 'stay' | 'exit' | 'dismiss';
 
 export type RunningFocus = 'back' | TransportRole;
 
@@ -52,12 +52,19 @@ export function preferredTransportRole(buttons: TransportButton[]): TransportRol
 }
 
 /**
- * Back or Menu pauses a running clock and stays on the screen.
- * The next Back, once the clock is stopped, leaves. A reset question closes first.
+ * Back or Menu pauses a running clock and stays.
+ * The same press on a clock that is already paused also stays, and arms the next
+ * Back to leave. A reset question closes first. Idle and finished clocks leave.
  */
-export function backStep(input: { running: boolean; confirming: boolean }): BackStep {
+export function backStep(input: {
+  running: boolean;
+  paused: boolean;
+  confirming: boolean;
+  leaveArmed: boolean;
+}): BackStep {
   if (input.confirming) return 'dismiss';
   if (input.running) return 'pause';
+  if (input.paused && !input.leaveArmed) return 'stay';
   return 'exit';
 }
 

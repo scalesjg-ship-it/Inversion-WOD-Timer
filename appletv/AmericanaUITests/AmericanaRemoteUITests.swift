@@ -151,7 +151,7 @@ final class AmericanaRemoteUITests: XCTestCase {
     }
     press(.select, settle: 0.8)
     let paused = waitFace(containing: "Paused", timeout: 6)
-    let resumeFocused = waitFocus("timer-pause", timeout: 4)
+    let resumeFocused = waitResumeFocused()
     let label = any("timer-pause").label
     let stillThere = any("timer-face").exists && app.state == .runningForeground
     let held = clockHeld(from: clockSeconds())
@@ -341,6 +341,17 @@ final class AmericanaRemoteUITests: XCTestCase {
   private func focused(_ id: String) -> Bool {
     let element = any(id)
     return element.exists && element.hasFocus
+  }
+
+  private func waitResumeFocused(timeout: TimeInterval = 6) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+      let button = any("timer-pause")
+      if button.exists && button.hasFocus && button.label.contains("Resume") { return true }
+      Thread.sleep(forTimeInterval: 0.2)
+    }
+    let button = any("timer-pause")
+    return button.exists && button.hasFocus && button.label.contains("Resume")
   }
 
   private func waitFocus(_ id: String, timeout: TimeInterval) -> Bool {

@@ -9,6 +9,7 @@ export type RemoteCommand =
   | { type: 'showControls' }
   | { type: 'hideControls' }
   | { type: 'pause'; focusResume: boolean }
+  | { type: 'menu' }
   | { type: 'exit' }
   | { type: 'ignore' };
 
@@ -45,7 +46,7 @@ export function mapRemoteEvent(eventType: string, context: RemoteContext): Remot
 
   switch (eventType) {
     case 'select':
-      if (context.running) return { type: 'pause', focusResume: false };
+      if (context.running) return { type: 'pause', focusResume: true };
       return context.controlsVisible ? { type: 'ignore' } : { type: 'toggle' };
     case 'playPause':
     case 'play':
@@ -70,6 +71,8 @@ export function mapRemoteEvent(eventType: string, context: RemoteContext): Remot
       return context.controlsVisible ? { type: 'hideControls' } : { type: 'ignore' };
     case 'back':
     case 'menu':
+      // Television decides from the live clock. A phone preview still leaves once stopped.
+      if (context.stableControls) return { type: 'menu' };
       return context.running ? { type: 'pause', focusResume: true } : { type: 'exit' };
     default:
       return { type: 'ignore' };

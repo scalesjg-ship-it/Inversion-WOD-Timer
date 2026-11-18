@@ -47,13 +47,15 @@ describe('TV transport buttons', () => {
 });
 
 describe('back on a running clock', () => {
-  it('pauses a running clock and leaves once it is stopped', () => {
-    expect(backStep({ running: true, confirming: false })).toBe('pause');
-    expect(backStep({ running: false, confirming: false })).toBe('exit');
+  it('pauses a running clock, stays on an already paused clock, and leaves on the next back', () => {
+    expect(backStep({ running: true, paused: false, confirming: false, leaveArmed: false })).toBe('pause');
+    expect(backStep({ running: false, paused: true, confirming: false, leaveArmed: false })).toBe('stay');
+    expect(backStep({ running: false, paused: true, confirming: false, leaveArmed: true })).toBe('exit');
+    expect(backStep({ running: false, paused: false, confirming: false, leaveArmed: false })).toBe('exit');
   });
 
   it('closes a reset question before leaving', () => {
-    expect(backStep({ running: true, confirming: true })).toBe('dismiss');
+    expect(backStep({ running: true, paused: false, confirming: true, leaveArmed: true })).toBe('dismiss');
   });
 });
 
