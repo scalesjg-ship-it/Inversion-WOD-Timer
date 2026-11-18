@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Platform, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { useState, type ComponentRef } from 'react';
+import { Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { inkOn } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
@@ -15,6 +15,13 @@ export function BigButton({
   testID,
   variant = 'solid',
   focusDown = null,
+  focusUp = null,
+  focusLeft = null,
+  focusRight = null,
+  hasTVPreferredFocus,
+  onHost,
+  onFocus,
+  focusable,
 }: {
   label: string;
   onPress: () => void;
@@ -23,6 +30,13 @@ export function BigButton({
   variant?: 'solid' | 'ghost';
   /** TV only. Down from this button moves to the tab bar. */
   focusDown?: TvFocusTag | null;
+  focusUp?: TvFocusTag | null;
+  focusLeft?: TvFocusTag | null;
+  focusRight?: TvFocusTag | null;
+  hasTVPreferredFocus?: boolean;
+  onHost?: (node: ComponentRef<typeof Pressable> | null) => void;
+  onFocus?: () => void;
+  focusable?: boolean;
 }) {
   const solid = variant === 'solid';
   const tv = Platform.isTV === true;
@@ -35,6 +49,13 @@ export function BigButton({
       accessibilityRole="button"
       testID={testID}
       focusDown={focusDown}
+      focusUp={focusUp}
+      focusLeft={focusLeft}
+      focusRight={focusRight}
+      hasTVPreferredFocus={hasTVPreferredFocus}
+      onHost={onHost}
+      onFocus={onFocus}
+      focusable={focusable}
       onPress={onPress}
       style={({ pressed }) => [
         styles.big,

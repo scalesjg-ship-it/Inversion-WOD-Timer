@@ -1,8 +1,8 @@
 import { Image } from 'expo-image';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { BackHandler, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
@@ -20,7 +20,14 @@ import type { Phase } from '@/src/timer/types';
 import { clockStatusHint } from '@/src/tv/copy';
 import { fitClock, isTenFootLayout, scaleTvStyle, tvClockChrome, tvSafeBox, tvSafeInset, tvScale } from '@/src/tv/layout';
 import type { RemoteCommand } from '@/src/tv/remoteMap';
+import {
+  backStep,
+  transportNeighbor,
+  tvTransportButtons,
+  type TransportRole,
+} from '@/src/tv/timerTransport';
 import { useRemoteCommands } from '@/src/tv/useRemoteCommands';
+import { useTvFocusTag } from '@/src/tv/useTvFocusTag';
 
 const KEEP_AWAKE = 'americana-timer';
 
@@ -54,8 +61,17 @@ export default function TimerScreen() {
       };
   const [faceBox, setFaceBox] = useState({ width: 0, height: 0 });
   const [controlsHeld, setControlsHeld] = useState(false);
-  const controlsVisible = tenFoot ? controlsHeld : true;
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const controlsVisible = tv ? true : tenFoot ? controlsHeld : true;
+  const [confirmKind, setConfirmKind] = useState<null | 'reset'>(null);
+  const [preferPrimary, setPreferPrimary] = useState(true);
+  const [preferDialog, setPreferDialog] = useState(false);
+  const [backTag, onBackHost] = useTvFocusTag();
+  const [primaryTag, onPrimaryHost] = useTvFocusTag();
+  const [stopTag, onStopHost] = useTvFocusTag();
+  const [resetTag, onResetHost] = useTvFocusTag();
+  const [confirmResetTag, onConfirmResetHost] = useTvFocusTag();
+  const [confirmCancelTag, onConfirmCancelHost] = useTvFocusTag();
+  const leaveGate = useRef(false);
   const palette = screenColors(branding);
   const phaseColor = phaseInk(timer.snapshot.phase, branding, timer.snapshot.warningActive);
   const digits = palette.digits;
@@ -88,21 +104,94 @@ export default function TimerScreen() {
     };
   }, [timer.snapshot.running]);
 
+  // Preferred focus is applied on mount. Leaving it true pulls focus back on every
+  // clock tick, so the remote could never move from Pause to Stop.
+  useEffect(() => {
+    if (!preferPrimary) return undefined;
+    const id = requestAnimationFrame(() => setPreferPrimary(false));
+    return () => cancelAnimationFrame(id);
+  }, [preferPrimary]);
+
+  useEffect(() => {
+    if (!preferDialog) return undefined;
+    const id = requestAnimationFrame(() => setPreferDialog(false));
+    return () => cancelAnimationFrame(id);
+  }, [preferDialog]);
+
   const onClock = () => {
     if (timer.snapshot.running || timer.snapshot.paused) timer.toggle();
   };
 
-  const onRemote = useCallback((command: RemoteCommand) => {
+  const closeConfirm = () => {
+    setConfirmKind(null);
+    setPreferDialog(false);
+    setPreferPrimary(true);
+  };
+
+  const holdClock = (focusResume: boolean) => {
+    timer.pauseTimer();
+    if (focusResume) setPreferPrimary(true);
+  };
+
+  const exitTimer = () => {
+    if (router.canGoBack()) router.back();
+    else router.navigate('/');
+  };
+
+  const onTvBackRef = useRef(() => {});
+  useEffect(() => {
+    onTvBackRef.current = () => {
+      if (leaveGate.current) return;
+      leaveGate.current = true;
+      requestAnimationFrame(() => {
+        leaveGate.current = false;
+      });
+      const step = backStep({
+        running: timer.snapshot.running,
+        confirming: confirmKind !== null,
+      });
+      switch (step) {
+        case 'dismiss':
+          closeConfirm();
+          return;
+        case 'pause':
+          holdClock(true);
+          return;
+        case 'exit':
+          exitTimer();
+          return;
+        default: {
+          const unexpected: never = step;
+          return unexpected;
+        }
+      }
+    };
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!tv) return undefined;
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        onTvBackRef.current();
+        return true;
+      });
+      return () => subscription.remove();
+    }, [tv]),
+  );
+
+  const onRemote = (command: RemoteCommand) => {
     switch (command.type) {
       case 'toggle':
         timer.toggle();
         break;
       case 'confirmReset':
-        setConfirmOpen(true);
+        setPreferPrimary(false);
+        setPreferDialog(true);
+        setConfirmKind('reset');
         setControlsHeld(true);
         break;
       case 'dismissConfirm':
-        setConfirmOpen(false);
+        closeConfirm();
         break;
       case 'seek':
         timer.seekTimer(command.seconds);
@@ -115,10 +204,14 @@ export default function TimerScreen() {
         break;
       case 'hideControls':
         setControlsHeld(false);
-        setConfirmOpen(false);
+        closeConfirm();
+        break;
+      case 'pause':
+        holdClock(command.focusResume);
         break;
       case 'exit':
-        router.navigate('/');
+        if (tv) onTvBackRef.current();
+        else router.navigate('/');
         break;
       case 'ignore':
         break;
@@ -127,12 +220,82 @@ export default function TimerScreen() {
         return exhaustive;
       }
     }
-  }, [timer, setConfirmOpen, setControlsHeld]);
+  };
 
   useRemoteCommands(
-    { mode: config.mode, controlsVisible, confirmOpen },
+    {
+      mode: config.mode,
+      controlsVisible,
+      confirmOpen: confirmKind !== null,
+      stableControls: tv,
+      running: tv && timer.snapshot.running,
+    },
     onRemote,
   );
+
+  const transport = tvTransportButtons({
+    phase: timer.snapshot.phase,
+    running: timer.snapshot.running,
+    paused: timer.snapshot.paused,
+    mode: config.mode,
+  });
+  const transportRoles = transport.map((button) => button.role);
+
+  const tagFor = (role: TransportRole) => {
+    switch (role) {
+      case 'primary':
+        return primaryTag;
+      case 'stop':
+        return stopTag;
+      case 'reset':
+        return resetTag;
+      default: {
+        const unexpected: never = role;
+        return unexpected;
+      }
+    }
+  };
+
+  const hostFor = (role: TransportRole) => {
+    switch (role) {
+      case 'primary':
+        return onPrimaryHost;
+      case 'stop':
+        return onStopHost;
+      case 'reset':
+        return onResetHost;
+      default: {
+        const unexpected: never = role;
+        return unexpected;
+      }
+    }
+  };
+
+  const pressTransport = (role: TransportRole) => {
+    // Select on a focused control also arrives as a remote event. Both see this
+    // render, so a running clock only pauses and does not also resume or reset.
+    if (timer.snapshot.running) {
+      timer.pauseTimer();
+      return;
+    }
+    switch (role) {
+      case 'primary':
+        if (timer.snapshot.phase === 'idle' || timer.snapshot.phase === 'finished') timer.startTimer();
+        else timer.toggle();
+        return;
+      case 'stop':
+        timer.completeTimer();
+        return;
+      case 'reset':
+        timer.resetTimer();
+        closeConfirm();
+        return;
+      default: {
+        const unexpected: never = role;
+        return unexpected;
+      }
+    }
+  };
 
   const phaseText = phaseLabelInk(phaseColor, branding.digitColor, branding.backgroundColor);
   const attention = readableDigitColor(chrome.gold, branding.backgroundColor);
@@ -234,6 +397,38 @@ export default function TimerScreen() {
         </View>
       </Pressable>
       <View pointerEvents="box-none" style={[styles.overlay, { paddingTop: safe.top }]}>
+        {tv ? (
+          <View
+            collapsable={false}
+            pointerEvents={confirmKind === null ? 'box-none' : 'none'}
+            style={[
+              styles.controlsTv,
+              {
+                bottom: safe.bottom + 8,
+                right: Math.max(18, safe.right),
+                left: Math.max(18, safe.left),
+              },
+            ]}
+          >
+            {transport.map((button) => (
+              <BigButton
+                key={button.role}
+                label={button.label}
+                color={digits}
+                variant={button.variant}
+                testID={button.testID}
+                onPress={() => pressTransport(button.role)}
+                onHost={hostFor(button.role)}
+                focusable={confirmKind === null}
+                hasTVPreferredFocus={preferPrimary && confirmKind === null && button.role === 'primary'}
+                onFocus={button.role === 'primary' ? () => setPreferPrimary(false) : undefined}
+                focusLeft={tagFor(transportNeighbor(transportRoles, button.role, -1))}
+                focusRight={tagFor(transportNeighbor(transportRoles, button.role, 1))}
+                focusUp={backTag}
+              />
+            ))}
+          </View>
+        ) : null}
         <View style={[styles.top, tv ? { height: brandHeight } : null]} pointerEvents="box-none">
           {tv ? (
             <View pointerEvents="none" style={styles.tvBrand}>
@@ -277,8 +472,23 @@ export default function TimerScreen() {
             accent={palette.text}
             accessibilityRole="button"
             testID="timer-back"
-            onPress={() => router.back()}
+            onPress={() => {
+              if (!tv) {
+                router.back();
+                return;
+              }
+              if (timer.snapshot.running) {
+                holdClock(true);
+                return;
+              }
+              onTvBackRef.current();
+            }}
             hitSlop={tv ? undefined : 12}
+            onHost={tv ? onBackHost : undefined}
+            focusDown={tv && confirmKind === null ? primaryTag : null}
+            focusLeft={tv ? backTag : null}
+            focusRight={tv ? backTag : null}
+            focusable={tv && confirmKind !== null ? false : undefined}
             style={({ pressed }) => [
               styles.backButton,
               { left: Math.max(18, safe.left) },
@@ -294,22 +504,46 @@ export default function TimerScreen() {
             </View>
           )}
         </View>
-        {confirmOpen ? (
-          <View style={styles.confirm} testID="reset-confirm">
+        {confirmKind === 'reset' ? (
+          <View style={[styles.confirm, tv ? styles.confirmTv : null]} testID="reset-confirm">
             <Text style={styles.confirmTitle}>Reset this timer?</Text>
-            <BigButton label="Reset" color={digits} onPress={() => { timer.resetTimer(); setConfirmOpen(false); }} testID="confirm-reset" />
-            <BigButton label="Cancel" color={digits} variant="ghost" onPress={() => setConfirmOpen(false)} testID="confirm-cancel" />
+            <BigButton
+              label="Reset"
+              color={digits}
+              onPress={() => {
+                timer.resetTimer();
+                closeConfirm();
+              }}
+              testID="confirm-reset"
+              onHost={tv ? onConfirmResetHost : undefined}
+              focusDown={tv ? confirmCancelTag : null}
+              focusUp={tv ? confirmResetTag : null}
+              focusable={tv ? true : undefined}
+            />
+            <BigButton
+              label="Cancel"
+              color={digits}
+              variant="ghost"
+              onPress={closeConfirm}
+              testID="confirm-cancel"
+              hasTVPreferredFocus={tv ? preferDialog : undefined}
+              onFocus={tv ? () => setPreferDialog(false) : undefined}
+              onHost={tv ? onConfirmCancelHost : undefined}
+              focusUp={tv ? confirmResetTag : null}
+              focusDown={tv ? confirmCancelTag : null}
+              focusable={tv ? true : undefined}
+            />
           </View>
         ) : null}
-        {controlsVisible ? (
+        {!tv && controlsVisible ? (
         <View
           pointerEvents="box-none"
           style={[
-            tv ? styles.controlsTv : landscape ? styles.controlsLandscape : styles.controls,
+            landscape ? styles.controlsLandscape : styles.controls,
             {
               bottom: safe.bottom + 8,
               right: Math.max(18, safe.right),
-              left: tv || !landscape ? Math.max(18, safe.left) : undefined,
+              left: !landscape ? Math.max(18, safe.left) : undefined,
             },
           ]}
         >
@@ -557,6 +791,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(244,247,251,0.3)',
   },
+  confirmTv: {
+    zIndex: 2,
+  },
   confirmTitle: {
     color: chrome.text,
     fontFamily: 'Oswald',
@@ -574,6 +811,7 @@ const styles = StyleSheet.create({
   controlsTv: {
     position: 'absolute',
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 24,
   },
   controlsLandscape: {

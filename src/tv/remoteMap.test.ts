@@ -1,20 +1,45 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapRemoteEvent, shouldHandleKeyAction, type RemoteContext } from './remoteMap';
+import { mapRemoteEvent, type RemoteContext } from './remoteMap';
 
-const hidden: RemoteContext = { mode: 'countdown', controlsVisible: false, confirmOpen: false };
-const rounds: RemoteContext = { mode: 'rounds', controlsVisible: false, confirmOpen: false };
-const shown: RemoteContext = { mode: 'countdown', controlsVisible: true, confirmOpen: false };
-const confirming: RemoteContext = { mode: 'amrap', controlsVisible: false, confirmOpen: true };
+const hidden: RemoteContext = {
+  mode: 'countdown',
+  controlsVisible: false,
+  confirmOpen: false,
+  stableControls: false,
+  running: false,
+};
+const rounds: RemoteContext = {
+  mode: 'rounds',
+  controlsVisible: false,
+  confirmOpen: false,
+  stableControls: false,
+  running: false,
+};
+const shown: RemoteContext = {
+  mode: 'countdown',
+  controlsVisible: true,
+  confirmOpen: false,
+  stableControls: false,
+  running: false,
+};
+const tv: RemoteContext = {
+  mode: 'countdown',
+  controlsVisible: true,
+  confirmOpen: false,
+  stableControls: true,
+  running: true,
+};
+const tvStopped: RemoteContext = { ...tv, running: false };
+const confirming: RemoteContext = {
+  mode: 'amrap',
+  controlsVisible: true,
+  confirmOpen: true,
+  stableControls: true,
+  running: true,
+};
 
 describe('remote key mapping', () => {
-  it('ignores key-up so a press does not run twice', () => {
-    expect(shouldHandleKeyAction(1)).toBe(false);
-    expect(shouldHandleKeyAction(0)).toBe(true);
-    expect(shouldHandleKeyAction(-1)).toBe(true);
-    expect(shouldHandleKeyAction(undefined)).toBe(true);
-  });
-
   it('starts and pauses from select or play/pause on either remote', () => {
     expect(mapRemoteEvent('select', hidden)).toEqual({ type: 'toggle' });
     expect(mapRemoteEvent('playPause', hidden)).toEqual({ type: 'toggle' });
@@ -42,11 +67,17 @@ describe('remote key mapping', () => {
     expect(mapRemoteEvent('right', { ...rounds, mode: 'emom' })).toEqual({ type: 'seek', seconds: 10 });
   });
 
-  it('shows controls with up and leaves the menu with back or menu', () => {
+  it('shows controls with up, pauses a running clock on back, and leaves once it is stopped', () => {
     expect(mapRemoteEvent('up', hidden)).toEqual({ type: 'showControls' });
     expect(mapRemoteEvent('swipeUp', hidden)).toEqual({ type: 'showControls' });
-    expect(mapRemoteEvent('back', hidden)).toEqual({ type: 'exit' });
-    expect(mapRemoteEvent('menu', hidden)).toEqual({ type: 'exit' });
+    expect(mapRemoteEvent('up', shown)).toEqual({ type: 'ignore' });
+    expect(mapRemoteEvent('back', tv)).toEqual({ type: 'pause', focusResume: true });
+    expect(mapRemoteEvent('menu', tv)).toEqual({ type: 'pause', focusResume: true });
+    expect(mapRemoteEvent('select', tv)).toEqual({ type: 'pause', focusResume: false });
+    expect(mapRemoteEvent('playPause', tv)).toEqual({ type: 'toggle' });
+    expect(mapRemoteEvent('back', tvStopped)).toEqual({ type: 'exit' });
+    expect(mapRemoteEvent('menu', tvStopped)).toEqual({ type: 'exit' });
+    expect(mapRemoteEvent('select', tvStopped)).toEqual({ type: 'ignore' });
   });
 
   it('lets the d-pad move between visible controls instead of seeking', () => {
@@ -54,8 +85,12 @@ describe('remote key mapping', () => {
     expect(mapRemoteEvent('right', shown)).toEqual({ type: 'ignore' });
     expect(mapRemoteEvent('select', shown)).toEqual({ type: 'ignore' });
     expect(mapRemoteEvent('playPause', shown)).toEqual({ type: 'toggle' });
+    expect(mapRemoteEvent('play', tv)).toEqual({ type: 'toggle' });
+    expect(mapRemoteEvent('pause', tv)).toEqual({ type: 'toggle' });
     expect(mapRemoteEvent('down', shown)).toEqual({ type: 'hideControls' });
     expect(mapRemoteEvent('down', hidden)).toEqual({ type: 'ignore' });
+    expect(mapRemoteEvent('down', tv)).toEqual({ type: 'ignore' });
+    expect(mapRemoteEvent('swipeDown', tv)).toEqual({ type: 'ignore' });
   });
 
   it('closes the reset confirm with back and does not also toggle', () => {

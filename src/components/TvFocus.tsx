@@ -32,9 +32,12 @@ export function TvFocusPressable({
   children,
   focusDown = null,
   focusUp = null,
+  focusLeft = null,
+  focusRight = null,
   onHost,
+  focusable,
   ...rest
-}: Omit<PressableProps, 'style' | 'children'> & {
+}: Omit<PressableProps, 'style' | 'children' | 'focusable'> & {
   accent?: string;
   dim?: boolean;
   scale?: boolean;
@@ -44,8 +47,13 @@ export function TvFocusPressable({
   focusDown?: TvFocusTag | null;
   /** TV only. Native tag focused by Up. The first row points this at the open tab. */
   focusUp?: TvFocusTag | null;
+  /** TV only. Native tag focused by Left. */
+  focusLeft?: TvFocusTag | null;
+  /** TV only. Native tag focused by Right. */
+  focusRight?: TvFocusTag | null;
   /** Fired when the native host mounts. Stable: not called again on render. */
   onHost?: (node: React.ComponentRef<typeof Pressable> | null) => void;
+  focusable?: boolean;
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
@@ -63,11 +71,17 @@ export function TvFocusPressable({
     tint: false,
     borderWidth: tv ? tvScaled(TV_FOCUS_BORDER, width, height) : undefined,
   };
+  const locked = focusable === false;
+  const linked = tv && !locked && (focusDown != null || focusUp != null || focusLeft != null || focusRight != null);
   return (
     <Pressable
       {...rest}
-      {...(tv && focusDown != null ? { nextFocusDown: focusDown, focusable: true as const } : {})}
-      {...(tv && focusUp != null ? { nextFocusUp: focusUp, focusable: true as const } : {})}
+      {...(tv && !locked && focusDown != null ? { nextFocusDown: focusDown } : {})}
+      {...(tv && !locked && focusUp != null ? { nextFocusUp: focusUp } : {})}
+      {...(tv && !locked && focusLeft != null ? { nextFocusLeft: focusLeft } : {})}
+      {...(tv && !locked && focusRight != null ? { nextFocusRight: focusRight } : {})}
+      {...(linked || focusable === true ? { focusable: true as const } : {})}
+      {...(locked ? { focusable: false as const } : {})}
       {...(tv ? tvParallaxProps() : {})}
       ref={setHost}
       onFocus={(event) => {
