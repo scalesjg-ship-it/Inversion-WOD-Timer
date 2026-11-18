@@ -107,12 +107,14 @@ export default function TimerScreen() {
     };
   }, [timer.snapshot.running]);
 
-  // Preferred focus is applied on mount. Leaving it true pulls focus back on every
-  // clock tick, so the remote could never move from Pause to Stop.
+  // Preferred focus has to stay through the first focus pass or Back takes it.
+  // onFocus clears it once Pause/Resume actually has focus. The timeout covers a
+  // press that sets the flag while that button is already focused, so a later
+  // clock tick does not pull the remote back.
   useEffect(() => {
     if (!preferPrimary) return undefined;
-    const id = requestAnimationFrame(() => setPreferPrimary(false));
-    return () => cancelAnimationFrame(id);
+    const id = setTimeout(() => setPreferPrimary(false), 600);
+    return () => clearTimeout(id);
   }, [preferPrimary]);
 
   useEffect(() => {
@@ -508,15 +510,9 @@ export default function TimerScreen() {
                 router.back();
                 return;
               }
-              // Select on Back is the same press as the remote select event.
-              if (!claim('select')) return;
-              const snap = timer.readSnapshot();
-              if (snap.running) {
-                pauseOnResume();
-                leaveArmed.current = false;
-                return;
-              }
-              decideBackRef.current();
+              // Menu also activates this button. Share the menu claim with the
+              // remote event so one press cannot pause and then leave.
+              onTvBackRef.current();
             }}
             hitSlop={tv ? undefined : 12}
             onHost={tv ? onBackHost : undefined}
