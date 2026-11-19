@@ -10,6 +10,7 @@ const SOURCE = `#import <UIKit/UIKit.h>
 static BOOL americanaConsumeMenuPress = NO;
 static void (*americanaOrigPressesBegan)(id, SEL, NSSet<UIPress *> *, UIPressesEvent *);
 static void (*americanaOrigPressesEnded)(id, SEL, NSSet<UIPress *> *, UIPressesEvent *);
+static UIViewController *(*americanaOrigPop)(id, SEL, BOOL);
 
 static BOOL AmericanaPressesIncludeMenu(NSSet<UIPress *> *presses)
 {
@@ -24,11 +25,16 @@ static BOOL AmericanaPressesIncludeMenu(NSSet<UIPress *> *presses)
   return NO;
 }
 
+static void AmericanaPostMenu(void)
+{
+  [[NSNotificationCenter defaultCenter] postNotificationName:@"RCTTVNavigationEventNotification"
+                                                      object:@{@"eventType": @"menu"}];
+}
+
 static void AmericanaPressesBegan(id self, SEL cmd, NSSet<UIPress *> *presses, UIPressesEvent *event)
 {
   if (AmericanaPressesIncludeMenu(presses)) {
-    [[NSNotificationCenter defaultCenter] postNotificationName:@"RCTTVNavigationEventNotification"
-                                                        object:@{@"eventType": @"menu"}];
+    AmericanaPostMenu();
     return;
   }
   americanaOrigPressesBegan(self, cmd, presses, event);
@@ -40,6 +46,15 @@ static void AmericanaPressesEnded(id self, SEL cmd, NSSet<UIPress *> *presses, U
     return;
   }
   americanaOrigPressesEnded(self, cmd, presses, event);
+}
+
+static UIViewController *AmericanaPop(id self, SEL cmd, BOOL animated)
+{
+  if (americanaConsumeMenuPress) {
+    AmericanaPostMenu();
+    return nil;
+  }
+  return americanaOrigPop(self, cmd, animated);
 }
 
 static void AmericanaInstallPressSwizzle(Class cls, SEL sel, IMP replacement, void (**original)(id, SEL, NSSet<UIPress *> *, UIPressesEvent *))
@@ -79,6 +94,9 @@ static void AmericanaInstallPressSwizzle(Class cls, SEL sel, IMP replacement, vo
   }
   AmericanaInstallPressSwizzle(nav, @selector(pressesBegan:withEvent:), (IMP)AmericanaPressesBegan, &americanaOrigPressesBegan);
   AmericanaInstallPressSwizzle(nav, @selector(pressesEnded:withEvent:), (IMP)AmericanaPressesEnded, &americanaOrigPressesEnded);
+  Method pop = class_getInstanceMethod(nav, @selector(popViewControllerAnimated:));
+  americanaOrigPop = (UIViewController *(*)(id, SEL, BOOL))method_getImplementation(pop);
+  method_setImplementation(pop, (IMP)AmericanaPop);
 }
 
 @end
