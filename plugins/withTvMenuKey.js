@@ -2,76 +2,16 @@ const fs = require('fs');
 const path = require('path');
 const { withDangerousMod } = require('expo/config-plugins');
 
-const MARKER = 'AMERICANA_TV_MENU_CANCEL';
+const SOURCE = `#import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 
-const ENABLE_BEFORE = `- (void)enableTVMenuKey
-{
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (![[self.view gestureRecognizers] containsObject:self.tvMenuKeyRecognizer]) {
-            [self.view addGestureRecognizer:self.tvMenuKeyRecognizer];
-        }
-    });
-}`;
-
-const ENABLE_AFTER = `- (void)enableTVMenuKey
-{
-    // ${MARKER}: own Menu while the timer is open. UIKit pops on pressesEnded unless this runs first.
-    americanaConsumeMenuPress = YES;
-    AmericanaInstallMenuPressSwizzle();
-    dispatch_async(dispatch_get_main_queue(), ^{
-        self.tvMenuKeyRecognizer.cancelsTouchesInView = YES;
-        if (![[self.view gestureRecognizers] containsObject:self.tvMenuKeyRecognizer]) {
-            [self.view addGestureRecognizer:self.tvMenuKeyRecognizer];
-        }
-    });
-}`;
-
-const DISABLE_BEFORE = `- (void)disableTVMenuKey
-{
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if ([[self.view gestureRecognizers] containsObject:self.tvMenuKeyRecognizer]) {
-            [self.view removeGestureRecognizer:self.tvMenuKeyRecognizer];
-        }
-    });
-}`;
-
-const DISABLE_AFTER = `- (void)disableTVMenuKey
-{
-    americanaConsumeMenuPress = NO;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if ([[self.view gestureRecognizers] containsObject:self.tvMenuKeyRecognizer]) {
-            [self.view removeGestureRecognizer:self.tvMenuKeyRecognizer];
-        }
-    });
-}`;
-
-const IMPORT = '#import <objc/runtime.h>\n';
-
-const CATEGORY = `
+// Compiled into the app. React ships as a prebuilt framework, so a patch of
+// RCTTVRemoteHandler.m never reaches the tvOS binary. This swizzle does.
 static BOOL americanaConsumeMenuPress = NO;
+static void (*americanaOrigPressesBegan)(id, SEL, NSSet<UIPress *> *, UIPressesEvent *);
+static void (*americanaOrigPressesEnded)(id, SEL, NSSet<UIPress *> *, UIPressesEvent *);
 
-static void AmericanaInstallMenuPressSwizzle(void)
-{
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    Class cls = UIViewController.class;
-    SEL began = @selector(pressesBegan:withEvent:);
-    SEL beganSwizzled = @selector(americana_tvPressesBegan:withEvent:);
-    method_exchangeImplementations(class_getInstanceMethod(cls, began), class_getInstanceMethod(cls, beganSwizzled));
-    SEL ended = @selector(pressesEnded:withEvent:);
-    SEL endedSwizzled = @selector(americana_tvPressesEnded:withEvent:);
-    method_exchangeImplementations(class_getInstanceMethod(cls, ended), class_getInstanceMethod(cls, endedSwizzled));
-  });
-}
-
-@interface UIViewController (AmericanaMenuCancel)
-- (void)americana_tvPressesBegan:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event;
-- (void)americana_tvPressesEnded:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event;
-@end
-
-@implementation UIViewController (AmericanaMenuCancel)
-
-- (BOOL)americana_pressesIncludeMenu:(NSSet<UIPress *> *)presses
+static BOOL AmericanaPressesIncludeMenu(NSSet<UIPress *> *presses)
 {
   if (!americanaConsumeMenuPress) {
     return NO;
@@ -84,58 +24,83 @@ static void AmericanaInstallMenuPressSwizzle(void)
   return NO;
 }
 
-- (void)americana_tvPressesBegan:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event
+static void AmericanaPressesBegan(id self, SEL cmd, NSSet<UIPress *> *presses, UIPressesEvent *event)
 {
-  if ([self americana_pressesIncludeMenu:presses]) {
-    [[NSNotificationCenter defaultCenter] postNavigationPressEventWithType:RCTTVRemoteEventMenu
-                                                                 keyAction:nil
-                                                                       tag:nil
-                                                                    target:nil];
+  if (AmericanaPressesIncludeMenu(presses)) {
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"RCTTVNavigationEventNotification"
+                                                        object:@{@"eventType": @"menu"}];
     return;
   }
-  [self americana_tvPressesBegan:presses withEvent:event];
+  americanaOrigPressesBegan(self, cmd, presses, event);
 }
 
-- (void)americana_tvPressesEnded:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event
+static void AmericanaPressesEnded(id self, SEL cmd, NSSet<UIPress *> *presses, UIPressesEvent *event)
 {
-  if ([self americana_pressesIncludeMenu:presses]) {
+  if (AmericanaPressesIncludeMenu(presses)) {
     return;
   }
-  [self americana_tvPressesEnded:presses withEvent:event];
+  americanaOrigPressesEnded(self, cmd, presses, event);
+}
+
+static void AmericanaInstallPressSwizzle(Class cls, SEL sel, IMP replacement, void (**original)(id, SEL, NSSet<UIPress *> *, UIPressesEvent *))
+{
+  Method existing = class_getInstanceMethod(cls, sel);
+  Method inherited = class_getInstanceMethod(class_getSuperclass(cls), sel);
+  if (existing == inherited) {
+    class_addMethod(cls, sel, replacement, method_getTypeEncoding(existing));
+    *original = (void *)method_getImplementation(inherited);
+    return;
+  }
+  *original = (void *)method_setImplementation(existing, replacement);
+}
+
+@interface AmericanaMenuCancel : NSObject
+@end
+
+@implementation AmericanaMenuCancel
+
++ (void)load
+{
+  [[NSNotificationCenter defaultCenter] addObserverForName:@"RCTTVEnableMenuKeyNotification"
+                                                    object:nil
+                                                     queue:nil
+                                                usingBlock:^(__unused NSNotification *note) {
+                                                  americanaConsumeMenuPress = YES;
+                                                }];
+  [[NSNotificationCenter defaultCenter] addObserverForName:@"RCTTVDisableMenuKeyNotification"
+                                                    object:nil
+                                                     queue:nil
+                                                usingBlock:^(__unused NSNotification *note) {
+                                                  americanaConsumeMenuPress = NO;
+                                                }];
+  Class nav = NSClassFromString(@"UINavigationController");
+  if (nav == Nil) {
+    return;
+  }
+  AmericanaInstallPressSwizzle(nav, @selector(pressesBegan:withEvent:), (IMP)AmericanaPressesBegan, &americanaOrigPressesBegan);
+  AmericanaInstallPressSwizzle(nav, @selector(pressesEnded:withEvent:), (IMP)AmericanaPressesEnded, &americanaOrigPressesEnded);
 }
 
 @end
 `;
 
-function patchMenuKey(source) {
-  if (source.includes(MARKER)) return source;
-  if (!source.includes(ENABLE_BEFORE) || !source.includes(DISABLE_BEFORE)) {
-    throw new Error('RCTTVRemoteHandler menu methods changed. Update plugins/withTvMenuKey.js.');
-  }
-  let next = source.replace(ENABLE_BEFORE, ENABLE_AFTER).replace(DISABLE_BEFORE, DISABLE_AFTER);
-  if (!next.includes('#import <objc/runtime.h>')) {
-    next = next.replace('#import "RCTTVRemoteHandler.h"\n', `#import "RCTTVRemoteHandler.h"\n${IMPORT}`);
-  }
-  if (!next.includes('@implementation UIViewController (AmericanaMenuCancel)')) {
-    next = next.replace('\n#endif\n', `\n${CATEGORY}\n#endif\n`);
-  }
-  return next;
-}
-
 function withTvMenuKey(config) {
   return withDangerousMod(config, [
     'ios',
     (mod) => {
-      const file = path.join(
-        mod.modRequest.projectRoot,
-        'node_modules/react-native/React/Base/RCTTVRemoteHandler.m',
-      );
-      const source = fs.readFileSync(file, 'utf8');
-      fs.writeFileSync(file, patchMenuKey(source));
+      const ios = mod.modRequest.platformProjectRoot;
+      const appDir = fs
+        .readdirSync(ios, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => path.join(ios, entry.name))
+        .find((dir) => fs.existsSync(path.join(dir, 'AppDelegate.swift')));
+      if (!appDir) {
+        throw new Error('Could not find the iOS app directory for the Menu press swizzle.');
+      }
+      fs.writeFileSync(path.join(appDir, 'AmericanaMenuCancel.m'), SOURCE);
       return mod;
     },
   ]);
 }
 
 module.exports = withTvMenuKey;
-module.exports.patchMenuKey = patchMenuKey;

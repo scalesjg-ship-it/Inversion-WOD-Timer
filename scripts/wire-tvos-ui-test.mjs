@@ -128,10 +128,39 @@ function wireScheme(schemePath, projectName, targetId) {
   fs.writeFileSync(schemePath, scheme);
 }
 
+function addMenuCancelSource(pbx) {
+  if (pbx.includes('AmericanaMenuCancel.m')) return pbx;
+  const fileId = xid('menu-cancel-file');
+  const buildId = xid('menu-cancel-build');
+  if (!pbx.includes('/* AppDelegate.swift */')) {
+    throw new Error('AppDelegate.swift is missing from the Xcode project');
+  }
+  let next = insertBeforeEnd(
+    pbx,
+    'PBXFileReference',
+    `\t\t${fileId} /* AmericanaMenuCancel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AmericanaMenuCancel.m; sourceTree = "<group>"; };`,
+  );
+  next = insertBeforeEnd(
+    next,
+    'PBXBuildFile',
+    `\t\t${buildId} /* AmericanaMenuCancel.m in Sources */ = {isa = PBXBuildFile; fileRef = ${fileId} /* AmericanaMenuCancel.m */; };`,
+  );
+  next = next.replace(
+    '/* AppDelegate.swift */,',
+    `/* AppDelegate.swift */,\n\t\t\t\t${fileId} /* AmericanaMenuCancel.m */,`,
+  );
+  next = next.replace(
+    '/* AppDelegate.swift in Sources */,',
+    `/* AppDelegate.swift in Sources */,\n\t\t\t\t${buildId} /* AmericanaMenuCancel.m in Sources */,`,
+  );
+  return next;
+}
+
 function main() {
   if (!fs.existsSync(sourceSwift)) throw new Error(`Missing ${sourceSwift}`);
   const project = findProject();
-  let pbx = fs.readFileSync(project.pbx, 'utf8');
+  let pbx = addMenuCancelSource(fs.readFileSync(project.pbx, 'utf8'));
+  fs.writeFileSync(project.pbx, pbx);
   if (!/appletvos|appletvsimulator|TVOS_DEPLOYMENT_TARGET/.test(pbx)) {
     throw new Error('Xcode project is not a tvOS project. Prebuild must run with EXPO_TV=1.');
   }
