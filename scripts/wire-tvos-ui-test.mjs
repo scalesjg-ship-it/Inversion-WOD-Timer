@@ -138,7 +138,7 @@ function addMenuCancelSource(pbx) {
   let next = insertBeforeEnd(
     pbx,
     'PBXFileReference',
-    `\t\t${fileId} /* AmericanaMenuCancel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AmericanaMenuCancel.m; sourceTree = "<group>"; };`,
+    `\t\t${fileId} /* AmericanaMenuCancel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AmericanaMenuCancel.m; path = Americana/AmericanaMenuCancel.m; sourceTree = "<group>"; };`,
   );
   next = insertBeforeEnd(
     next,
