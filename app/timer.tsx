@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, usePreventRemove } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BackHandler, Platform, Pressable, StyleSheet, Text, TVEventControl, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -75,6 +75,8 @@ export default function TimerScreen() {
   const confirmKindRef = useRef(confirmKind);
   const pressClaim = useRef<PressClaim | null>(null);
   const leaveArmed = useRef(false);
+  const pendingExit = useRef(false);
+  const handleMenuRef = useRef<(finish?: () => void) => void>(() => {});
   const palette = screenColors(branding);
   const phaseColor = phaseInk(timer.snapshot.phase, branding, timer.snapshot.warningActive);
   const digits = palette.digits;
@@ -152,9 +154,16 @@ export default function TimerScreen() {
   };
 
   const onTvBackRef = useRef(() => {});
-  const decideBackRef = useRef(() => {});
   useEffect(() => {
-    decideBackRef.current = () => {
+    handleMenuRef.current = (finish) => {
+      const accepted = claim('menu');
+      if (!accepted) {
+        if (pendingExit.current && finish) {
+          pendingExit.current = false;
+          finish();
+        }
+        return;
+      }
       const snap = timer.readSnapshot();
       const step = backStep({
         running: snap.running,
@@ -162,9 +171,6 @@ export default function TimerScreen() {
         confirming: confirmKindRef.current !== null,
         leaveArmed: leaveArmed.current,
       });
-      console.log(
-        `TV_BACK step=${step} running=${snap.running} paused=${snap.paused} phase=${snap.phase} armed=${leaveArmed.current}`,
-      );
       switch (step) {
         case 'dismiss':
           closeConfirm();
@@ -178,7 +184,11 @@ export default function TimerScreen() {
           leaveArmed.current = true;
           return;
         case 'exit':
-          exitTimer();
+          if (finish) finish();
+          else {
+            pendingExit.current = true;
+            exitTimer();
+          }
           return;
         default: {
           const unexpected: never = step;
@@ -187,9 +197,12 @@ export default function TimerScreen() {
       }
     };
     onTvBackRef.current = () => {
-      if (!claim('menu')) return;
-      decideBackRef.current();
+      handleMenuRef.current();
     };
+  });
+
+  usePreventRemove(tv, ({ repeat }) => {
+    handleMenuRef.current(repeat);
   });
 
   useFocusEffect(
