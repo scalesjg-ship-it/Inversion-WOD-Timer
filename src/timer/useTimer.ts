@@ -132,8 +132,10 @@ export function useTimer(config: TimerConfig, options: UseTimerOptions) {
   }, [options.autoStart, startTimer]);
 
   const snapshot: TimerSnapshot = project(state, now);
+  const readSnapshot = useCallback(() => project(stateRef.current, Date.now()), []);
   return {
     snapshot,
+    readSnapshot,
     startTimer,
     pauseTimer,
     resetTimer,

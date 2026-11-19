@@ -3,7 +3,7 @@ export function clockStatusHint(tv: boolean, kind: 'running' | 'paused'): string
     case 'running':
       return tv ? 'Select or back pauses. Play/pause toggles.' : 'Tap the clock to pause';
     case 'paused':
-      return tv ? 'Paused · select Resume, or back to leave' : 'Paused · tap to resume';
+      return tv ? 'Paused · select Resume. Back again leaves' : 'Paused · tap to resume';
     default: {
       const unexpected: never = kind;
       return unexpected;

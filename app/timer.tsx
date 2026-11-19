@@ -1,8 +1,8 @@
 import { Image } from 'expo-image';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, usePreventRemove } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BackHandler, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { BackHandler, Platform, Pressable, StyleSheet, Text, TVEventControl, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
@@ -19,6 +19,7 @@ import { useTimer } from '@/src/timer/useTimer';
 import type { Phase } from '@/src/timer/types';
 import { clockStatusHint } from '@/src/tv/copy';
 import { fitClock, isTenFootLayout, scaleTvStyle, tvClockChrome, tvSafeBox, tvSafeInset, tvScale } from '@/src/tv/layout';
+import { claimPress, type PressClaim } from '@/src/tv/pressClaim';
 import type { RemoteCommand } from '@/src/tv/remoteMap';
 import {
   backStep,
@@ -71,7 +72,11 @@ export default function TimerScreen() {
   const [resetTag, onResetHost] = useTvFocusTag();
   const [confirmResetTag, onConfirmResetHost] = useTvFocusTag();
   const [confirmCancelTag, onConfirmCancelHost] = useTvFocusTag();
-  const leaveGate = useRef(false);
+  const confirmKindRef = useRef(confirmKind);
+  const pressClaim = useRef<PressClaim | null>(null);
+  const leaveArmed = useRef(false);
+  const pendingExit = useRef(false);
+  const handleMenuRef = useRef<(finish?: () => void) => void>(() => {});
   const palette = screenColors(branding);
   const phaseColor = phaseInk(timer.snapshot.phase, branding, timer.snapshot.warningActive);
   const digits = palette.digits;
@@ -104,12 +109,14 @@ export default function TimerScreen() {
     };
   }, [timer.snapshot.running]);
 
-  // Preferred focus is applied on mount. Leaving it true pulls focus back on every
-  // clock tick, so the remote could never move from Pause to Stop.
+  // Preferred focus has to stay through the first focus pass or Back takes it.
+  // onFocus clears it once Pause/Resume actually has focus. The timeout covers a
+  // press that sets the flag while that button is already focused, so a later
+  // clock tick does not pull the remote back.
   useEffect(() => {
     if (!preferPrimary) return undefined;
-    const id = requestAnimationFrame(() => setPreferPrimary(false));
-    return () => cancelAnimationFrame(id);
+    const id = setTimeout(() => setPreferPrimary(false), 600);
+    return () => clearTimeout(id);
   }, [preferPrimary]);
 
   useEffect(() => {
@@ -119,18 +126,26 @@ export default function TimerScreen() {
   }, [preferDialog]);
 
   const onClock = () => {
+    if (tv) return;
     if (timer.snapshot.running || timer.snapshot.paused) timer.toggle();
   };
 
   const closeConfirm = () => {
+    confirmKindRef.current = null;
     setConfirmKind(null);
     setPreferDialog(false);
     setPreferPrimary(true);
   };
 
-  const holdClock = (focusResume: boolean) => {
+  const claim = (kind: 'select' | 'menu') => {
+    const next = claimPress(kind, Date.now(), pressClaim.current);
+    pressClaim.current = next.claim;
+    return next.accept;
+  };
+
+  const pauseOnResume = () => {
     timer.pauseTimer();
-    if (focusResume) setPreferPrimary(true);
+    setPreferPrimary(true);
   };
 
   const exitTimer = () => {
@@ -140,25 +155,40 @@ export default function TimerScreen() {
 
   const onTvBackRef = useRef(() => {});
   useEffect(() => {
-    onTvBackRef.current = () => {
-      if (leaveGate.current) return;
-      leaveGate.current = true;
-      requestAnimationFrame(() => {
-        leaveGate.current = false;
-      });
+    handleMenuRef.current = (finish) => {
+      const accepted = claim('menu');
+      if (!accepted) {
+        if (pendingExit.current && finish) {
+          pendingExit.current = false;
+          finish();
+        }
+        return;
+      }
+      const snap = timer.readSnapshot();
       const step = backStep({
-        running: timer.snapshot.running,
-        confirming: confirmKind !== null,
+        running: snap.running,
+        paused: snap.paused,
+        confirming: confirmKindRef.current !== null,
+        leaveArmed: leaveArmed.current,
       });
       switch (step) {
         case 'dismiss':
           closeConfirm();
           return;
         case 'pause':
-          holdClock(true);
+          pauseOnResume();
+          leaveArmed.current = true;
+          return;
+        case 'stay':
+          setPreferPrimary(true);
+          leaveArmed.current = true;
           return;
         case 'exit':
-          exitTimer();
+          if (finish) finish();
+          else {
+            pendingExit.current = true;
+            exitTimer();
+          }
           return;
         default: {
           const unexpected: never = step;
@@ -166,27 +196,41 @@ export default function TimerScreen() {
         }
       }
     };
+    onTvBackRef.current = () => {
+      handleMenuRef.current();
+    };
+  });
+
+  usePreventRemove(tv, ({ repeat }) => {
+    handleMenuRef.current(repeat);
   });
 
   useFocusEffect(
     useCallback(() => {
       if (!tv) return undefined;
+      // Without this, tvOS still pops the stack on Menu after JavaScript pauses.
+      TVEventControl.enableTVMenuKey();
       const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
         onTvBackRef.current();
         return true;
       });
-      return () => subscription.remove();
+      return () => {
+        subscription.remove();
+        TVEventControl.disableTVMenuKey();
+      };
     }, [tv]),
   );
 
   const onRemote = (command: RemoteCommand) => {
     switch (command.type) {
       case 'toggle':
+        leaveArmed.current = false;
         timer.toggle();
         break;
       case 'confirmReset':
         setPreferPrimary(false);
         setPreferDialog(true);
+        confirmKindRef.current = 'reset';
         setConfirmKind('reset');
         setControlsHeld(true);
         break;
@@ -206,8 +250,16 @@ export default function TimerScreen() {
         setControlsHeld(false);
         closeConfirm();
         break;
-      case 'pause':
-        holdClock(command.focusResume);
+      case 'pause': {
+        if (!claim('select')) break;
+        const snap = timer.readSnapshot();
+        if (!snap.running) break;
+        pauseOnResume();
+        leaveArmed.current = false;
+        break;
+      }
+      case 'menu':
+        onTvBackRef.current();
         break;
       case 'exit':
         if (tv) onTvBackRef.current();
@@ -272,15 +324,17 @@ export default function TimerScreen() {
   };
 
   const pressTransport = (role: TransportRole) => {
-    // Select on a focused control also arrives as a remote event. Both see this
-    // render, so a running clock only pauses and does not also resume or reset.
-    if (timer.snapshot.running) {
-      timer.pauseTimer();
+    if (!claim('select')) return;
+    const snap = timer.readSnapshot();
+    if (snap.running) {
+      pauseOnResume();
+      leaveArmed.current = false;
       return;
     }
+    leaveArmed.current = false;
     switch (role) {
       case 'primary':
-        if (timer.snapshot.phase === 'idle' || timer.snapshot.phase === 'finished') timer.startTimer();
+        if (snap.phase === 'idle' || snap.phase === 'finished') timer.startTimer();
         else timer.toggle();
         return;
       case 'stop':
@@ -319,7 +373,7 @@ export default function TimerScreen() {
       <View pointerEvents="none" style={[styles.wash, { backgroundColor: phaseColor }]} />
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${phaseLabel(timer.snapshot.phase, config.mode)}, ${clockText}`}
+        accessibilityLabel={`${phaseLabel(timer.snapshot.phase, config.mode)}, ${clockText}${timer.snapshot.paused ? ', Paused' : ''}`}
         testID="timer-face"
         onPress={onClock}
         focusable={false}
@@ -477,10 +531,8 @@ export default function TimerScreen() {
                 router.back();
                 return;
               }
-              if (timer.snapshot.running) {
-                holdClock(true);
-                return;
-              }
+              // Menu also activates this button. Share the menu claim with the
+              // remote event so one press cannot pause and then leave.
               onTvBackRef.current();
             }}
             hitSlop={tv ? undefined : 12}

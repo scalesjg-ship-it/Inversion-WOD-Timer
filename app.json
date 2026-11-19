@@ -65,6 +65,7 @@
         }
       ],
       "./plugins/withTvForegroundAudio",
+      "./plugins/withTvMenuKey",
       [
         "expo-audio",
         {

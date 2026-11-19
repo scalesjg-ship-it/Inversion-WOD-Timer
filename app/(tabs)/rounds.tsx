@@ -105,7 +105,7 @@ export default function RoundsScreen() {
     const cardHeight = titleSize + detailSize + tvScaled(8, width, height);
     return (
       <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: Math.max(4, Math.round(box.vertical * 0.35)) }]}>
-        <Text style={[styles.title, { fontSize: tvScaled(40, width, height), lineHeight: tvScaled(46, width, height) }]}>Rounds</Text>
+        <Text testID="screen-rounds" style={[styles.title, { fontSize: tvScaled(40, width, height), lineHeight: tvScaled(46, width, height) }]}>Rounds</Text>
         <View style={styles.presetsTv}>
           {BUILTIN_PRESETS.map((preset, index) => (
             <View key={preset.id} style={{ width: cell, paddingHorizontal: gutter, paddingVertical: tvScaled(4, width, height) }}>
