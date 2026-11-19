@@ -162,6 +162,9 @@ export default function TimerScreen() {
         confirming: confirmKindRef.current !== null,
         leaveArmed: leaveArmed.current,
       });
+      console.log(
+        `TV_BACK step=${step} running=${snap.running} paused=${snap.paused} phase=${snap.phase} armed=${leaveArmed.current}`,
+      );
       switch (step) {
         case 'dismiss':
           closeConfirm();
