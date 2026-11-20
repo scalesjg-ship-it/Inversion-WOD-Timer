@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 import importlib.util
+import json
 import os
 import plistlib
 import subprocess
@@ -284,8 +285,14 @@ class PrebuildTests(unittest.TestCase):
             exported = github_env.read_text()
             self.assertIn("SCHEME=Americana", exported)
             self.assertIn("TVOS_BUILD_NUMBER=23", exported)
+            self.assertIn("MARKETING_VERSION=1.0.0", exported)
+            self.assertIn("SOURCE_MARKETING_VERSION=1.0.0", exported)
             self.assertIn("Americana.xcworkspace", exported)
             self.assertIn("SCHEME=Americana", env_file.read_text())
+            self.assertEqual(
+                plistlib.loads((app / "Info.plist").read_bytes())["CFBundleShortVersionString"],
+                "1.0.0",
+            )
 
     def test_real_prebuild_tree_is_tvos_build_23(self):
         ios = ROOT / "ios"
@@ -304,7 +311,202 @@ class PrebuildTests(unittest.TestCase):
                 workspace.rmdir()
         self.assertEqual(result["SCHEME"], "Americana")
         self.assertEqual(result["TVOS_BUILD_NUMBER"], "23")
+        self.assertEqual(result["MARKETING_VERSION"], "1.0.0")
+        self.assertEqual(result["SOURCE_MARKETING_VERSION"], "1.0.0")
         self.assertTrue(result["WORKSPACE"].endswith("Americana.xcworkspace"))
+
+
+def write_tvos_tree(ios: Path, short_version: str = "1.0.0", *, variable_short_version: bool = False) -> Path:
+    project = ios / "Americana.xcodeproj"
+    schemes = project / "xcshareddata" / "xcschemes"
+    schemes.mkdir(parents=True)
+    project_text = "\n".join(
+        [
+            "SDKROOT = appletvos;",
+            "TARGETED_DEVICE_FAMILY = 3;",
+            "TVOS_DEPLOYMENT_TARGET = 16.4;",
+            'PRODUCT_BUNDLE_IDENTIFIER = "com.garrettscales.americana";',
+            "\t\tAPP /* Release */ = {",
+            "\t\t\tisa = XCBuildConfiguration;",
+            "\t\t\tbuildSettings = {",
+            "\t\t\t\tCURRENT_PROJECT_VERSION = 23;",
+            '\t\t\t\tINFOPLIST_KEY_CFBundleShortVersionString = 1.0.0;',
+            '\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = "com.garrettscales.americana";',
+            "\t\t\t\tSDKROOT = appletvos;",
+            "\t\t\t};",
+            "\t\t\tname = Release;",
+            "\t\t};",
+            "\t\tPROJ /* Release */ = {",
+            "\t\t\tisa = XCBuildConfiguration;",
+            "\t\t\tbuildSettings = {",
+            "\t\t\t\tMARKETING_VERSION = 1.0;",
+            "\t\t\t\tSDKROOT = appletvos;",
+            "\t\t\t};",
+            "\t\t\tname = Release;",
+            "\t\t};",
+        ]
+    )
+    (project / "project.pbxproj").write_text(project_text + "\n")
+    (schemes / "Americana.xcscheme").write_text(
+        '<ArchiveAction\n   buildConfiguration = "Release"\n   revealArchiveInOrganizer = "YES">\n</ArchiveAction>\n'
+    )
+    (ios / "Americana.xcworkspace").mkdir()
+    app = ios / "Americana"
+    app.mkdir()
+    short = "$(MARKETING_VERSION)" if variable_short_version else short_version
+    with (app / "Info.plist").open("wb") as handle:
+        plistlib.dump(
+            {"CFBundleVersion": "23", "CFBundleShortVersionString": short, "CFBundleName": "Americana"},
+            handle,
+        )
+    other = ios / "Other"
+    other.mkdir()
+    with (other / "Info.plist").open("wb") as handle:
+        plistlib.dump(
+            {"CFBundleVersion": "18", "CFBundleShortVersionString": "1.0.0"},
+            handle,
+        )
+    pods = ios / "Pods"
+    pods.mkdir()
+    with (pods / "Info.plist").open("wb") as handle:
+        plistlib.dump(
+            {"CFBundleVersion": "23", "CFBundleShortVersionString": "1.0.0"},
+            handle,
+        )
+    return project / "project.pbxproj"
+
+
+class MarketingVersionTests(unittest.TestCase):
+    def test_marketing_version_must_be_higher_than_the_approved_release(self):
+        self.assertEqual(signing.normalize_marketing_version("1.0.1"), "1.0.1")
+        self.assertEqual(signing.normalize_marketing_version(" 1.2 "), "1.2")
+        self.assertEqual(signing.normalize_marketing_version("2.0.0"), "2.0.0")
+        expect_fail(self, "90062", lambda: signing.normalize_marketing_version("1.0.0"))
+        expect_fail(self, "90062", lambda: signing.normalize_marketing_version("1.0"))
+        expect_fail(self, "1.0.1", lambda: signing.normalize_marketing_version("1.0.1;rm -rf"))
+        expect_fail(self, "marketing_version", lambda: signing.normalize_marketing_version(""))
+        expect_fail(self, "marketing_version", lambda: signing.normalize_marketing_version("1.0.1\n2.0.0"))
+
+    def test_check_env_rejects_the_approved_version_before_secrets(self):
+        previous = os.environ.get("TVOS_MARKETING_VERSION")
+        os.environ["TVOS_MARKETING_VERSION"] = "1.0.0"
+        try:
+            expect_fail(self, "90062", signing.check_env)
+        finally:
+            if previous is None:
+                os.environ.pop("TVOS_MARKETING_VERSION", None)
+            else:
+                os.environ["TVOS_MARKETING_VERSION"] = previous
+
+    def test_project_marketing_version_is_applied_to_the_app_target(self):
+        project = "\n".join(
+            [
+                "\t\tAPP /* Release */ = {",
+                "\t\t\tisa = XCBuildConfiguration;",
+                "\t\t\tbuildSettings = {",
+                "\t\t\t\tCURRENT_PROJECT_VERSION = 23;",
+                '\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = "com.garrettscales.americana";',
+                "\t\t\t\tSDKROOT = appletvos;",
+                "\t\t\t};",
+                "\t\t\tname = Release;",
+                "\t\t};",
+                "\t\tPROJ /* Release */ = {",
+                "\t\t\tisa = XCBuildConfiguration;",
+                "\t\t\tbuildSettings = {",
+                "\t\t\t\tMARKETING_VERSION = 1.0;",
+                '\t\t\t\tINFOPLIST_KEY_CFBundleShortVersionString = "1.0.0";',
+                "\t\t\t\tSDKROOT = appletvos;",
+                "\t\t\t};",
+                "\t\t\tname = Release;",
+                "\t\t};",
+                "\t\tTESTS /* Release */ = {",
+                "\t\t\tisa = XCBuildConfiguration;",
+                "\t\t\tbuildSettings = {",
+                '\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = "com.garrettscales.americana.uitests";',
+                "\t\t\t\tSDKROOT = appletvos;",
+                "\t\t\t};",
+                "\t\t\tname = Release;",
+                "\t\t};",
+            ]
+        )
+        updated = signing.apply_tvos_marketing_version(project, "1.0.1")
+        self.assertEqual(updated.count("MARKETING_VERSION = 1.0.1;"), 2)
+        self.assertNotIn("MARKETING_VERSION = 1.0;", updated)
+        self.assertIn("INFOPLIST_KEY_CFBundleShortVersionString = 1.0.1;", updated)
+        self.assertIn("CURRENT_PROJECT_VERSION = 23;", updated)
+        self.assertIn('PRODUCT_BUNDLE_IDENTIFIER = "com.garrettscales.americana.uitests";', updated)
+        app_block = updated.split("TESTS /* Release */", 1)[0]
+        test_block = updated.split("TESTS /* Release */", 1)[1]
+        self.assertEqual(app_block.count("MARKETING_VERSION = 1.0.1;"), 2)
+        self.assertNotIn("MARKETING_VERSION", test_block)
+        expect_fail(self, "90062", lambda: signing.apply_tvos_marketing_version(project, "1.0.0"))
+
+    def test_verify_prebuild_overrides_only_the_tvos_plist(self):
+        app_json = (ROOT / "app.json").read_bytes()
+        with tempfile.TemporaryDirectory() as tmp:
+            ios = Path(tmp)
+            pbx = write_tvos_tree(ios)
+            env_file = ios / "prebuild.env"
+            previous = os.environ.get("GITHUB_ENV")
+            github_env = ios / "github.env"
+            os.environ["GITHUB_ENV"] = str(github_env)
+            try:
+                signing.main(
+                    [
+                        "verify-prebuild",
+                        "--repo",
+                        str(ROOT),
+                        "--ios-dir",
+                        str(ios),
+                        "--env-file",
+                        str(env_file),
+                        "--marketing-version",
+                        "1.0.1",
+                    ]
+                )
+            finally:
+                if previous is None:
+                    os.environ.pop("GITHUB_ENV", None)
+                else:
+                    os.environ["GITHUB_ENV"] = previous
+            exported = github_env.read_text()
+            self.assertIn("MARKETING_VERSION=1.0.1", exported)
+            self.assertIn("SOURCE_MARKETING_VERSION=1.0.0", exported)
+            self.assertIn("TVOS_BUILD_NUMBER=23", exported)
+            app_plist = plistlib.loads((ios / "Americana" / "Info.plist").read_bytes())
+            self.assertEqual(app_plist["CFBundleShortVersionString"], "1.0.1")
+            self.assertEqual(app_plist["CFBundleVersion"], "23")
+            self.assertEqual(app_plist["CFBundleName"], "Americana")
+            other = plistlib.loads((ios / "Other" / "Info.plist").read_bytes())
+            self.assertEqual(other["CFBundleShortVersionString"], "1.0.0")
+            self.assertEqual(other["CFBundleVersion"], "18")
+            pods = plistlib.loads((ios / "Pods" / "Info.plist").read_bytes())
+            self.assertEqual(pods["CFBundleShortVersionString"], "1.0.0")
+            project_text = pbx.read_text()
+            self.assertIn("MARKETING_VERSION = 1.0.1;", project_text)
+            self.assertIn("INFOPLIST_KEY_CFBundleShortVersionString = 1.0.1;", project_text)
+            self.assertIn("CURRENT_PROJECT_VERSION = 23;", project_text)
+            signed, count = signing.apply_manual_signing(
+                project_text, "Americana tvOS App Store b17", "23"
+            )
+            self.assertEqual(count, 1)
+            self.assertIn("MARKETING_VERSION = 1.0.1;", signed)
+            self.assertIn("CURRENT_PROJECT_VERSION = 23;", signed)
+            self.assertEqual((ROOT / "app.json").read_bytes(), app_json)
+            stored = json.loads(app_json)
+            self.assertEqual(stored["expo"]["version"], "1.0.0")
+            self.assertEqual(stored["expo"]["ios"]["buildNumber"], "18")
+            self.assertEqual(stored["expo"]["android"]["versionCode"], 12)
+
+    def test_variable_short_version_is_replaced_with_the_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ios = Path(tmp)
+            write_tvos_tree(ios, variable_short_version=True)
+            result = signing.verify_prebuild(ROOT, ios, "1.0.1")
+            plist = plistlib.loads((ios / "Americana" / "Info.plist").read_bytes())
+            self.assertEqual(plist["CFBundleShortVersionString"], "1.0.1")
+            self.assertEqual(result["MARKETING_VERSION"], "1.0.1")
+            self.assertEqual(result["SOURCE_MARKETING_VERSION"], "1.0.0")
 
 
 class SecretHandlingTests(unittest.TestCase):
@@ -416,6 +618,15 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("eas submit", text)
         self.assertIn("confirm", text)
         self.assertIn("UPLOAD", text)
+        self.assertIn("marketing_version:", text)
+        self.assertIn('default: "1.0.1"', text)
+        self.assertIn("TVOS_MARKETING_VERSION: ${{ inputs.marketing_version }}", text)
+        self.assertIn('--marketing-version "$TVOS_MARKETING_VERSION"', text)
+        self.assertIn('--marketing-version "$MARKETING_VERSION"', text)
+        self.assertIn('"$MARKETING_VERSION" = "1.0.0"', text)
+        self.assertIn('"CURRENT_PROJECT_VERSION=$TVOS_BUILD_NUMBER"', text)
+        self.assertIn('"MARKETING_VERSION=$MARKETING_VERSION"', text)
+        self.assertIn("SOURCE_MARKETING_VERSION", text)
         upload = text.split("uses: actions/upload-artifact@v4", 1)[1]
         self.assertIn("artifacts/public-logs/*.log", upload)
         self.assertNotIn(".ipa", upload)
