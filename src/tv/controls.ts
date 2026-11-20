@@ -118,19 +118,37 @@ export function tintHex(color: string, alpha: number): string {
   return `rgba(${red},${green},${blue},${alpha})`;
 }
 
+/**
+ * Setup and Rounds controls sit larger than the first compact pass, about a quarter,
+ * so a 1080p form fills more of the screen without spanning the bezel.
+ * Below 700px tall the growth eases off so a 960×540 frame still fits.
+ */
+export const TV_SETUP_SCALE = 1.25;
+
+export function tvSetupScale(screenHeight: number): number {
+  const height = screenHeight > 0 ? screenHeight : 1080;
+  if (height >= 720) return TV_SETUP_SCALE;
+  const t = Math.min(1, Math.max(0, (height - 540) / (720 - 540)));
+  return 1 + (TV_SETUP_SCALE - 1) * t;
+}
+
+function setupBasis(at1080: number, screenHeight: number): number {
+  return Math.round(at1080 * tvSetupScale(screenHeight));
+}
+
 /** Phone stepper metrics match the existing iPhone stylesheet. TV sizes scale from 1080p. Compact rows fit a whole setup on one screen. */
 export function stepperControlSize(tv: boolean, screenHeight = 1080, compact = false): StepperMetrics {
   if (!tv) {
     return { button: 52, glyph: 32, value: 32, suffix: 12, gap: 8, radius: 14, valueMinWidth: 56 };
   }
   const scale = Math.max(0.6, screenHeight / 1080);
-  const buttonBasis = compact ? 56 : 96;
-  const glyphBasis = compact ? 36 : 68;
-  const valueBasis = compact ? 32 : 60;
-  const suffixBasis = compact ? 14 : 24;
-  const gapBasis = compact ? 8 : 22;
-  const radiusBasis = compact ? 14 : 28;
-  const valueWidthBasis = compact ? 48 : 108;
+  const buttonBasis = compact ? setupBasis(56, screenHeight) : 96;
+  const glyphBasis = compact ? setupBasis(36, screenHeight) : 68;
+  const valueBasis = compact ? setupBasis(32, screenHeight) : 60;
+  const suffixBasis = compact ? setupBasis(14, screenHeight) : 24;
+  const gapBasis = compact ? setupBasis(8, screenHeight) : 22;
+  const radiusBasis = compact ? setupBasis(14, screenHeight) : 28;
+  const valueWidthBasis = compact ? setupBasis(48, screenHeight) : 108;
   return {
     button: Math.round(buttonBasis * scale),
     glyph: Math.round(glyphBasis * scale),

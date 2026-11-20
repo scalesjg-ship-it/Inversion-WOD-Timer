@@ -10,8 +10,8 @@ import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvCountRow, TvTo
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, tvSafeBox, tvScaled } from '@/src/tv/layout';
-import { tvSetupMetrics } from '@/src/tv/setupLayout';
+import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, tvSafeBox } from '@/src/tv/layout';
+import { tvSetupMetrics, tvSetupScaled } from '@/src/tv/setupLayout';
 import { normalizeConfig } from '@/src/timer/engine';
 import { modeTitle } from '@/src/timer/labels';
 import { defaultConfig } from '@/src/timer/presets';
@@ -149,7 +149,7 @@ function SetupForm({
 
   if (tv) {
     const metrics = tvSetupMetrics(width, height);
-    const titleSize = tvScaled(40, width, height);
+    const titleSize = tvSetupScaled(40, width, height);
     const formWidth = Math.min(metrics.timeRow, Math.max(1, width - box.horizontal * 2));
     return (
       <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical }]}>
@@ -226,7 +226,7 @@ function SetupForm({
           </View>
           <View style={styles.tvShelf}>{shelf}</View>
           <View style={styles.footer}>
-            <BigButton testID="start-timer" label="Start" color={accent} onPress={() => onStart(config, runLabel)} />
+            <BigButton roomy testID="start-timer" label="Start" color={accent} onPress={() => onStart(config, runLabel)} />
           </View>
         </View>
       </View>

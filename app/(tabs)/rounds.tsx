@@ -204,7 +204,7 @@ export default function RoundsScreen() {
               onClearSelection={() => apply(BUILTIN_PRESETS[0])}
             />
           </View>
-          <BigButton testID="start-rounds" label="Start rounds" color={accent} onPress={() => start()} />
+          <BigButton roomy testID="start-rounds" label="Start rounds" color={accent} onPress={() => start()} />
         </View>
       </View>
     );

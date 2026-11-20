@@ -54,6 +54,7 @@ describe('TV control sizes', () => {
   });
 
   it('makes TV steppers easy to focus and keeps the tab bar inside a shorter 10-foot row', () => {
+    expect(stepperControlSize(true, 1080, true).button).toBe(70);
     const step = stepperControlSize(true);
     const tab = tabBarControlSize(true, 1080, 1920);
     expect(step.button).toBeGreaterThanOrEqual(96);

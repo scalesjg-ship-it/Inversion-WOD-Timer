@@ -6,7 +6,7 @@ import { TvFocusPressable } from '@/src/components/TvFocus';
 import type { TvFocusTag } from '@/src/components/TvTabFocus';
 import { useTvFocusTag } from '@/src/tv/useTvFocusTag';
 import { chrome } from '@/src/theme/chrome';
-import { stepperControlSize } from '@/src/tv/controls';
+import { stepperControlSize, tvSetupScale } from '@/src/tv/controls';
 import { fitTvStyle, scaleTvStyle, tvScale } from '@/src/tv/layout';
 import { stepperFocus, tvSetupMetrics, type StepperLinks } from '@/src/tv/setupLayout';
 
@@ -24,6 +24,7 @@ export function BigButton({
   onHost,
   onFocus,
   focusable,
+  roomy = false,
 }: {
   label: string;
   onPress: () => void;
@@ -39,12 +40,26 @@ export function BigButton({
   onHost?: (node: ComponentRef<typeof Pressable> | null) => void;
   onFocus?: () => void;
   focusable?: boolean;
+  /** TV setup and Rounds. A larger Start control. Phones ignore it. */
+  roomy?: boolean;
 }) {
   const solid = variant === 'solid';
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
   const scale = tv ? tvScale(width, height) : 1;
   const ink = solid ? inkOn(color) : color;
+  const grown = tvSetupScale(height);
+  const tvButton = roomy
+    ? {
+        minHeight: Math.round(72 * grown),
+        borderRadius: Math.round(18 * grown),
+        paddingHorizontal: Math.round(36 * grown),
+        minWidth: Math.round(240 * grown),
+      }
+    : { minHeight: 72, borderRadius: 18, paddingHorizontal: 36, minWidth: 240 };
+  const tvLabel = roomy
+    ? { fontSize: Math.round(32 * grown), letterSpacing: 1.4 }
+    : { fontSize: 32, letterSpacing: 1.2 };
   return (
     <TvFocusPressable
       accent={ink}
@@ -62,7 +77,7 @@ export function BigButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.big,
-        tv && scaleTvStyle({ minHeight: 72, borderRadius: 18, paddingHorizontal: 36, minWidth: 240 }, scale),
+        tv && scaleTvStyle(tvButton, scale),
         tv && { alignSelf: 'center', maxWidth: '100%' },
         solid
           ? { backgroundColor: color }
@@ -74,7 +89,7 @@ export function BigButton({
         style={[
           styles.bigLabel,
           { backgroundColor: 'transparent' },
-          tv && scaleTvStyle({ fontSize: 32, letterSpacing: 1.2 }, scale),
+          tv && scaleTvStyle(tvLabel, scale),
           { color: ink },
         ]}
       >
@@ -481,6 +496,7 @@ export function Chip({
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
   const scale = tv ? tvScale(width, height) : 1;
+  const grown = tvSetupScale(height);
   return (
     <TvFocusPressable
       accent={color}
@@ -491,14 +507,23 @@ export function Chip({
       onPress={onPress}
       style={() => [
         styles.chip,
-        tv && scaleTvStyle({ minHeight: 52, paddingHorizontal: 16, paddingVertical: 8, borderWidth: 3 }, scale),
+        tv &&
+          scaleTvStyle(
+            {
+              minHeight: Math.round(52 * grown),
+              paddingHorizontal: Math.round(16 * grown),
+              paddingVertical: Math.round(8 * grown),
+              borderWidth: 3,
+            },
+            scale,
+          ),
         {
           borderColor: selected ? color : chrome.line,
           backgroundColor: selected ? `${color}22` : chrome.surface,
         },
       ]}
     >
-      <Text style={[styles.chipLabel, { backgroundColor: 'transparent' }, tv && scaleTvStyle({ fontSize: 22 }, scale), { color: selected ? chrome.text : chrome.muted }]}>
+      <Text style={[styles.chipLabel, { backgroundColor: 'transparent' }, tv && scaleTvStyle({ fontSize: Math.round(22 * grown) }, scale), { color: selected ? chrome.text : chrome.muted }]}>
         {selected ? `✓  ${label}` : label}
       </Text>
     </TvFocusPressable>
@@ -676,7 +701,7 @@ const styles = StyleSheet.create({
   },
   fieldLabelTv: {
     color: chrome.text,
-    fontSize: 22,
+    fontSize: 28,
     letterSpacing: 1,
   },
   fieldRow: {
@@ -727,16 +752,16 @@ const styles = StyleSheet.create({
     backgroundColor: chrome.surface,
   },
   tvToggle: {
-    minHeight: 52,
-    borderRadius: 22,
+    minHeight: 65,
+    borderRadius: 26,
     borderWidth: 4,
     backgroundColor: chrome.surface,
-    paddingHorizontal: 22,
-    paddingVertical: 16,
+    paddingHorizontal: 28,
+    paddingVertical: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 16,
+    gap: 20,
   },
   tvToggleCopy: {
     flex: 1,
@@ -744,12 +769,12 @@ const styles = StyleSheet.create({
   },
   tvToggleHelp: {
     color: chrome.muted,
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 20,
+    lineHeight: 26,
   },
   tvToggleValue: {
     fontFamily: 'Oswald',
-    fontSize: 22,
+    fontSize: 28,
     letterSpacing: 0.4,
   },
 });

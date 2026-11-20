@@ -5,6 +5,7 @@ import { Alert, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, Vie
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { chrome } from '@/src/theme/chrome';
 import { isTenFootLayout, tvScaled } from '@/src/tv/layout';
+import { tvSetupScaled } from '@/src/tv/setupLayout';
 import {
   deletePreset,
   listPresets,
@@ -522,8 +523,8 @@ function TextButton({
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
   const boxed = tv && prominent && !dense;
-  const denseHeight = Math.max(36, tvScaled(44, width, height));
-  const denseFont = Math.max(15, tvScaled(20, width, height));
+  const denseHeight = Math.max(36, tvSetupScaled(44, width, height));
+  const denseFont = Math.max(15, tvSetupScaled(20, width, height));
   return (
     <TvFocusPressable
       accent={color}
