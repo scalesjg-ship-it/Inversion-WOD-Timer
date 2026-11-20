@@ -4,6 +4,8 @@ import {
   backStep,
   nextDialogFocus,
   nextRunningFocus,
+  onScreenBackFocusable,
+  onScreenBackPress,
   preferredTransportRole,
   tvTransportButtons,
 } from './timerTransport';
@@ -62,6 +64,19 @@ describe('back on a running clock', () => {
 describe('TV timer focus', () => {
   const forTime = ['primary', 'stop', 'reset'] as const;
   const amrap = ['primary', 'reset'] as const;
+
+  it('keeps the on-screen Back control out of the TV focus order', () => {
+    expect(onScreenBackFocusable(true)).toBe(false);
+    expect(onScreenBackFocusable(false)).toBe(true);
+    expect(preferredTransportRole(tvTransportButtons({ ...running, mode: 'forTime' }))).not.toBe('back');
+  });
+
+  it('treats Select on the on-screen Back control as pause or resume', () => {
+    expect(onScreenBackPress({ tv: true, running: true, paused: false })).toBe('toggle');
+    expect(onScreenBackPress({ tv: true, running: false, paused: true })).toBe('toggle');
+    expect(onScreenBackPress({ tv: true, running: false, paused: false })).toBe('leave');
+    expect(onScreenBackPress({ tv: false, running: true, paused: false })).toBe('phone-back');
+  });
 
   it('lands on Pause from Back and walks the row without leaving it', () => {
     expect(nextRunningFocus('back', 'down', [...forTime])).toBe('primary');

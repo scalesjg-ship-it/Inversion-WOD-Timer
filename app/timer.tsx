@@ -1,8 +1,8 @@
 import { Image } from 'expo-image';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { router, useFocusEffect, usePreventRemove } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { BackHandler, Platform, Pressable, StyleSheet, Text, TVEventControl, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
+import { BackHandler, Platform, Pressable, StyleSheet, Text, TVEventControl, TVFocusGuideView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
@@ -19,10 +19,12 @@ import { useTimer } from '@/src/timer/useTimer';
 import type { Phase } from '@/src/timer/types';
 import { clockStatusHint } from '@/src/tv/copy';
 import { fitClock, isTenFootLayout, scaleTvStyle, tvClockChrome, tvSafeBox, tvSafeInset, tvScale } from '@/src/tv/layout';
-import { claimPress, type PressClaim } from '@/src/tv/pressClaim';
+import { DUPLICATE_PRESS_MS, claimPress, type PressClaim } from '@/src/tv/pressClaim';
 import type { RemoteCommand } from '@/src/tv/remoteMap';
 import {
   backStep,
+  onScreenBackFocusable,
+  onScreenBackPress,
   transportNeighbor,
   tvTransportButtons,
   type TransportRole,
@@ -31,6 +33,7 @@ import { useRemoteCommands } from '@/src/tv/useRemoteCommands';
 import { useTvFocusTag } from '@/src/tv/useTvFocusTag';
 
 const KEEP_AWAKE = 'americana-timer';
+const FocusGuide = TVFocusGuideView ?? View;
 
 export default function TimerScreen() {
   const { session } = useTimerSession();
@@ -68,6 +71,7 @@ export default function TimerScreen() {
   const [preferDialog, setPreferDialog] = useState(false);
   const [backTag, onBackHost] = useTvFocusTag();
   const [primaryTag, onPrimaryHost] = useTvFocusTag();
+  const [primaryNode, setPrimaryNode] = useState<ComponentRef<typeof Pressable> | null>(null);
   const [stopTag, onStopHost] = useTvFocusTag();
   const [resetTag, onResetHost] = useTvFocusTag();
   const [confirmResetTag, onConfirmResetHost] = useTvFocusTag();
@@ -351,6 +355,7 @@ export default function TimerScreen() {
     }
   };
 
+  const Overlay = tv ? FocusGuide : View;
   const phaseText = phaseLabelInk(phaseColor, branding.digitColor, branding.backgroundColor);
   const attention = readableDigitColor(chrome.gold, branding.backgroundColor);
   const cornerVisible = Boolean(branding.logoUri) && branding.logoPlacement === 'corner';
@@ -450,7 +455,11 @@ export default function TimerScreen() {
           </View>
         </View>
       </Pressable>
-      <View pointerEvents="box-none" style={[styles.overlay, { paddingTop: safe.top }]}>
+      <Overlay
+        pointerEvents="box-none"
+        style={[styles.overlay, { paddingTop: safe.top }]}
+        {...(tv ? { autoFocus: true, destinations: primaryNode ? [primaryNode] : [] } : {})}
+      >
         {tv ? (
           <View
             collapsable={false}
@@ -472,13 +481,17 @@ export default function TimerScreen() {
                 variant={button.variant}
                 testID={button.testID}
                 onPress={() => pressTransport(button.role)}
-                onHost={hostFor(button.role)}
+                onHost={(node) => {
+                  hostFor(button.role)(node);
+                  if (button.role !== 'primary') return;
+                  setPrimaryNode((current) => (current === node ? current : node));
+                }}
                 focusable={confirmKind === null}
                 hasTVPreferredFocus={preferPrimary && confirmKind === null && button.role === 'primary'}
                 onFocus={button.role === 'primary' ? () => setPreferPrimary(false) : undefined}
                 focusLeft={tagFor(transportNeighbor(transportRoles, button.role, -1))}
                 focusRight={tagFor(transportNeighbor(transportRoles, button.role, 1))}
-                focusUp={backTag}
+                focusUp={null}
               />
             ))}
           </View>
@@ -527,20 +540,42 @@ export default function TimerScreen() {
             accessibilityRole="button"
             testID="timer-back"
             onPress={() => {
-              if (!tv) {
-                router.back();
-                return;
+              const action = onScreenBackPress({
+                tv,
+                running: timer.readSnapshot().running,
+                paused: timer.readSnapshot().paused,
+              });
+              switch (action) {
+                case 'phone-back':
+                  router.back();
+                  return;
+                case 'toggle': {
+                  // Select on this control pauses or resumes. A hardware Back
+                  // that also clicks it already claimed menu and must not toggle.
+                  const recentMenu =
+                    pressClaim.current?.kind === 'menu' && Date.now() - pressClaim.current.at < DUPLICATE_PRESS_MS;
+                  if (recentMenu) return;
+                  if (!claim('select')) return;
+                  timer.toggle();
+                  leaveArmed.current = false;
+                  setPreferPrimary(true);
+                  return;
+                }
+                case 'leave':
+                  onTvBackRef.current();
+                  return;
+                default: {
+                  const unexpected: never = action;
+                  return unexpected;
+                }
               }
-              // Menu also activates this button. Share the menu claim with the
-              // remote event so one press cannot pause and then leave.
-              onTvBackRef.current();
             }}
             hitSlop={tv ? undefined : 12}
             onHost={tv ? onBackHost : undefined}
             focusDown={tv && confirmKind === null ? primaryTag : null}
             focusLeft={tv ? backTag : null}
             focusRight={tv ? backTag : null}
-            focusable={tv && confirmKind !== null ? false : undefined}
+            focusable={onScreenBackFocusable(tv)}
             style={({ pressed }) => [
               styles.backButton,
               { left: Math.max(18, safe.left) },
@@ -615,7 +650,7 @@ export default function TimerScreen() {
           ) : null}
         </View>
         ) : null}
-      </View>
+      </Overlay>
     </View>
   );
 }

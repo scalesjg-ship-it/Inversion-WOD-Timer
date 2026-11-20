@@ -563,11 +563,13 @@ const styles = StyleSheet.create({
   tvWrap: {
     gap: 4,
     maxWidth: '100%',
+    alignItems: 'center',
   },
   tvRow: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
     maxWidth: '100%',
   },

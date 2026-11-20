@@ -52,6 +52,25 @@ export function preferredTransportRole(buttons: TransportButton[]): TransportRol
 }
 
 /**
+ * The on-screen Back control is drawn on TV but is not in the focus order.
+ * Select would activate a focused Back and leave the workout. Hardware Back
+ * still uses `backStep`.
+ */
+export function onScreenBackFocusable(tv: boolean): boolean {
+  return !tv;
+}
+
+/**
+ * If Select does reach the on-screen Back control, pause or resume.
+ * Leaving is only for a clock that is idle or already finished.
+ */
+export function onScreenBackPress(input: { tv: boolean; running: boolean; paused: boolean }): 'phone-back' | 'toggle' | 'leave' {
+  if (!input.tv) return 'phone-back';
+  if (input.running || input.paused) return 'toggle';
+  return 'leave';
+}
+
+/**
  * Back or Menu pauses a running clock and stays.
  * The same press on a clock that is already paused also stays, and arms the next
  * Back to leave. A reset question closes first. Idle and finished clocks leave.

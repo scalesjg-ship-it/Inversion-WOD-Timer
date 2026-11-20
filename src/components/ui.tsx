@@ -1,12 +1,14 @@
-import { useState, type ComponentRef } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { inkOn } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import type { TvFocusTag } from '@/src/components/TvTabFocus';
+import { useTvFocusTag } from '@/src/tv/useTvFocusTag';
 import { chrome } from '@/src/theme/chrome';
 import { stepperControlSize } from '@/src/tv/controls';
 import { fitTvStyle, scaleTvStyle, tvScale } from '@/src/tv/layout';
+import { stepperFocus, tvSetupMetrics, type StepperLinks } from '@/src/tv/setupLayout';
 
 export function BigButton({
   label,
@@ -91,6 +93,10 @@ export function NumberStepper({
   testID,
   accent,
   compact = false,
+  outsideLeft = null,
+  outsideRight = null,
+  onLinks,
+  preferred = false,
 }: {
   value: number;
   onChange: (value: number) => void;
@@ -101,10 +107,27 @@ export function NumberStepper({
   accent: string;
   /** Shorter TV row so a whole setup fits on one screen. Phones ignore it. */
   compact?: boolean;
+  /** TV only. Focus Left from the minus button. Stays on minus when null. */
+  outsideLeft?: TvFocusTag | null;
+  /** TV only. Focus Right from the plus button. Stays on plus when null. */
+  outsideRight?: TvFocusTag | null;
+  /** TV only. Reports the native tags so the next cluster can link across. */
+  onLinks?: (links: StepperLinks) => void;
+  /** TV only. First control on a setup screen. */
+  preferred?: boolean;
 }) {
   const tv = Platform.isTV === true;
-  const { height } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const size = stepperControlSize(tv, tv ? height : 1080, tv && compact);
+  const metrics = tv ? tvSetupMetrics(width, height) : null;
+  const [decTag, onDecHost] = useTvFocusTag();
+  const [incTag, onIncHost] = useTvFocusTag();
+  const onLinksRef = useRef(onLinks);
+  useEffect(() => {
+    onLinksRef.current = onLinks;
+    onLinksRef.current?.({ dec: decTag, inc: incTag });
+  }, [onLinks, decTag, incTag]);
+  const focus = stepperFocus({ dec: decTag, inc: incTag }, outsideLeft, outsideRight);
   const [text, setText] = useState(String(value));
   const [tracked, setTracked] = useState(value);
   if (value !== tracked) {
@@ -131,53 +154,65 @@ export function NumberStepper({
   ];
 
   return (
-    <View style={[styles.stepper, { gap: size.gap }]}>
+    <View style={[tv ? styles.stepperTv : styles.stepper, { gap: size.gap }]}>
       <TvFocusPressable
         accent={accent}
         accessibilityRole="button"
         accessibilityLabel={`Decrease ${suffix}`}
         testID={`${testID}-dec`}
+        hasTVPreferredFocus={tv && preferred ? true : undefined}
+        onHost={tv ? onDecHost : undefined}
+        focusLeft={tv ? focus.decLeft : null}
+        focusRight={tv ? focus.decRight : null}
         onPress={() => commit(value - 1)}
         style={({ pressed }) => stepFace(pressed)}
       >
         <Text style={[styles.stepGlyph, { color: accent, fontSize: size.glyph, lineHeight: size.glyph + 4 }]}>−</Text>
       </TvFocusPressable>
-      <View style={styles.stepValue} focusable={tv ? false : undefined}>
+      <View style={tv ? [styles.stepValueTv, { width: metrics?.valueSlot }] : styles.stepValue} focusable={tv ? false : undefined}>
         {tv ? (
           // number-pad is a phone keyboard. Reconciling that field during a TV focus move quits the app.
           <Text
             testID={testID}
-            accessibilityLabel={suffix}
+            accessibilityLabel={`${text} ${suffix}`}
             accessible={false}
             importantForAccessibility="no"
-            style={[styles.stepInput, { fontSize: size.value, minWidth: size.valueMinWidth }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.55}
+            style={[styles.stepInput, styles.stepInputTv, { fontSize: size.value }]}
           >
-            {text}
+            {text} {suffix}
           </Text>
         ) : (
-          <TextInput
-            testID={testID}
-            accessibilityLabel={suffix}
-            value={text}
-            onChangeText={(raw) => {
-              const digits = raw.replace(/[^0-9]/g, '');
-              setText(digits);
-              if (digits === '') return;
-              commit(Number(digits));
-            }}
-            onBlur={() => commit(text === '' ? min : Number(text))}
-            keyboardType="number-pad"
-            inputMode="numeric"
-            style={[styles.stepInput, { fontSize: size.value, minWidth: size.valueMinWidth }]}
-          />
+          <>
+            <TextInput
+              testID={testID}
+              accessibilityLabel={suffix}
+              value={text}
+              onChangeText={(raw) => {
+                const digits = raw.replace(/[^0-9]/g, '');
+                setText(digits);
+                if (digits === '') return;
+                commit(Number(digits));
+              }}
+              onBlur={() => commit(text === '' ? min : Number(text))}
+              keyboardType="number-pad"
+              inputMode="numeric"
+              style={[styles.stepInput, { fontSize: size.value, minWidth: size.valueMinWidth }]}
+            />
+            <Text style={[styles.suffix, { fontSize: size.suffix }]}>{suffix}</Text>
+          </>
         )}
-        <Text style={[styles.suffix, { fontSize: size.suffix }]}>{suffix}</Text>
       </View>
       <TvFocusPressable
         accent={accent}
         accessibilityRole="button"
         accessibilityLabel={`Increase ${suffix}`}
         testID={`${testID}-inc`}
+        onHost={tv ? onIncHost : undefined}
+        focusLeft={tv ? focus.incLeft : null}
+        focusRight={tv ? focus.incRight : null}
         onPress={() => commit(value + 1)}
         style={({ pressed }) => stepFace(pressed)}
       >
@@ -194,6 +229,7 @@ export function TimeField({
   testID,
   accent,
   compact = false,
+  preferred = false,
 }: {
   label: string;
   seconds: number;
@@ -201,6 +237,8 @@ export function TimeField({
   testID: string;
   accent: string;
   compact?: boolean;
+  /** TV only. Focus starts on this row's minus button. */
+  preferred?: boolean;
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
@@ -208,6 +246,47 @@ export function TimeField({
   const labelSize = compact ? 20 : 32;
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
+  const [minuteLinks, setMinuteLinks] = useState<StepperLinks>({ dec: null, inc: null });
+  const [secondLinks, setSecondLinks] = useState<StepperLinks>({ dec: null, inc: null });
+  const rememberMinutes = (links: StepperLinks) => {
+    setMinuteLinks((current) => (current.dec === links.dec && current.inc === links.inc ? current : links));
+  };
+  const rememberSeconds = (links: StepperLinks) => {
+    setSecondLinks((current) => (current.dec === links.dec && current.inc === links.inc ? current : links));
+  };
+  if (tv) {
+    const metrics = tvSetupMetrics(width, height);
+    return (
+      <View style={[styles.tvFieldRow, { gap: metrics.controlGap, minHeight: metrics.button }]}>
+        <TvFieldLabel label={label} width={metrics.labelWidth} size={metrics.labelSize} />
+        <NumberStepper
+          value={minutes}
+          min={0}
+          max={180}
+          suffix="min"
+          testID={`${testID}-minutes`}
+          accent={accent}
+          compact={compact}
+          preferred={preferred}
+          outsideRight={secondLinks.dec}
+          onLinks={rememberMinutes}
+          onChange={(next) => onChange(next * 60 + remainder)}
+        />
+        <NumberStepper
+          value={remainder}
+          min={0}
+          max={59}
+          suffix="sec"
+          testID={`${testID}-seconds`}
+          accent={accent}
+          compact={compact}
+          outsideLeft={minuteLinks.inc}
+          onLinks={rememberSeconds}
+          onChange={(next) => onChange(minutes * 60 + next)}
+        />
+      </View>
+    );
+  }
   return (
     <View style={styles.field}>
       <Text style={[styles.fieldLabel, { color: chrome.muted }, tv && scaleTvStyle({ fontSize: labelSize, letterSpacing: compact ? 1.2 : 2 }, scale)]}>{label}</Text>
@@ -237,18 +316,153 @@ export function TimeField({
   );
 }
 
+export function TvCountRow({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  suffix,
+  testID,
+  accent,
+  preferred = false,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+  suffix: string;
+  testID: string;
+  accent: string;
+  preferred?: boolean;
+}) {
+  const { width, height } = useWindowDimensions();
+  const metrics = tvSetupMetrics(width, height);
+  return (
+    <View style={[styles.tvFieldRow, { gap: metrics.controlGap, minHeight: metrics.button }]}>
+      <TvFieldLabel label={label} width={metrics.labelWidth} size={metrics.labelSize} />
+      <NumberStepper
+        compact
+        value={value}
+        min={min}
+        max={max}
+        suffix={suffix}
+        testID={testID}
+        accent={accent}
+        preferred={preferred}
+        onChange={onChange}
+      />
+    </View>
+  );
+}
+
+export function TvDurationRow({
+  label,
+  hours,
+  minutes,
+  seconds,
+  onHours,
+  onMinutes,
+  onSeconds,
+  accent,
+  preferred = false,
+}: {
+  label: string;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  onHours: (value: number) => void;
+  onMinutes: (value: number) => void;
+  onSeconds: (value: number) => void;
+  accent: string;
+  preferred?: boolean;
+}) {
+  const { width, height } = useWindowDimensions();
+  const metrics = tvSetupMetrics(width, height);
+  const [hourLinks, setHourLinks] = useState<StepperLinks>({ dec: null, inc: null });
+  const [minuteLinks, setMinuteLinks] = useState<StepperLinks>({ dec: null, inc: null });
+  const [secondLinks, setSecondLinks] = useState<StepperLinks>({ dec: null, inc: null });
+  const rememberHours = (links: StepperLinks) => {
+    setHourLinks((current) => (current.dec === links.dec && current.inc === links.inc ? current : links));
+  };
+  const rememberMinutes = (links: StepperLinks) => {
+    setMinuteLinks((current) => (current.dec === links.dec && current.inc === links.inc ? current : links));
+  };
+  const rememberSeconds = (links: StepperLinks) => {
+    setSecondLinks((current) => (current.dec === links.dec && current.inc === links.inc ? current : links));
+  };
+  return (
+    <View style={[styles.tvFieldRow, { gap: metrics.controlGap, minHeight: metrics.button }]}>
+      <TvFieldLabel label={label} width={metrics.labelWidth} size={metrics.labelSize} />
+      <NumberStepper
+        compact
+        value={hours}
+        min={0}
+        max={23}
+        suffix="hr"
+        testID="countdown-hours"
+        accent={accent}
+        preferred={preferred}
+        outsideRight={minuteLinks.dec}
+        onLinks={rememberHours}
+        onChange={onHours}
+      />
+      <NumberStepper
+        compact
+        value={minutes}
+        min={0}
+        max={59}
+        suffix="min"
+        testID="countdown-minutes"
+        accent={accent}
+        outsideLeft={hourLinks.inc}
+        outsideRight={secondLinks.dec}
+        onLinks={rememberMinutes}
+        onChange={onMinutes}
+      />
+      <NumberStepper
+        compact
+        value={seconds}
+        min={0}
+        max={59}
+        suffix="sec"
+        testID="countdown-seconds"
+        accent={accent}
+        outsideLeft={minuteLinks.inc}
+        onLinks={rememberSeconds}
+        onChange={onSeconds}
+      />
+    </View>
+  );
+}
+
+function TvFieldLabel({ label, width, size }: { label: string; width: number; size: number }) {
+  return (
+    <Text
+      style={[styles.tvFieldLabel, { width, fontSize: size, lineHeight: size + 4 }]}
+      numberOfLines={1}
+    >
+      {label}
+    </Text>
+  );
+}
+
 export function Chip({
   label,
   selected,
   onPress,
   color,
   testID,
+  preferred = false,
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
   color: string;
   testID?: string;
+  /** TV only. Focus starts here when this chip is the first control. */
+  preferred?: boolean;
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
@@ -259,6 +473,7 @@ export function Chip({
       accessibilityRole="button"
       accessibilityState={{ selected }}
       testID={testID}
+      hasTVPreferredFocus={tv && preferred ? true : undefined}
       onPress={onPress}
       style={() => [
         styles.chip,
@@ -312,6 +527,7 @@ export function TvToggle({
   testID,
   accent,
   disabled = false,
+  preferred = false,
 }: {
   label: string;
   help?: string;
@@ -320,6 +536,8 @@ export function TvToggle({
   testID?: string;
   accent: string;
   disabled?: boolean;
+  /** TV only. Focus starts here when the toggle is the first control. */
+  preferred?: boolean;
 }) {
   const { width, height } = useWindowDimensions();
   const toggle = fitTvStyle(styles.tvToggle, width, height);
@@ -334,6 +552,7 @@ export function TvToggle({
       accessibilityState={{ checked: value, disabled }}
       disabled={disabled}
       testID={testID}
+      hasTVPreferredFocus={preferred ? true : undefined}
       onPress={() => onValueChange(!value)}
       style={({ pressed }) => [
         toggle,
@@ -380,6 +599,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  stepperTv: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+  },
   step: {
     borderWidth: 1,
     alignItems: 'center',
@@ -393,11 +619,32 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
+  stepValueTv: {
+    flexGrow: 0,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   stepInput: {
     fontFamily: 'Oswald',
     color: chrome.text,
     textAlign: 'center',
     paddingVertical: 0,
+  },
+  stepInputTv: {
+    width: '100%',
+    textTransform: 'lowercase',
+  },
+  tvFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+  },
+  tvFieldLabel: {
+    color: chrome.muted,
+    fontFamily: 'OswaldMedium',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
   suffix: {
     color: chrome.muted,

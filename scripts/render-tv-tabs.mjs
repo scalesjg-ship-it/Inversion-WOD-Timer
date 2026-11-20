@@ -107,13 +107,20 @@ const frames = [
   { tab: 'wod', width: 1920, height: 1080, file: 'tv-tab-wod-1920x1080.png' },
   { tab: 'rounds', width: 1920, height: 1080, file: 'tv-tab-rounds-1920x1080.png', seed: true },
   { tab: 'brand', width: 1920, height: 1080, file: 'tv-tab-brand-1920x1080.png' },
-  { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-fortime-1920x1080.png', seed: true },
+  { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-fortime-1920x1080.png', seed: true, mode: 'forTime' },
+  { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-tabata-1920x1080.png', seed: true, mode: 'tabata' },
+  { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-amrap-1920x1080.png', seed: true, mode: 'amrap' },
+  { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-emom-1920x1080.png', seed: true, mode: 'emom' },
+  { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-intervals-1920x1080.png', seed: true, mode: 'intervals' },
   { tab: 'countdown', width: 1920, height: 1080, file: 'tv-countdown-1920x1080.png', seed: true },
   { tab: 'rounds-confirm', width: 1920, height: 1080, file: 'tv-rounds-delete-1920x1080.png', seed: true, confirm: true },
   { tab: 'wod', width: 960, height: 540, file: 'tv-tab-wod-960x540.png' },
   { tab: 'rounds', width: 960, height: 540, file: 'tv-tab-rounds-960x540.png', seed: true },
+  { tab: 'rounds', width: 1280, height: 720, file: 'tv-tab-rounds-1280x720.png', seed: true },
   { tab: 'brand', width: 960, height: 540, file: 'tv-tab-brand-960x540.png' },
-  { tab: 'setup', width: 960, height: 540, file: 'tv-setup-fortime-960x540.png', seed: true },
+  { tab: 'setup', width: 960, height: 540, file: 'tv-setup-fortime-960x540.png', seed: true, mode: 'forTime' },
+  { tab: 'setup', width: 960, height: 540, file: 'tv-setup-tabata-960x540.png', seed: true, mode: 'tabata' },
+  { tab: 'setup', width: 1280, height: 720, file: 'tv-setup-tabata-1280x720.png', seed: true, mode: 'tabata' },
   { tab: 'countdown', width: 960, height: 540, file: 'tv-countdown-960x540.png', seed: true },
   { tab: 'rounds-confirm', width: 960, height: 540, file: 'tv-rounds-delete-960x540.png', seed: true, confirm: true },
 ];
@@ -139,7 +146,7 @@ function presetDocument() {
   };
 }
 
-function pageFor(tab, width, height, seed, confirm) {
+function pageFor(tab, width, height, seed, confirm, mode) {
   const storage = seed
     ? `localStorage.setItem('americana.presets.v1', ${JSON.stringify(JSON.stringify(presetDocument()))});`
     : `localStorage.removeItem('americana.presets.v1');`;
@@ -160,6 +167,7 @@ function pageFor(tab, width, height, seed, confirm) {
 ${storage}
 ${preview}
 globalThis.__TV_TAB__ = ${JSON.stringify(tab)};
+globalThis.__TV_SETUP_MODE__ = ${JSON.stringify(mode ?? '')};
 </script>
 <script src="/bundle.js"></script>
 </body>
@@ -171,7 +179,7 @@ const server = createServer(async (req, res) => {
   if (url.startsWith('/index.html')) {
     const params = new URL(url, 'http://127.0.0.1').searchParams;
     res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(pageFor(params.get('tab') ?? 'wod', Number(params.get('w') ?? 1920), Number(params.get('h') ?? 1080), params.get('seed') === '1', params.get('confirm') === '1'));
+    res.end(pageFor(params.get('tab') ?? 'wod', Number(params.get('w') ?? 1920), Number(params.get('h') ?? 1080), params.get('seed') === '1', params.get('confirm') === '1', params.get('mode') ?? ''));
     return;
   }
   if (url === '/bundle.js') {
@@ -199,7 +207,7 @@ const port = address.port;
 
 function shoot(frame) {
   const shot = path.join(outDir, frame.file);
-  const url = `http://127.0.0.1:${port}/index.html?tab=${frame.tab}&w=${frame.width}&h=${frame.height}&seed=${frame.seed ? 1 : 0}&confirm=${frame.confirm ? 1 : 0}`;
+  const url = `http://127.0.0.1:${port}/index.html?tab=${frame.tab}&w=${frame.width}&h=${frame.height}&seed=${frame.seed ? 1 : 0}&confirm=${frame.confirm ? 1 : 0}&mode=${encodeURIComponent(frame.mode ?? '')}`;
   return new Promise((resolve, reject) => {
     const chrome = spawn(
       '/usr/bin/google-chrome-stable',
