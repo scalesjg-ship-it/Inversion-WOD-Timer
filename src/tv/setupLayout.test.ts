@@ -10,6 +10,9 @@ describe('TV setup form', () => {
     const fire = tvSetupMetrics(960, 540);
     const hd720 = tvSetupMetrics(1280, 720);
     expect(hd.cluster).toBeLessThan(360);
+    const bothColumns = hd.cluster * 2 + hd.controlGap;
+    expect(hd.cluster).toBeLessThan(bothColumns * 0.6);
+    expect(hd.timeRow).toBe(hd.labelWidth + hd.controlGap + bothColumns);
     expect(hd.timeRow).toBeLessThan(1920 * 0.55);
     expect(hd.timeRow).toBeGreaterThan(hd.labelWidth + hd.cluster * 2);
     expect(hd.durationRow).toBeGreaterThan(hd.timeRow);

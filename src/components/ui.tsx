@@ -154,7 +154,21 @@ export function NumberStepper({
   ];
 
   return (
-    <View style={[tv ? styles.stepperTv : styles.stepper, { gap: size.gap }]}>
+    <View
+      style={[
+        tv ? styles.stepperTv : styles.stepper,
+        { gap: size.gap },
+        // One cluster wide. A lone stepper must not grow into the minutes+seconds row.
+        tv && metrics
+          ? {
+              width: metrics.cluster,
+              minWidth: metrics.cluster,
+              maxWidth: metrics.cluster,
+              flexBasis: metrics.cluster,
+            }
+          : null,
+      ]}
+    >
       <TvFocusPressable
         accent={accent}
         accessibilityRole="button"
@@ -632,7 +646,6 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   stepInputTv: {
-    width: '100%',
     textTransform: 'lowercase',
   },
   tvFieldRow: {
