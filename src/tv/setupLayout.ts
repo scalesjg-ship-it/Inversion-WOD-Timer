@@ -1,5 +1,10 @@
-import { TV_FOCUS_BORDER, TV_FOCUS_SCALE, stepperControlSize, tvTabBarHeight } from './controls';
+import { TV_FOCUS_BORDER, TV_FOCUS_SCALE, stepperControlSize, tvSetupScale, tvTabBarHeight } from './controls';
 import { TV_OVERSCAN, tvFocusGutter, tvSafeBox, tvScaled } from './layout';
+
+/** 1080p setup length, grown so the form fills more of the television. */
+export function tvSetupScaled(at1080: number, width: number, height: number): number {
+  return tvScaled(Math.round(at1080 * tvSetupScale(height)), width, height);
+}
 
 export interface StepperLinks {
   dec: number | null;
@@ -47,9 +52,9 @@ export interface TvSetupMetrics {
 /** Width of a couch form. Clusters stay on their values instead of stretching to the bezel. */
 export function tvSetupMetrics(width: number, height: number): TvSetupMetrics {
   const step = stepperControlSize(true, height > 0 ? height : 1080, true);
-  const labelSize = tvScaled(26, width, height);
-  const labelWidth = tvScaled(168, width, height);
-  const controlGap = tvScaled(20, width, height);
+  const labelSize = tvSetupScaled(26, width, height);
+  const labelWidth = tvSetupScaled(168, width, height);
+  const controlGap = tvSetupScaled(20, width, height);
   const focusGap = Math.ceil(step.button * (TV_FOCUS_SCALE - 1)) + 2;
   const rowGap = Math.max(tvScaled(12, width, height), focusGap);
   // Wide enough for "180 min" at the value size. The slot does not grow with the screen.
@@ -115,10 +120,10 @@ export function tvRoundsLayout(screenWidth: number, screenHeight: number, preset
   const columns = presetCount <= 1 ? 1 : 2;
   const count = Math.max(1, presetCount);
   const cardRows = Math.max(1, Math.ceil(count / columns));
-  const titleSize = tvScaled(36, width, height);
+  const titleSize = tvSetupScaled(36, width, height);
   const titleLine = titleSize + tvScaled(6, width, height);
-  const titleFont = tvScaled(26, width, height);
-  const detailFont = tvScaled(18, width, height);
+  const titleFont = tvSetupScaled(26, width, height);
+  const detailFont = tvSetupScaled(18, width, height);
   // Padding, name line, gap, meta line, and the focus border drawn inside the card.
   const border = tvScaled(TV_FOCUS_BORDER, width, height);
   const textHeight = titleFont + detailFont + 34 + border * 2;
@@ -127,9 +132,9 @@ export function tvRoundsLayout(screenWidth: number, screenHeight: number, preset
   if (gutterX * 2 >= cellWidth) gutterX = Math.max(0, Math.floor((cellWidth - 1) / 2));
   const cardWidth = Math.max(1, cellWidth - gutterX * 2);
   const rowBlock = Math.max(metrics.button, metrics.labelLine);
-  const chip = Math.max(metrics.labelLine, tvScaled(52, width, height));
-  const start = Math.max(metrics.button, tvScaled(72, width, height));
-  const shelf = Math.max(36, tvScaled(44, width, height));
+  const chip = Math.max(metrics.labelLine, tvSetupScaled(52, width, height));
+  const start = Math.max(metrics.button, tvSetupScaled(72, width, height));
+  const shelf = Math.max(36, tvSetupScaled(44, width, height));
   const sceneForCards = Math.max(1, viewportHeight - padTop - padBottom - titleLine);
   const oldCell = Math.max(1, Math.floor(sceneForCards / cardRows));
   const oneThirdCap = Math.max(textHeight, Math.round(oldCell / 3 / TV_FOCUS_SCALE));

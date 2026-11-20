@@ -9,7 +9,9 @@ describe('TV setup form', () => {
     const hd = tvSetupMetrics(1920, 1080);
     const fire = tvSetupMetrics(960, 540);
     const hd720 = tvSetupMetrics(1280, 720);
-    expect(hd.cluster).toBeLessThan(360);
+    expect(hd.cluster).toBeLessThan(hd.timeRow * 0.5);
+    expect(hd.button).toBe(70);
+    expect(hd.labelSize).toBe(33);
     const bothColumns = hd.cluster * 2 + hd.controlGap;
     expect(hd.cluster).toBeLessThan(bothColumns * 0.6);
     expect(hd.timeRow).toBe(hd.labelWidth + hd.controlGap + bothColumns);
@@ -20,7 +22,8 @@ describe('TV setup form', () => {
     expect(fire.timeRow).toBeLessThan(960 - 96);
     expect(fire.durationRow).toBeLessThan(960 - 96);
     expect(hd720.timeRow).toBeLessThan(1280 - 128);
-    expect(hd.labelSize).toBe(fire.labelSize * 2);
+    expect(hd.labelSize).toBeGreaterThanOrEqual(32);
+    expect(fire.labelSize).toBeLessThan(hd.labelSize);
     expect(hd.rowGap).toBeGreaterThanOrEqual(Math.ceil(hd.button * (TV_FOCUS_SCALE - 1)));
   });
 

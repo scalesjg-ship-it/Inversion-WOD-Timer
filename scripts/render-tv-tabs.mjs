@@ -110,6 +110,7 @@ const frames = [
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-fortime-1920x1080.png', seed: true, mode: 'forTime' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-tabata-1920x1080.png', seed: true, mode: 'tabata' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-amrap-1920x1080.png', seed: true, mode: 'amrap' },
+  { tab: 'setup', width: 960, height: 540, file: 'tv-setup-amrap-960x540.png', seed: true, mode: 'amrap' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-emom-1920x1080.png', seed: true, mode: 'emom' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-intervals-1920x1080.png', seed: true, mode: 'intervals' },
   { tab: 'countdown', width: 1920, height: 1080, file: 'tv-countdown-1920x1080.png', seed: true },

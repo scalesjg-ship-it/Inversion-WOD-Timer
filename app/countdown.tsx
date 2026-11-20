@@ -10,8 +10,8 @@ import { PresetShelf } from '@/src/components/PresetShelf';
 import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvDurationRow } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, tvSafeBox, tvScaled } from '@/src/tv/layout';
-import { tvSetupMetrics } from '@/src/tv/setupLayout';
+import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, tvSafeBox } from '@/src/tv/layout';
+import { tvSetupMetrics, tvSetupScaled } from '@/src/tv/setupLayout';
 import {
   WARNING_MARK_CHOICES,
   addCountdownSeconds,
@@ -115,7 +115,7 @@ export default function CountdownScreen() {
 
   if (tv) {
     const metrics = tvSetupMetrics(width, height);
-    const titleSize = tvScaled(40, width, height);
+    const titleSize = tvSetupScaled(40, width, height);
     const formWidth = Math.min(metrics.durationRow, Math.max(1, width - box.horizontal * 2));
     return (
       <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical }]} testID="screen-countdown">
@@ -178,7 +178,7 @@ export default function CountdownScreen() {
           </View>
           <View style={styles.tvShelf}>{shelf}</View>
           <View style={styles.footer}>
-            <BigButton testID="start-countdown" label="Start countdown" color={accent} onPress={() => start(config, runLabel)} />
+            <BigButton roomy testID="start-countdown" label="Start countdown" color={accent} onPress={() => start(config, runLabel)} />
           </View>
         </View>
       </View>
