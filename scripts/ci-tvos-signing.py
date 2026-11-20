@@ -212,15 +212,33 @@ def upsert_setting(block: str, key: str, value: str) -> str:
     return f"{head}\n{indent}{assignment}\n{tail}"
 
 
-def apply_manual_signing(text: str, profile_name: str, build_number: str) -> tuple[str, int]:
-    """Set manual distribution signing on configs that use the Americana bundle id."""
+def signing_identity_value(identity: str) -> str:
+    """A certificate name that can be one xcodebuild KEY=VALUE argument."""
+    if not identity or any(char in identity for char in "\n\r="):
+        fail("Signing identity must be one line and must not contain '='")
+    return identity
+
+
+def apply_manual_signing(
+    text: str,
+    profile_name: str,
+    build_number: str,
+    identity: str = "Apple Distribution",
+) -> tuple[str, int]:
+    """Set manual distribution signing on configs that use the Americana bundle id.
+
+    The appletvos identity is stored in the project file, where the key is quoted.
+    Do not pass CODE_SIGN_IDENTITY[sdk=appletvos*]=... to xcodebuild: it splits the
+    argument on the first '=', so the identity becomes 'appletvos*]=...'.
+    """
     if "\n" in profile_name or "\r" in profile_name:
         fail("Profile name is not a single line")
+    quoted_identity = quote_pbx(signing_identity_value(identity))
     settings = {
         "CODE_SIGN_STYLE": "Manual",
         "DEVELOPMENT_TEAM": TEAM_ID,
-        "CODE_SIGN_IDENTITY": quote_pbx("Apple Distribution"),
-        '"CODE_SIGN_IDENTITY[sdk=appletvos*]"': quote_pbx("Apple Distribution"),
+        "CODE_SIGN_IDENTITY": quoted_identity,
+        '"CODE_SIGN_IDENTITY[sdk=appletvos*]"': quoted_identity,
         "PROVISIONING_PROFILE_SPECIFIER": quote_pbx(profile_name),
         "CURRENT_PROJECT_VERSION": build_number,
         "PRODUCT_BUNDLE_IDENTIFIER": f'"{BUNDLE_ID}"',
@@ -245,13 +263,13 @@ def apply_manual_signing(text: str, profile_name: str, build_number: str) -> tup
     return "".join(pieces), updated
 
 
-def export_options(profile_name: str) -> dict:
+def export_options(profile_name: str, identity: str = "Apple Distribution") -> dict:
     """Local App Store export. destination=export does not upload or submit."""
     return {
         "method": "app-store-connect",
         "destination": "export",
         "signingStyle": "manual",
-        "signingCertificate": "Apple Distribution",
+        "signingCertificate": signing_identity_value(identity),
         "teamID": TEAM_ID,
         "provisioningProfiles": {BUNDLE_ID: profile_name},
         "manageAppVersionAndBuildNumber": False,
@@ -260,27 +278,46 @@ def export_options(profile_name: str) -> dict:
     }
 
 
-def write_export_plist(path: Path, profile_name: str) -> None:
+def write_export_plist(path: Path, profile_name: str, identity: str = "Apple Distribution") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("wb") as handle:
-        plistlib.dump(export_options(profile_name), handle, fmt=plistlib.FMT_XML)
+        plistlib.dump(export_options(profile_name, identity), handle, fmt=plistlib.FMT_XML)
 
 
-def assert_distribution_identity(text: str) -> None:
-    found = False
+def distribution_identity_name(text: str) -> str:
+    """Pick the distribution certificate for team BNP9QFC679.
+
+    Modern certificates are named 'Apple Distribution'. Older ones are named
+    'iPhone Distribution' and still sign tvOS App Store builds. Development
+    certificates are ignored.
+    """
+    matches: list[tuple[int, str]] = []
     for line in text.splitlines():
-        if "Distribution" not in line:
+        if "Distribution" not in line or '"' not in line:
             continue
         if FORBIDDEN_MARK in line.lower():
             fail("Refusing a distribution certificate that mentions PushPress")
-        teams = re.findall(r"\(([A-Z0-9]{10})\)", line)
-        if "Apple Distribution" not in line:
+        quoted = re.findall(r'"([^"]+)"', line)
+        if not quoted:
             continue
+        name = quoted[0]
+        if "Apple Distribution" in name:
+            rank = 0
+        elif "iPhone Distribution" in name:
+            rank = 1
+        else:
+            continue
+        teams = re.findall(r"\(([A-Z0-9]{10})\)", name)
         if teams != [TEAM_ID]:
-            fail(f"Apple Distribution certificate must be team {TEAM_ID} only")
-        found = True
-    if not found:
-        fail(f"Temporary keychain has no Apple Distribution identity for {TEAM_ID}")
+            fail(f"Distribution certificate must be team {TEAM_ID} only")
+        matches.append((rank, signing_identity_value(name)))
+    if not matches:
+        fail(
+            "Temporary keychain has no Apple Distribution or iPhone Distribution "
+            f"identity for {TEAM_ID}"
+        )
+    matches.sort()
+    return matches[0][1]
 
 
 def assert_codesign(text: str) -> None:
@@ -297,8 +334,11 @@ def assert_codesign(text: str) -> None:
         for line in text.splitlines()
         if line.startswith("Authority=")
     ]
-    if not any("Apple Distribution" in line and TEAM_ID in line for line in authorities):
-        fail(f"Signature authority must be Apple Distribution for {TEAM_ID}")
+    if not any(
+        ("Apple Distribution" in line or "iPhone Distribution" in line) and TEAM_ID in line
+        for line in authorities
+    ):
+        fail(f"Signature authority must be a distribution certificate for {TEAM_ID}")
 
 
 def verify_built_plist(plist: dict, marketing_version: str, build_number: str) -> None:
@@ -593,13 +633,14 @@ def cmd_apply_signing(args: argparse.Namespace) -> None:
         fail("Refusing to edit a Pods project")
     root = repo_root()
     build = read_tvos_build_number(root)
-    updated_text, count = apply_manual_signing(path.read_text(), args.profile_name, build)
+    identity = signing_identity_value(args.identity)
+    updated_text, count = apply_manual_signing(path.read_text(), args.profile_name, build, identity)
     path.write_text(updated_text)
     print(f"Set manual signing on {count} Americana build configuration(s)")
 
 
 def cmd_write_export_plist(args: argparse.Namespace) -> None:
-    write_export_plist(Path(args.out), args.profile_name)
+    write_export_plist(Path(args.out), args.profile_name, args.identity)
     print(f"Wrote {Path(args.out).name} (method=app-store-connect destination=export)")
 
 
@@ -614,8 +655,14 @@ def cmd_decode_secret(args: argparse.Namespace) -> None:
 
 def cmd_assert_identity(args: argparse.Namespace) -> None:
     text = Path(args.file).read_text() if args.file else sys.stdin.read()
-    assert_distribution_identity(text)
-    print(f"Apple Distribution identity matches {TEAM_ID}")
+    identity = distribution_identity_name(text)
+    pairs = {"CODE_SIGN_IDENTITY": identity}
+    if args.github_env:
+        os.environ["GITHUB_ENV"] = args.github_env
+        append_github_env(pairs)
+    if args.env_file:
+        write_shell_env(Path(args.env_file), pairs)
+    print(f"Using signing identity: {identity}")
 
 
 def cmd_assert_codesign(args: argparse.Namespace) -> None:
@@ -660,10 +707,12 @@ def build_parser() -> argparse.ArgumentParser:
     apply = sub.add_parser("apply-signing")
     apply.add_argument("--pbx", required=True)
     apply.add_argument("--profile-name", required=True)
+    apply.add_argument("--identity", required=True)
     apply.set_defaults(func=cmd_apply_signing)
 
     export = sub.add_parser("write-export-plist")
     export.add_argument("--profile-name", required=True)
+    export.add_argument("--identity", required=True)
     export.add_argument("--out", required=True)
     export.set_defaults(func=cmd_write_export_plist)
 
@@ -674,6 +723,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     identity = sub.add_parser("assert-identity")
     identity.add_argument("--file")
+    identity.add_argument("--github-env")
+    identity.add_argument("--env-file")
     identity.set_defaults(func=cmd_assert_identity)
 
     codesign = sub.add_parser("assert-codesign")

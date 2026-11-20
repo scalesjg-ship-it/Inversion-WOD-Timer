@@ -107,6 +107,14 @@ jobs:
       - name: Install the distribution certificate and tvOS profile
         run: bash scripts/ci-tvos-install-signing.sh
 
+      - name: Show codesigning identities
+        run: |
+          set -euo pipefail
+          echo "Keychain search list:"
+          security list-keychains -d user
+          echo "Codesigning identities (hash and name only):"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
       - name: Apply manual signing to the Americana target
         run: |
           set -euo pipefail
@@ -115,7 +123,10 @@ jobs:
             echo "::error::Expected one app project.pbxproj under ios/, found $#."
             exit 1
           fi
-          python3 scripts/ci-tvos-signing.py apply-signing --pbx "$1" --profile-name "$PROFILE_NAME"
+          python3 scripts/ci-tvos-signing.py apply-signing \
+            --pbx "$1" \
+            --profile-name "$PROFILE_NAME" \
+            --identity "$CODE_SIGN_IDENTITY"
 
       - name: Archive for appletvos
         run: |
@@ -125,11 +136,16 @@ jobs:
           ARCHIVE_PATH="$RUNNER_TEMP/Americana.xcarchive"
           echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
           echo "Archiving $SCHEME from $WORKSPACE for generic/platform=tvOS"
-          echo "CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=BNP9QFC679 CODE_SIGN_IDENTITY=Apple Distribution"
+          echo "CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=BNP9QFC679"
+          echo "CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY"
           echo "PROVISIONING_PROFILE_SPECIFIER=$PROFILE_NAME"
           echo "CURRENT_PROJECT_VERSION=$TVOS_BUILD_NUMBER MARKETING_VERSION=$MARKETING_VERSION"
           # Pod targets keep CocoaPods' CODE_SIGNING_ALLOWED=NO, so this profile
           # is applied to Americana and not to the pods.
+          # Do not pass CODE_SIGN_IDENTITY[sdk=appletvos*]=... here. xcodebuild
+          # splits a build setting on the first '=', and the sdk condition
+          # contains one, so the identity becomes appletvos*]=...
+          # The sdk-specific identity is already written in the Xcode project.
           xcodebuild -workspace "$WORKSPACE" -list
           xcodebuild archive \
             -workspace "$WORKSPACE" \
@@ -142,8 +158,7 @@ jobs:
             RCT_NO_LAUNCH_PACKAGER=1 \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=BNP9QFC679 \
-            "CODE_SIGN_IDENTITY=Apple Distribution" \
-            "CODE_SIGN_IDENTITY[sdk=appletvos*]=Apple Distribution" \
+            "CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY" \
             "PROVISIONING_PROFILE_SPECIFIER=$PROFILE_NAME" \
             PRODUCT_BUNDLE_IDENTIFIER=com.garrettscales.americana \
             "CURRENT_PROJECT_VERSION=$TVOS_BUILD_NUMBER" \
