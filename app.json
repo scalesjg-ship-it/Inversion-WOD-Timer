@@ -23,7 +23,7 @@
     },
     "android": {
       "package": "com.garrettscales.americana",
-      "versionCode": 11,
+      "versionCode": 12,
       "adaptiveIcon": {
         "backgroundColor": "#07080A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -49,6 +49,7 @@
     },
     "plugins": [
       "./plugins/withPlayAdaptiveIcon",
+      "./plugins/withOptionalWifi",
       "expo-router",
       "./plugins/withTvLogoLan",
       "./plugins/withTvTcpSocket",
