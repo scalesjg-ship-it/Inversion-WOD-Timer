@@ -40,7 +40,8 @@ describe('tvOS foreground audio', () => {
 
   it('sets the tvOS build and the Android version code for the next artifacts', () => {
     expect(app.expo.ios.buildNumber).toBe('18');
-    expect(app.expo.android.versionCode).toBe(11);
+    expect(app.expo.version).toBe('1.0.0');
+    expect(app.expo.android.versionCode).toBe(12);
     expect(app.expo.ios.infoPlist.UIBackgroundModes).toEqual(['audio']);
     expect(TVOS_BUILD_NUMBER).toBe('23');
     expect(applyTvBuildNumber({ ios: { buildNumber: '18' } }, {}).ios.buildNumber).toBe('18');
