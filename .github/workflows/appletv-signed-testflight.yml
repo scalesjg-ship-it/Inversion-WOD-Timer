@@ -15,7 +15,10 @@
 # marketing_version (default 1.0.1) is applied to this tvOS archive only.
 # app.json stays 1.0.0, which is the iOS marketing version still in review.
 # Android versionName and versionCode are left as they are in app.json.
-# CFBundleVersion stays 23.
+# build_number (default 24) is the tvOS CFBundleVersion. 1.0.1 (23) is already
+# VALID, so another 1.0.1 upload must use 24 or higher. The prebuild plugin and
+# ci-tvos-signing.py both read it from TVOS_BUILD_NUMBER. The iOS buildNumber
+# in app.json is not changed.
 name: Apple TV signed TestFlight
 
 on:
@@ -29,6 +32,11 @@ on:
         description: tvOS CFBundleShortVersionString. Must be higher than the approved 1.0.0. iOS stays 1.0.0. Android versionName and versionCode stay as in app.json.
         required: false
         default: "1.0.1"
+        type: string
+      build_number:
+        description: tvOS CFBundleVersion. Positive integer. 1.0.1 (23) is already VALID, so use 24 or higher for 1.0.1. Does not change the iOS build number.
+        required: false
+        default: "24"
         type: string
 
 concurrency:
@@ -51,6 +59,7 @@ jobs:
       BUNDLE_ID: "com.garrettscales.americana"
       CONFIRM: ${{ inputs.confirm }}
       TVOS_MARKETING_VERSION: ${{ inputs.marketing_version }}
+      TVOS_BUILD_NUMBER: ${{ inputs.build_number }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}

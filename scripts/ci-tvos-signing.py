@@ -4,8 +4,8 @@
 The workflow calls this for values that must match the repo (team, bundle id,
 tvOS build number) and for files that must never be printed (certificates,
 profiles, the App Store Connect private key). It applies the tvOS marketing
-version from workflow_dispatch to the prebuild only. It does not write
-app.json, and it does not submit an app for review.
+version and build number from workflow_dispatch to the prebuild only. It does
+not write app.json, and it does not submit an app for review.
 """
 
 from __future__ import annotations
@@ -31,6 +31,12 @@ ASC_APP_ID = "6833266123"
 # rejects another upload whose CFBundleShortVersionString is 1.0.0.
 APPROVED_TVOS_MARKETING = (1, 0, 0)
 MARKETING_VERSION_RE = re.compile(r"(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){1,2}")
+# Committed fallback in plugins/withTvBuildNumber.js. workflow_dispatch input
+# build_number arrives as TVOS_BUILD_NUMBER and replaces this for an upload.
+PLUGIN_TVOS_BUILD_NUMBER = "24"
+BUILD_NUMBER_RE = re.compile(r"^[1-9]\d{0,8}$")
+# Marketing versions that already have a VALID build on App Store Connect.
+TVOS_BUILD_ALREADY_UPLOADED = {"1.0.1": 23}
 FORBIDDEN_MARK = "pushpress"
 TVOS_PLATFORMS = {"tvos", "appletvos", "com.apple.platform.appletvos"}
 UUID_RE = re.compile(
@@ -60,12 +66,54 @@ def fail(message: str) -> None:
     raise SystemExit(f"::error::{message}")
 
 
-def read_tvos_build_number(root: Path) -> str:
+def read_plugin_tvos_build_number(root: Path) -> str:
+    """The committed default. The upload build can override it."""
     text = (root / "plugins" / "withTvBuildNumber.js").read_text()
     match = re.search(r"const TVOS_BUILD_NUMBER = '([^']+)';", text)
     if not match or not match.group(1).strip():
         fail("Could not read TVOS_BUILD_NUMBER from plugins/withTvBuildNumber.js")
-    return match.group(1).strip()
+    value = match.group(1).strip()
+    if value != PLUGIN_TVOS_BUILD_NUMBER:
+        fail(
+            "plugins/withTvBuildNumber.js TVOS_BUILD_NUMBER is "
+            f"{value!r}, expected {PLUGIN_TVOS_BUILD_NUMBER}"
+        )
+    return value
+
+
+def normalize_build_number(value: str) -> str:
+    """Accept a tvOS CFBundleVersion that can be passed to xcodebuild."""
+    text = value.strip()
+    if not BUILD_NUMBER_RE.fullmatch(text):
+        fail(
+            "build_number must be a positive integer CFBundleVersion with no leading zero "
+            f"(got {text!r})"
+        )
+    return text
+
+
+def reject_known_tvos_build(marketing: str, build: str) -> None:
+    """Refuse a CFBundleVersion App Store Connect already accepted."""
+    taken = TVOS_BUILD_ALREADY_UPLOADED.get(marketing)
+    if taken is None or int(build) > taken:
+        return
+    fail(
+        f"tvOS {marketing} ({taken}) is already VALID on App Store Connect. "
+        f"CFBundleVersion {build} would collide. Use {taken + 1} or higher."
+    )
+
+
+def read_tvos_build_number(root: Path) -> str:
+    """CFBundleVersion the tvOS plugin writes.
+
+    workflow_dispatch input build_number is passed as TVOS_BUILD_NUMBER.
+    When that variable is unset or blank, the plugin default is used.
+    """
+    read_plugin_tvos_build_number(root)
+    raw = os.environ.get("TVOS_BUILD_NUMBER")
+    if raw is None or not raw.strip():
+        return PLUGIN_TVOS_BUILD_NUMBER
+    return normalize_build_number(raw)
 
 
 def assert_repo_identity(root: Path) -> str:
@@ -86,9 +134,8 @@ def assert_repo_identity(root: Path) -> str:
         fail(f"eas.json ascAppId is {submit.get('ascAppId')!r}, expected {ASC_APP_ID}")
     if submit.get("appleTeamId") != TEAM_ID:
         fail(f"eas.json appleTeamId is {submit.get('appleTeamId')!r}, expected {TEAM_ID}")
-    build = read_tvos_build_number(root)
-    if build != "23":
-        fail(f"plugins/withTvBuildNumber.js TVOS_BUILD_NUMBER is {build!r}, expected 23")
+    # Pins the plugin default at 24 and validates TVOS_BUILD_NUMBER when set.
+    read_tvos_build_number(root)
     return version
 
 
@@ -479,6 +526,8 @@ def verify_prebuild(
 ) -> dict[str, str]:
     source_version = assert_repo_identity(root)
     build = read_tvos_build_number(root)
+    if marketing_version is not None:
+        reject_known_tvos_build(normalize_marketing_version(marketing_version), build)
     pbx_files = sorted(ios_dir.glob("*.xcodeproj/project.pbxproj"))
     if len(pbx_files) != 1:
         fail("Expected one project.pbxproj")
@@ -589,9 +638,14 @@ def normalize_p8(value: str) -> str:
 
 def check_env() -> None:
     raw_marketing = os.environ.get("TVOS_MARKETING_VERSION")
+    marketing = None
     if raw_marketing is not None:
-        version = normalize_marketing_version(raw_marketing)
-        print(f"tvOS marketing version {version} is higher than the approved 1.0.0.")
+        marketing = normalize_marketing_version(raw_marketing)
+        print(f"tvOS marketing version {marketing} is higher than the approved 1.0.0.")
+    build = read_tvos_build_number(repo_root())
+    if marketing is not None:
+        reject_known_tvos_build(marketing, build)
+    print(f"tvOS CFBundleVersion {build}.")
     team = os.environ.get("APPLE_TEAM_ID", "").strip()
     if team and team != TEAM_ID:
         fail(f"APPLE_TEAM_ID must be {TEAM_ID} (CrossFit Inversion LLC). Refusing any other team.")
@@ -676,6 +730,7 @@ def verify_built_app(app: Path, root: Path, marketing_version: str | None = None
         if marketing_version is not None
         else source_version
     )
+    reject_known_tvos_build(marketing, build)
     info = load_plist(app / "Info.plist")
     verify_built_plist(info, marketing, build)
     profile = app / "embedded.mobileprovision"

@@ -7,7 +7,11 @@ import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { stripBackgroundAudioMode } = require('../../plugins/withTvForegroundAudio.js');
-const { TVOS_BUILD_NUMBER, applyTvBuildNumber } = require('../../plugins/withTvBuildNumber.js');
+const {
+  TVOS_BUILD_NUMBER,
+  applyTvBuildNumber,
+  resolveTvBuildNumber,
+} = require('../../plugins/withTvBuildNumber.js');
 
 const app = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../app.json'), 'utf8'));
 
@@ -43,9 +47,13 @@ describe('tvOS foreground audio', () => {
     expect(app.expo.version).toBe('1.0.0');
     expect(app.expo.android.versionCode).toBe(12);
     expect(app.expo.ios.infoPlist.UIBackgroundModes).toEqual(['audio']);
-    expect(TVOS_BUILD_NUMBER).toBe('23');
+    expect(TVOS_BUILD_NUMBER).toBe('24');
     expect(applyTvBuildNumber({ ios: { buildNumber: '18' } }, {}).ios.buildNumber).toBe('18');
-    expect(applyTvBuildNumber({ ios: { buildNumber: '18' } }, { EXPO_TV: '1' }).ios.buildNumber).toBe('23');
+    expect(applyTvBuildNumber({ ios: { buildNumber: '18' } }, { TVOS_BUILD_NUMBER: '25' }).ios.buildNumber).toBe('18');
+    expect(applyTvBuildNumber({ ios: { buildNumber: '18' } }, { EXPO_TV: '1' }).ios.buildNumber).toBe('24');
+    expect(applyTvBuildNumber({ ios: { buildNumber: '18' } }, { EXPO_TV: '1', TVOS_BUILD_NUMBER: '25' }).ios.buildNumber).toBe('25');
+    expect(resolveTvBuildNumber({ TVOS_BUILD_NUMBER: ' 30 ' })).toBe('30');
+    expect(() => resolveTvBuildNumber({ TVOS_BUILD_NUMBER: '23;touch' })).toThrow(/TVOS_BUILD_NUMBER/);
     const plugins = app.expo.plugins.map((plugin) => (Array.isArray(plugin) ? plugin[0] : plugin));
     expect(plugins).toContain('./plugins/withTvBuildNumber');
   });
