@@ -154,6 +154,12 @@ class ExportAndSigningTests(unittest.TestCase):
         self.assertIn("DEVELOPMENT_TEAM = BNP9QFC679;", updated)
         self.assertIn('CODE_SIGN_IDENTITY = "Apple Distribution";', updated)
         self.assertIn('"CODE_SIGN_IDENTITY[sdk=appletvos*]" = "Apple Distribution";', updated)
+        legacy = "iPhone Distribution: CrossFit Inversion LLC (BNP9QFC679)"
+        legacy_project, _count = signing.apply_manual_signing(
+            project, "Americana tvOS App Store b17", "23", legacy
+        )
+        self.assertIn(f'CODE_SIGN_IDENTITY = "{legacy}";', legacy_project)
+        self.assertNotIn("appletvos*]=", legacy_project)
         self.assertIn('PROVISIONING_PROFILE_SPECIFIER = "Americana tvOS App Store b17";', updated)
         self.assertIn("CURRENT_PROJECT_VERSION = 23;", updated)
         self.assertIn('"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";', updated)
@@ -167,27 +173,42 @@ class ExportAndSigningTests(unittest.TestCase):
 
     def test_distribution_identity_must_be_inversion(self):
         good = '  1) ABCDEF "Apple Distribution: CrossFit Inversion LLC (BNP9QFC679)"\n     1 valid identities found\n'
-        signing.assert_distribution_identity(good)
+        self.assertEqual(
+            signing.distribution_identity_name(good),
+            "Apple Distribution: CrossFit Inversion LLC (BNP9QFC679)",
+        )
+        legacy = '  1) ABCDEF "iPhone Distribution: CrossFit Inversion LLC (BNP9QFC679)"\n'
+        self.assertEqual(
+            signing.distribution_identity_name(legacy),
+            "iPhone Distribution: CrossFit Inversion LLC (BNP9QFC679)",
+        )
+        both = good + legacy
+        self.assertTrue(signing.distribution_identity_name(both).startswith("Apple Distribution"))
         expect_fail(
             self,
             "PushPress",
-            lambda: signing.assert_distribution_identity(
+            lambda: signing.distribution_identity_name(
                 '  1) ABC "Apple Distribution: PushPress (BNP9QFC679)"\n'
             ),
         )
         expect_fail(
             self,
             "BNP9QFC679",
-            lambda: signing.assert_distribution_identity(
+            lambda: signing.distribution_identity_name(
                 '  1) ABC "Apple Distribution: Other LLC (AAAAAAAAAA)"\n'
             ),
         )
         expect_fail(
             self,
             "no Apple Distribution",
-            lambda: signing.assert_distribution_identity(
+            lambda: signing.distribution_identity_name(
                 '  1) ABC "Apple Development: CrossFit Inversion LLC (BNP9QFC679)"\n'
             ),
+        )
+        expect_fail(
+            self,
+            "must not contain '='",
+            lambda: signing.signing_identity_value("Apple Distribution=bad"),
         )
 
     def test_codesign_output_must_match_the_app(self):
@@ -387,7 +408,9 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("scripts/ci-select-xcode.py", text)
         self.assertIn("generic/platform=tvOS", text)
         self.assertIn("CODE_SIGN_STYLE=Manual", text)
-        self.assertIn('CODE_SIGN_IDENTITY=Apple Distribution', text)
+        self.assertIn('CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY', text)
+        self.assertNotIn('"CODE_SIGN_IDENTITY[sdk=appletvos*]=Apple Distribution"', text)
+        self.assertIn("security find-identity -v -p codesigning", text)
         self.assertIn("-t appletvos", text)
         self.assertNotIn("xcrun notarytool", text)
         self.assertNotIn("eas submit", text)

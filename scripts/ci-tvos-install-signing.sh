@@ -65,8 +65,14 @@ LOGIN_KEYCHAIN="$(security default-keychain | tr -d '"')"
 security list-keychains -d user -s "$KEYCHAIN_PATH" "$LOGIN_KEYCHAIN"
 security default-keychain -s "$KEYCHAIN_PATH"
 
+# Hash and certificate name only. The .p12 and its password are not printed.
 security find-identity -v -p codesigning "$KEYCHAIN_PATH" | tee "$ROOT/identities.txt"
-python3 scripts/ci-tvos-signing.py assert-identity --file "$ROOT/identities.txt"
+python3 scripts/ci-tvos-signing.py assert-identity \
+  --file "$ROOT/identities.txt" \
+  --env-file "$ROOT/identity.env" \
+  --github-env "${GITHUB_ENV:-}"
+# shellcheck disable=SC1091
+source "$ROOT/identity.env"
 
 install_profile() {
   local dir="$1"
@@ -82,6 +88,7 @@ install_profile "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
 
 python3 scripts/ci-tvos-signing.py write-export-plist \
   --profile-name "$PROFILE_NAME" \
+  --identity "$CODE_SIGN_IDENTITY" \
   --out "$ROOT/ExportOptions.plist"
 
 if [ -n "${GITHUB_ENV:-}" ]; then
