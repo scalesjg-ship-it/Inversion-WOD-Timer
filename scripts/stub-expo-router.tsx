@@ -14,7 +14,10 @@ export function usePathname(): string {
 }
 
 export function useLocalSearchParams(): { mode?: string } {
-  if (tabName() === 'setup') return { mode: 'forTime' };
+  if (tabName() === 'setup') {
+    const mode = (globalThis as { __TV_SETUP_MODE__?: string }).__TV_SETUP_MODE__;
+    return { mode: mode && mode.length > 0 ? mode : 'forTime' };
+  }
   return {};
 }
 

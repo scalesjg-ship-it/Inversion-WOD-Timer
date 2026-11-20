@@ -6,11 +6,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
-import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvToggle } from '@/src/components/ui';
+import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvCountRow, TvToggle } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
 import { chrome } from '@/src/theme/chrome';
 import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, tvSafeBox, tvScaled } from '@/src/tv/layout';
+import { tvSetupMetrics } from '@/src/tv/setupLayout';
 import { normalizeConfig } from '@/src/timer/engine';
 import { modeTitle } from '@/src/timer/labels';
 import { defaultConfig } from '@/src/timer/presets';
@@ -147,81 +148,86 @@ function SetupForm({
   );
 
   if (tv) {
+    const metrics = tvSetupMetrics(width, height);
     const titleSize = tvScaled(40, width, height);
+    const formWidth = Math.min(metrics.timeRow, Math.max(1, width - box.horizontal * 2));
     return (
       <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical }]}>
         <View style={styles.header}>
           <HeaderBack onPress={() => router.back()} color={accent} />
           <Text style={[styles.kicker, styles.kickerTv]} numberOfLines={1}>Americana</Text>
         </View>
-        <Text testID="screen-setup" style={[styles.title, { fontSize: titleSize, lineHeight: titleSize + 6 }]}>{modeTitle(mode)}</Text>
-        <Text style={[styles.summary, styles.summaryTv]}>{summary}</Text>
-        <View style={styles.tvStack}>
-          {mode === 'forTime' ? (
-            <TvToggle
-              label="Time cap"
-              help="Stop the clock when the cap hits."
-              value={capOn}
-              onValueChange={setCapOn}
-              testID="for-time-cap"
+        <View style={[styles.tvBody, { paddingBottom: box.vertical, gap: metrics.rowGap }]}>
+          <Text testID="screen-setup" style={[styles.title, styles.titleCenter, { fontSize: titleSize, lineHeight: titleSize + 6 }]}>{modeTitle(mode)}</Text>
+          <Text style={[styles.summary, styles.summaryTv, styles.titleCenter]}>{summary}</Text>
+          <View style={[styles.tvForm, { width: formWidth, gap: metrics.rowGap }]}>
+            {mode === 'forTime' ? (
+              <TvToggle
+                preferred
+                label="Time cap"
+                help="Stop the clock when the cap hits."
+                value={capOn}
+                onValueChange={setCapOn}
+                testID="for-time-cap"
+                accent={accent}
+              />
+            ) : null}
+            {mode === 'forTime' && capOn ? (
+              <TimeField compact label="Cap" seconds={workSeconds} onChange={setWorkSeconds} testID="cap" accent={accent} />
+            ) : null}
+            {mode === 'amrap' ? (
+              <>
+                <ChipRow
+                  centered
+                  preferred
+                  accent={accent}
+                  options={[8, 10, 12, 15, 20].map((minutes) => ({
+                    label: `${minutes} min`,
+                    selected: workSeconds === minutes * 60,
+                    onPress: () => setWorkSeconds(minutes * 60),
+                    testID: `amrap-${minutes}`,
+                  }))}
+                />
+                <TimeField compact label="Time" seconds={workSeconds} onChange={setWorkSeconds} testID="amrap" accent={accent} />
+              </>
+            ) : null}
+            {mode === 'emom' ? (
+              <>
+                <TimeField compact preferred label="Every" seconds={workSeconds} onChange={setWorkSeconds} testID="emom-every" accent={accent} />
+                <ChipRow
+                  centered
+                  accent={accent}
+                  options={[8, 10, 12, 20].map((count) => ({
+                    label: `${count} rounds`,
+                    selected: rounds === count,
+                    onPress: () => setRounds(count),
+                    testID: `emom-rounds-${count}`,
+                  }))}
+                />
+              </>
+            ) : null}
+            {mode === 'tabata' || mode === 'intervals' ? (
+              <>
+                <TimeField compact preferred label="Work" seconds={workSeconds} onChange={setWorkSeconds} testID="work" accent={accent} />
+                <TimeField compact label="Rest" seconds={restSeconds} onChange={setRestSeconds} testID="rest" accent={accent} />
+              </>
+            ) : null}
+            {mode !== 'forTime' && mode !== 'amrap' ? (
+              <TvCountRow label="Rounds" value={rounds} min={1} max={99} suffix="rds" testID="rounds" accent={accent} onChange={setRounds} />
+            ) : null}
+            <TimeField
+              compact
+              label="Lead-in"
+              seconds={leadInSeconds}
+              onChange={(value) => setLeadInSeconds(Math.min(600, value))}
+              testID="lead-in"
               accent={accent}
             />
-          ) : null}
-          {mode === 'forTime' && capOn ? (
-            <TimeField compact label="Cap" seconds={workSeconds} onChange={setWorkSeconds} testID="cap" accent={accent} />
-          ) : null}
-          {mode === 'amrap' ? (
-            <>
-              <ChipRow
-                accent={accent}
-                options={[8, 10, 12, 15, 20].map((minutes) => ({
-                  label: `${minutes} min`,
-                  selected: workSeconds === minutes * 60,
-                  onPress: () => setWorkSeconds(minutes * 60),
-                  testID: `amrap-${minutes}`,
-                }))}
-              />
-              <TimeField compact label="Time" seconds={workSeconds} onChange={setWorkSeconds} testID="amrap" accent={accent} />
-            </>
-          ) : null}
-          {mode === 'emom' ? (
-            <>
-              <TimeField compact label="Every" seconds={workSeconds} onChange={setWorkSeconds} testID="emom-every" accent={accent} />
-              <ChipRow
-                accent={accent}
-                options={[8, 10, 12, 20].map((count) => ({
-                  label: `${count} rounds`,
-                  selected: rounds === count,
-                  onPress: () => setRounds(count),
-                  testID: `emom-rounds-${count}`,
-                }))}
-              />
-            </>
-          ) : null}
-          {mode === 'tabata' || mode === 'intervals' ? (
-            <>
-              <TimeField compact label="Work" seconds={workSeconds} onChange={setWorkSeconds} testID="work" accent={accent} />
-              <TimeField compact label="Rest" seconds={restSeconds} onChange={setRestSeconds} testID="rest" accent={accent} />
-            </>
-          ) : null}
-          {mode !== 'forTime' && mode !== 'amrap' ? (
-            <View style={styles.field}>
-              <Text style={[styles.fieldLabel, styles.fieldLabelTv]}>Rounds</Text>
-              <NumberStepper compact value={rounds} min={1} max={99} suffix="rds" testID="rounds" accent={accent} onChange={setRounds} />
-            </View>
-          ) : null}
-          <TimeField
-            compact
-            label="Lead-in"
-            seconds={leadInSeconds}
-            onChange={(value) => setLeadInSeconds(Math.min(600, value))}
-            testID="lead-in"
-            accent={accent}
-          />
-          {shelf}
-        </View>
-        <View style={[styles.footer, { paddingBottom: box.vertical }]}>
-          <BigButton testID="start-timer" label="Start" color={accent} onPress={() => onStart(config, runLabel)} />
+          </View>
+          <View style={styles.tvShelf}>{shelf}</View>
+          <View style={styles.footer}>
+            <BigButton testID="start-timer" label="Start" color={accent} onPress={() => onStart(config, runLabel)} />
+          </View>
         </View>
       </View>
     );
@@ -363,13 +369,17 @@ function SetupForm({
 function ChipRow({
   options,
   accent,
+  centered = false,
+  preferred = false,
 }: {
   accent: string;
   options: { label: string; selected: boolean; onPress: () => void; testID: string }[];
+  centered?: boolean;
+  preferred?: boolean;
 }) {
   return (
-    <View style={styles.chips}>
-      {options.map((option) => (
+    <View style={[styles.chips, centered && styles.chipsCentered]}>
+      {options.map((option, index) => (
         <Chip
           key={option.testID}
           label={option.label}
@@ -377,6 +387,7 @@ function ChipRow({
           onPress={option.onPress}
           color={accent}
           testID={option.testID}
+          preferred={preferred && index === 0}
         />
       ))}
     </View>
@@ -409,6 +420,22 @@ const styles = StyleSheet.create({
   tvStack: {
     flex: 1,
     justifyContent: 'space-evenly',
+  },
+  tvBody: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tvForm: {
+    alignSelf: 'center',
+  },
+  tvShelf: {
+    alignSelf: 'center',
+    maxWidth: '100%',
+  },
+  titleCenter: {
+    textAlign: 'center',
+    alignSelf: 'stretch',
   },
   // The scroll view reaches the screen edge so a focused control's 1.08 scale is not clipped;
   // the content pads back in to the safe margin.
@@ -481,6 +508,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  chipsCentered: {
+    justifyContent: 'center',
+    alignSelf: 'center',
   },
   footer: {
     paddingVertical: 12,

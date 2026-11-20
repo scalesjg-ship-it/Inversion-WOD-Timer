@@ -9,18 +9,17 @@ import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { useTvTabFocus } from '@/src/components/TvTabFocus';
-import { BigButton, Chip, NumberStepper, TimeField } from '@/src/components/ui';
+import { BigButton, Chip, NumberStepper, TimeField, TvCountRow } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import {
   TV_BODY_FONT,
   TV_MENU_FONT,
   TV_SAFE_HORIZONTAL,
-  tvFocusGutter,
   tvSafeBox,
-  tvScaled,
   type TvHomeLayout,
 } from '@/src/tv/layout';
+import { tvRoundsLayout } from '@/src/tv/setupLayout';
 import { formatSeconds } from '@/src/timer/format';
 import { isTvGridEntrance } from '@/src/tv/tabFocus';
 import { BUILTIN_PRESETS, configFromPreset, type RoundPreset } from '@/src/timer/presets';
@@ -96,63 +95,90 @@ export default function RoundsScreen() {
   const builtInSelected = BUILTIN_PRESETS.some((preset) => preset.id === selectedId);
 
   if (tv) {
-    const columns = BUILTIN_PRESETS.length <= 4 ? 2 : 4;
-    const inner = Math.max(1, width - box.horizontal * 2);
-    const cell = Math.floor(inner / columns);
-    const gutter = Math.max(tvFocusGutter(cell), tvScaled(12, width, height));
-    const titleSize = tvScaled(36, width, height);
-    const detailSize = tvScaled(22, width, height);
-    const cardHeight = titleSize + detailSize + tvScaled(8, width, height);
+    const layout = tvRoundsLayout(width, height, BUILTIN_PRESETS.length);
     return (
-      <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: Math.max(4, Math.round(box.vertical * 0.35)) }]}>
-        <Text testID="screen-rounds" style={[styles.title, { fontSize: tvScaled(40, width, height), lineHeight: tvScaled(46, width, height) }]}>Rounds</Text>
-        <View style={styles.presetsTv}>
-          {BUILTIN_PRESETS.map((preset, index) => (
-            <View key={preset.id} style={{ width: cell, paddingHorizontal: gutter, paddingVertical: tvScaled(4, width, height) }}>
-              <StandardCard
-                preset={preset}
-                accent={accent}
-                selected={selectedId === preset.id}
-                onPress={() => apply(preset)}
-                tv
-                frame={null}
-                titleSize={titleSize}
-                detailSize={detailSize}
-                cardHeight={cardHeight}
-                focusUp={isTvGridEntrance(index, BUILTIN_PRESETS.length, columns) ? tabFocus?.upTag ?? null : null}
-              />
-            </View>
-          ))}
-        </View>
-        <View style={styles.tvStack}>
-          <View style={styles.editorRow}>
-            <View style={styles.editorCell}>
-              <TimeField compact label="Round" seconds={draft.roundSeconds} onChange={(roundSeconds) => edit({ roundSeconds })} testID="round" accent={accent} />
-            </View>
-            <View style={styles.editorCell}>
-              <TimeField compact label="Rest" seconds={draft.restSeconds} onChange={(restSeconds) => edit({ restSeconds })} testID="rest" accent={restColor} />
-            </View>
+      <View
+        style={[
+          styles.safe,
+          {
+            paddingLeft: layout.padHorizontal,
+            paddingRight: layout.padHorizontal,
+            paddingTop: layout.padTop,
+            paddingBottom: layout.padBottom,
+          },
+        ]}
+      >
+        <View style={[styles.tvBody, { gap: layout.rowGap }]}>
+          <Text
+            testID="screen-rounds"
+            style={[styles.title, styles.titleCenter, { fontSize: layout.titleSize, lineHeight: layout.titleLine }]}
+          >
+            Rounds
+          </Text>
+          <View style={[styles.presetsTv, { width: layout.cellWidth * layout.columns }]}>
+            {BUILTIN_PRESETS.map((preset, index) => (
+              <View
+                key={preset.id}
+                style={{
+                  width: layout.cellWidth,
+                  height: layout.cellHeight,
+                  paddingHorizontal: layout.gutterX,
+                  paddingVertical: layout.gutterY,
+                }}
+              >
+                <StandardCard
+                  preset={preset}
+                  accent={accent}
+                  selected={selectedId === preset.id}
+                  onPress={() => apply(preset)}
+                  tv
+                  frame={null}
+                  titleSize={layout.titleFont}
+                  detailSize={layout.detailFont}
+                  cardHeight={layout.cardHeight}
+                  focusUp={isTvGridEntrance(index, BUILTIN_PRESETS.length, layout.columns) ? tabFocus?.upTag ?? null : null}
+                />
+              </View>
+            ))}
           </View>
-          <View style={styles.editorRow}>
-            <View style={[styles.editorCell, styles.field]}>
-              <Text style={[styles.fieldLabel, styles.fieldLabelTv]}>Rounds</Text>
-              <NumberStepper compact value={draft.rounds} min={1} max={99} suffix="rds" testID="round-count" accent={accent} onChange={(rounds) => edit({ rounds })} />
-            </View>
-            <View style={styles.editorCell}>
-              <TimeField
-                compact
-                label="Lead-in"
-                seconds={draft.leadInSeconds}
-                onChange={(leadInSeconds) => edit({ leadInSeconds: Math.min(600, leadInSeconds) })}
-                testID="lead-in"
-                accent={accent}
-              />
-            </View>
-          </View>
-          <View style={styles.editorRow}>
-            <View style={[styles.editorCell, styles.warningRow]}>
+          <View style={[styles.tvForm, { width: layout.formWidth, gap: layout.rowGap }]}>
+            <TimeField
+              compact
+              label="Round"
+              seconds={draft.roundSeconds}
+              onChange={(roundSeconds) => edit({ roundSeconds })}
+              testID="round"
+              accent={accent}
+            />
+            <TimeField
+              compact
+              label="Rest"
+              seconds={draft.restSeconds}
+              onChange={(restSeconds) => edit({ restSeconds })}
+              testID="rest"
+              accent={restColor}
+            />
+            <TvCountRow
+              label="Rounds"
+              value={draft.rounds}
+              min={1}
+              max={99}
+              suffix="rds"
+              testID="round-count"
+              accent={accent}
+              onChange={(rounds) => edit({ rounds })}
+            />
+            <TimeField
+              compact
+              label="Lead-in"
+              seconds={draft.leadInSeconds}
+              onChange={(leadInSeconds) => edit({ leadInSeconds: Math.min(600, leadInSeconds) })}
+              testID="lead-in"
+              accent={accent}
+            />
+            <View style={[styles.warningRow, styles.warningCenter]}>
               <Text style={[styles.fieldLabel, styles.fieldLabelTv]}>Warning</Text>
-              <View style={styles.chips}>
+              <View style={[styles.chips, styles.chipsCentered]}>
                 {WARNING_CHOICES.map((seconds) => (
                   <Chip
                     key={seconds}
@@ -165,22 +191,21 @@ export default function RoundsScreen() {
                 ))}
               </View>
             </View>
-            <View style={[styles.editorCell, styles.startCell]}>
-              <BigButton testID="start-rounds" label="Start rounds" color={accent} onPress={() => start()} />
-            </View>
           </View>
+          <View style={styles.tvShelf}>
+            <PresetShelf
+              mode="rounds"
+              accent={accent}
+              config={configFromPreset(draft)}
+              selectedId={selectedId}
+              nameHint={builtInSelected ? draft.name : undefined}
+              onLoad={applySaved}
+              onStart={(preset) => start(preset.config, preset.name)}
+              onClearSelection={() => apply(BUILTIN_PRESETS[0])}
+            />
+          </View>
+          <BigButton testID="start-rounds" label="Start rounds" color={accent} onPress={() => start()} />
         </View>
-        <PresetShelf
-          mode="rounds"
-          accent={accent}
-          config={configFromPreset(draft)}
-          selectedId={selectedId}
-          nameHint={builtInSelected ? draft.name : undefined}
-          onLoad={applySaved}
-          onStart={(preset) => start(preset.config, preset.name)}
-          onClearSelection={() => apply(BUILTIN_PRESETS[0])}
-        />
-        <View style={{ height: Math.max(4, Math.round(box.vertical * 0.25)) }} />
       </View>
     );
   }
@@ -343,7 +368,7 @@ function StandardCard({
       onBlur={onBlur}
       style={() => [
         styles.preset,
-        tv && !frame && styles.presetTv,
+        tv && !frame && cardHeight <= 0 && styles.presetTv,
         frame
           ? {
               width: '100%',
@@ -356,7 +381,19 @@ function StandardCard({
             }
           : null,
         cardHeight > 0
-          ? { width: '100%', height: cardHeight, minHeight: cardHeight, padding: 12, borderRadius: 16 }
+          ? {
+              width: '100%',
+              height: cardHeight,
+              minHeight: cardHeight,
+              maxHeight: cardHeight,
+              flexGrow: 0,
+              flexShrink: 0,
+              flexBasis: 'auto',
+              justifyContent: 'center',
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 16,
+            }
           : null,
         { borderColor: selected && !tv ? accent : chrome.line },
       ]}
@@ -384,7 +421,7 @@ function StandardCard({
           frame ? { fontSize: frame.detailSize, lineHeight: frame.detailSize + 4 } : null,
           detailSize > 0 ? { fontSize: detailSize, lineHeight: detailSize + 6, color: chrome.muted, backgroundColor: 'transparent' } : null,
         ]}
-        numberOfLines={frame ? frame.detailLines : 2}
+        numberOfLines={cardHeight > 0 ? 1 : frame ? frame.detailLines : 2}
       >
         {presetMeta(preset)}
       </Text>
@@ -459,7 +496,30 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 0,
     marginHorizontal: 0,
+    alignSelf: 'center',
     overflow: 'visible',
+  },
+  tvBody: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tvForm: {
+    alignSelf: 'center',
+  },
+  tvShelf: {
+    alignSelf: 'center',
+    maxWidth: '100%',
+  },
+  titleCenter: {
+    textAlign: 'center',
+    alignSelf: 'stretch',
+  },
+  warningCenter: {
+    justifyContent: 'center',
+  },
+  chipsCentered: {
+    justifyContent: 'center',
   },
   tvGrid: {
     flexGrow: 1,
