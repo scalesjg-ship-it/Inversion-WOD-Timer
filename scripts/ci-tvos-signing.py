@@ -3,8 +3,9 @@
 
 The workflow calls this for values that must match the repo (team, bundle id,
 tvOS build number) and for files that must never be printed (certificates,
-profiles, the App Store Connect private key). It does not submit an app for
-review.
+profiles, the App Store Connect private key). It applies the tvOS marketing
+version from workflow_dispatch to the prebuild only. It does not write
+app.json, and it does not submit an app for review.
 """
 
 from __future__ import annotations
@@ -26,6 +27,10 @@ from pathlib import Path
 TEAM_ID = "BNP9QFC679"
 BUNDLE_ID = "com.garrettscales.americana"
 ASC_APP_ID = "6833266123"
+# tvOS 1.0 build 22 is approved and live. App Store Connect error 90062
+# rejects another upload whose CFBundleShortVersionString is 1.0.0.
+APPROVED_TVOS_MARKETING = (1, 0, 0)
+MARKETING_VERSION_RE = re.compile(r"(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){1,2}")
 FORBIDDEN_MARK = "pushpress"
 TVOS_PLATFORMS = {"tvos", "appletvos", "com.apple.platform.appletvos"}
 UUID_RE = re.compile(
@@ -85,6 +90,77 @@ def assert_repo_identity(root: Path) -> str:
     if build != "23":
         fail(f"plugins/withTvBuildNumber.js TVOS_BUILD_NUMBER is {build!r}, expected 23")
     return version
+
+
+def version_key(value: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in value.split("."))
+
+
+def normalize_marketing_version(value: str) -> str:
+    """Accept a tvOS marketing version higher than the approved 1.0.0."""
+    text = value.strip()
+    if not MARKETING_VERSION_RE.fullmatch(text):
+        fail(f"marketing_version must be a numeric version such as 1.0.1 (got {text!r})")
+    parsed = version_key(text)
+    width = max(len(parsed), len(APPROVED_TVOS_MARKETING))
+    padded = parsed + (0,) * (width - len(parsed))
+    approved = APPROVED_TVOS_MARKETING + (0,) * (width - len(APPROVED_TVOS_MARKETING))
+    if padded <= approved:
+        fail(
+            "tvOS CFBundleShortVersionString must be higher than the approved version "
+            f"1.0.0 (App Store Connect error 90062). Got {text}."
+        )
+    return text
+
+
+def settings_block_has_bundle(block: str, bundle_id: str = BUNDLE_ID) -> bool:
+    """True when this buildSettings block sets bundle_id and not a longer id."""
+    return (
+        re.search(
+            rf'PRODUCT_BUNDLE_IDENTIFIER = "?{re.escape(bundle_id)}"?[ \t]*;',
+            block,
+        )
+        is not None
+    )
+
+
+def apply_tvos_marketing_version(text: str, marketing_version: str) -> str:
+    """Set MARKETING_VERSION on the tvOS Xcode project.
+
+    ios/ in this workflow is the EXPO_TV=1 prebuild. Existing MARKETING_VERSION
+    and INFOPLIST_KEY values in that project are updated. The Americana target
+    gains MARKETING_VERSION when that build setting is missing.
+    """
+    version = normalize_marketing_version(marketing_version)
+    pattern = re.compile(
+        r"^([ \t]*)(?P<key>\"?(?:MARKETING_VERSION|INFOPLIST_KEY_CFBundleShortVersionString)\"?)"
+        r"[ \t]*=[ \t]*.*;[ \t]*$",
+        re.MULTILINE,
+    )
+
+    def replace(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{match.group('key')} = {version};"
+
+    updated = pattern.sub(replace, text)
+    pieces: list[str] = []
+    cursor = 0
+    targets = 0
+    for start, end in iter_build_settings(updated):
+        pieces.append(updated[cursor:start])
+        block = updated[start : end + 1]
+        cursor = end + 1
+        if not settings_block_has_bundle(block):
+            pieces.append(block)
+            continue
+        block = upsert_setting(block, "MARKETING_VERSION", version)
+        if "INFOPLIST_KEY_CFBundleShortVersionString" in block:
+            block = upsert_setting(block, "INFOPLIST_KEY_CFBundleShortVersionString", version)
+        targets += 1
+        pieces.append(block)
+    pieces.append(updated[cursor:])
+    if targets == 0:
+        fail(f"No Xcode build configuration contains {BUNDLE_ID}")
+    return "".join(pieces)
 
 
 def load_plist(path: Path) -> dict:
@@ -396,8 +472,12 @@ def discover_prebuild(ios_dir: Path) -> tuple[Path, Path]:
     return workspaces[0], chosen
 
 
-def verify_prebuild(root: Path, ios_dir: Path) -> dict[str, str]:
-    marketing = assert_repo_identity(root)
+def verify_prebuild(
+    root: Path,
+    ios_dir: Path,
+    marketing_version: str | None = None,
+) -> dict[str, str]:
+    source_version = assert_repo_identity(root)
     build = read_tvos_build_number(root)
     pbx_files = sorted(ios_dir.glob("*.xcodeproj/project.pbxproj"))
     if len(pbx_files) != 1:
@@ -416,26 +496,48 @@ def verify_prebuild(root: Path, ios_dir: Path) -> dict[str, str]:
     info_files = [path for path in info_files if path.parent.name != "Pods"]
     if not info_files:
         fail("Prebuild did not write an app Info.plist")
-    matched = None
+    matched_plists: list[tuple[Path, dict]] = []
     for path in info_files:
         plist = load_plist(path)
         if str(plist.get("CFBundleVersion")) == build:
-            matched = plist
-            break
-    if matched is None:
-        fail(f"No Info.plist has CFBundleVersion {build}")
+            matched_plists.append((path, plist))
+    if len(matched_plists) != 1:
+        fail(f"Expected one Info.plist with CFBundleVersion {build}, found {len(matched_plists)}")
+    info_path, matched = matched_plists[0]
     short = str(matched.get("CFBundleShortVersionString"))
-    if short != marketing:
-        fail(f"Info.plist CFBundleShortVersionString is {short!r}, expected {marketing}")
+    exported = source_version
+    if marketing_version is None:
+        if short != source_version:
+            fail(f"Info.plist CFBundleShortVersionString is {short!r}, expected {source_version}")
+    else:
+        # Expo writes a literal CFBundleShortVersionString from app.json. A
+        # MARKETING_VERSION build setting does not replace that literal, so
+        # the tvOS plist has to be updated in the prebuild before archive.
+        if short not in {source_version, "$(MARKETING_VERSION)"}:
+            fail(
+                f"Info.plist CFBundleShortVersionString is {short!r}, expected {source_version} "
+                "from app.json before the tvOS override"
+            )
+        exported = normalize_marketing_version(marketing_version)
+        project_text = apply_tvos_marketing_version(project_text, exported)
+        pbx_files[0].write_text(project_text)
+        matched["CFBundleShortVersionString"] = exported
+        with info_path.open("wb") as handle:
+            plistlib.dump(matched, handle, fmt=plistlib.FMT_XML)
+        print(
+            f"tvOS CFBundleShortVersionString set to {exported} "
+            f"(app.json version remains {source_version}, CFBundleVersion {build})"
+        )
     workspace, scheme = discover_prebuild(ios_dir)
     print(f"workspace={workspace} (from ios/*.xcworkspace, excluding Pods)")
     print(f"scheme={scheme.stem} (from {scheme.relative_to(ios_dir)})")
-    print(f"CFBundleVersion={build} CFBundleShortVersionString={marketing}")
+    print(f"CFBundleVersion={build} CFBundleShortVersionString={exported}")
     return {
         "WORKSPACE": str(workspace),
         "SCHEME": scheme.stem,
         "TVOS_BUILD_NUMBER": build,
-        "MARKETING_VERSION": marketing,
+        "MARKETING_VERSION": exported,
+        "SOURCE_MARKETING_VERSION": source_version,
         "BUNDLE_ID": BUNDLE_ID,
         "APPLE_TEAM_ID_EXPECTED": TEAM_ID,
         "ASC_APP_ID": ASC_APP_ID,
@@ -486,6 +588,10 @@ def normalize_p8(value: str) -> str:
 
 
 def check_env() -> None:
+    raw_marketing = os.environ.get("TVOS_MARKETING_VERSION")
+    if raw_marketing is not None:
+        version = normalize_marketing_version(raw_marketing)
+        print(f"tvOS marketing version {version} is higher than the approved 1.0.0.")
     team = os.environ.get("APPLE_TEAM_ID", "").strip()
     if team and team != TEAM_ID:
         fail(f"APPLE_TEAM_ID must be {TEAM_ID} (CrossFit Inversion LLC). Refusing any other team.")
@@ -562,9 +668,14 @@ def prepare_log_artifact(source_dir: Path, dest_dir: Path, tail_lines: int = 200
     print(f"Prepared {wrote} redacted log tail(s)")
 
 
-def verify_built_app(app: Path, root: Path) -> None:
-    marketing = assert_repo_identity(root)
+def verify_built_app(app: Path, root: Path, marketing_version: str | None = None) -> None:
+    source_version = assert_repo_identity(root)
     build = read_tvos_build_number(root)
+    marketing = (
+        normalize_marketing_version(marketing_version)
+        if marketing_version is not None
+        else source_version
+    )
     info = load_plist(app / "Info.plist")
     verify_built_plist(info, marketing, build)
     profile = app / "embedded.mobileprovision"
@@ -598,13 +709,13 @@ def verify_built_app(app: Path, root: Path) -> None:
         sys.stderr.write(details.stderr or "")
         sys.stderr.write(verified.stderr or "")
         fail("codesign verification failed")
-    print(f"Signed {BUNDLE_ID} build {build} for team {TEAM_ID} (appletvos)")
+    print(f"Signed {BUNDLE_ID} build {build} ({marketing}) for team {TEAM_ID} (appletvos)")
 
 
 def cmd_verify_prebuild(args: argparse.Namespace) -> None:
     root = Path(args.repo).resolve()
     ios_dir = Path(args.ios_dir).resolve()
-    pairs = verify_prebuild(root, ios_dir)
+    pairs = verify_prebuild(root, ios_dir, args.marketing_version)
     for key in ("ASC_APP_ID", "BUNDLE_ID"):
         current = os.environ.get(key, "").strip()
         if current and current != pairs[key]:
@@ -685,7 +796,7 @@ def cmd_prepare_logs(args: argparse.Namespace) -> None:
 
 
 def cmd_verify_built_app(args: argparse.Namespace) -> None:
-    verify_built_app(Path(args.app), Path(args.repo).resolve())
+    verify_built_app(Path(args.app), Path(args.repo).resolve(), args.marketing_version)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -696,6 +807,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--repo", default=str(repo_root()))
     verify.add_argument("--ios-dir", default="ios")
     verify.add_argument("--env-file")
+    verify.add_argument("--marketing-version")
     verify.set_defaults(func=cmd_verify_prebuild)
 
     inspect = sub.add_parser("inspect-profile")
@@ -747,6 +859,7 @@ def build_parser() -> argparse.ArgumentParser:
     built = sub.add_parser("verify-built-app")
     built.add_argument("--app", required=True)
     built.add_argument("--repo", default=str(repo_root()))
+    built.add_argument("--marketing-version")
     built.set_defaults(func=cmd_verify_built_app)
     return parser
 
