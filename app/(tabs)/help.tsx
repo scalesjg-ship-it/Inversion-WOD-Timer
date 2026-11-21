@@ -158,9 +158,18 @@ function TvHelp({
   const links = helpNeighbors(items.map((item) => item.id));
   const focused = items.find((item) => item.id === focusedId) ?? items[0];
   const column = tvHelpColumn(width, height, items.length, pageSize);
+  const entryId = items[0]?.id ?? null;
+  const entryTag = entryId ? (tags[entryId] ?? null) : null;
   const remember = useCallback((id: string, tag: TvFocusTag | null) => {
     setTags((current) => (current[id] === tag ? current : { ...current, [id]: tag }));
   }, []);
+  useEffect(() => {
+    tabFocus?.bindEntry(entryTag);
+  }, [entryTag, tabFocus]);
+  useEffect(() => {
+    const clear = tabFocus?.bindEntry;
+    return () => clear?.(null);
+  }, [tabFocus?.bindEntry]);
 
   return (
     <View
@@ -234,6 +243,7 @@ function TvHelpRow({
       testID={section.id}
       accessibilityRole="button"
       accessibilityLabel={`${section.title}. ${section.body}`}
+      focusable
       scale={false}
       onHost={onHost}
       focusUp={focusUp}
