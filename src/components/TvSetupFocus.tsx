@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { findNodeHandle, Platform, TVFocusGuideView, type Pressable } from 'react-native';
+import { findNodeHandle, type Pressable } from 'react-native';
 
 import type { TvFocusTag } from '@/src/components/TvTabFocus';
 
@@ -44,12 +44,16 @@ function publishTag(
   node: Host | null,
   setter: (updater: (current: TvFocusTag | null) => TvFocusTag | null) => void,
 ) {
-  const apply = (tag: TvFocusTag | null) => {
+  let tries = 0;
+  const attempt = () => {
+    const tag = readTag(node);
     setter((current) => (current === tag ? current : tag));
+    if (node != null && tag == null && tries < 24) {
+      tries += 1;
+      requestAnimationFrame(attempt);
+    }
   };
-  const tag = readTag(node);
-  apply(tag);
-  if (node && tag == null) requestAnimationFrame(() => apply(readTag(node)));
+  attempt();
 }
 
 function sameHosts(left: Host[], right: (Host | null)[]): boolean {
@@ -102,42 +106,4 @@ export function TvSetupFocus({ children }: { children: ReactNode }) {
   );
 
   return <TvSetupFocusContext.Provider value={api}>{children}</TvSetupFocusContext.Provider>;
-}
-
-const guideStyle = {
-  position: 'absolute' as const,
-  left: 0,
-  right: 0,
-  height: 12,
-};
-
-const EMPTY_HOSTS: Host[] = [];
-
-/** Sits just under the last stepper row. Down from any button in that row lands on Start. */
-export function TvDownToStart() {
-  const setup = useTvSetupFocus();
-  const destination = setup?.startHost ?? null;
-  const destinations = useMemo(() => (destination ? [destination] : EMPTY_HOSTS), [destination]);
-  if (Platform.isTV !== true || TVFocusGuideView == null || destination == null) return null;
-  return (
-    <TVFocusGuideView
-      destinations={destinations}
-      pointerEvents="none"
-      style={[guideStyle, { bottom: -12 }]}
-    />
-  );
-}
-
-/** Sits just above Start. Up from Start returns to the last stepper row. */
-export function TvUpToRow() {
-  const setup = useTvSetupFocus();
-  const destinations = setup?.exitHosts ?? EMPTY_HOSTS;
-  if (Platform.isTV !== true || TVFocusGuideView == null || destinations.length === 0) return null;
-  return (
-    <TVFocusGuideView
-      destinations={destinations}
-      pointerEvents="none"
-      style={[guideStyle, { top: -12 }]}
-    />
-  );
 }

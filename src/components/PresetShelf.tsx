@@ -214,8 +214,8 @@ export function PresetShelf({
   if (tv) {
     const rowHeight = Math.max(36, tvScaled(44, width, height));
     const labelSize = Math.max(14, tvScaled(18, width, height));
-    const shelfUp = setup?.abovePreset ?? null;
-    const shelfDown = setup?.startTag ?? null;
+    const shelfUp = setup?.exitHosts[0] ?? setup?.abovePreset ?? null;
+    const shelfDown = setup?.startHost ?? setup?.startTag ?? null;
     const pending = presets.find((preset) => preset.id === confirmDeleteId);
     const confirming = pending != null && pending.id === selected?.id;
     return (
@@ -308,8 +308,8 @@ export function PresetShelf({
                 autoCapitalize="words"
                 returnKeyType="done"
                 onSubmitEditing={() => void commit(editor.confirmOverwrite)}
-                focusUp={shelfUp}
-                focusDown={shelfDown}
+                focusUp={setup?.lastEntry ?? null}
+                focusDown={setup?.startTag ?? null}
                 style={[styles.nameInput, { minHeight: rowHeight, fontSize: labelSize, flex: 1 }]}
               />
             ) : (
@@ -551,8 +551,8 @@ function TextButton({
   prominent?: boolean;
   /** Television shelf. A short focusable control so the setup still fits on one screen. */
   dense?: boolean;
-  focusUp?: TvFocusTag | null;
-  focusDown?: TvFocusTag | null;
+  focusUp?: TvFocusTag | ComponentRef<typeof Pressable> | null;
+  focusDown?: TvFocusTag | ComponentRef<typeof Pressable> | null;
   onHost?: (node: ComponentRef<typeof Pressable> | null) => void;
 }) {
   const tv = Platform.isTV === true;

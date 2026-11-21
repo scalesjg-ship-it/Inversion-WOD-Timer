@@ -4,7 +4,7 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, 
 import { inkOn } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import type { TvFocusTag } from '@/src/components/TvTabFocus';
-import { TvDownToStart, TvUpToRow, useTvSetupFocus } from '@/src/components/TvSetupFocus';
+import { useTvSetupFocus } from '@/src/components/TvSetupFocus';
 import { useTvFocusTag } from '@/src/tv/useTvFocusTag';
 import { chrome } from '@/src/theme/chrome';
 import { stepperControlSize, tvSetupScale } from '@/src/tv/controls';
@@ -27,6 +27,7 @@ export function BigButton({
   onFocus,
   focusable,
   roomy = false,
+  fill = false,
 }: {
   label: string;
   onPress: () => void;
@@ -34,8 +35,8 @@ export function BigButton({
   testID?: string;
   variant?: 'solid' | 'ghost';
   /** TV only. Down from this button moves to the tab bar. */
-  focusDown?: TvFocusTag | null;
-  focusUp?: TvFocusTag | null;
+  focusDown?: TvFocusTag | ComponentRef<typeof Pressable> | null;
+  focusUp?: TvFocusTag | ComponentRef<typeof Pressable> | null;
   focusLeft?: TvFocusTag | null;
   focusRight?: TvFocusTag | null;
   hasTVPreferredFocus?: boolean;
@@ -44,6 +45,8 @@ export function BigButton({
   focusable?: boolean;
   /** TV setup and Rounds. A larger Start control. Phones ignore it. */
   roomy?: boolean;
+  /** TV only. Stretch across the row so Down from the left edge can land here. */
+  fill?: boolean;
 }) {
   const solid = variant === 'solid';
   const tv = Platform.isTV === true;
@@ -80,7 +83,7 @@ export function BigButton({
       style={({ pressed }) => [
         styles.big,
         tv && scaleTvStyle(tvButton, scale),
-        tv && { alignSelf: 'center', maxWidth: '100%' },
+        tv && (fill ? { alignSelf: 'stretch', width: '100%' } : { alignSelf: 'center', maxWidth: '100%' }),
         solid
           ? { backgroundColor: color }
           : { backgroundColor: 'transparent', borderWidth: 1, borderColor: color },
@@ -117,18 +120,16 @@ export function TvLinkedStart({
 }) {
   const setup = useTvSetupFocus();
   return (
-    <View>
-      <TvUpToRow />
-      <BigButton
-        label={label}
-        onPress={onPress}
-        color={color}
-        testID={testID}
-        roomy={roomy}
-        onHost={setup?.bindStart}
-        focusUp={setup?.lastEntry ?? null}
-      />
-    </View>
+    <BigButton
+      label={label}
+      onPress={onPress}
+      color={color}
+      testID={testID}
+      roomy={roomy}
+      fill
+      onHost={setup?.bindStart}
+      focusUp={setup?.exitHosts[0] ?? setup?.lastEntry ?? null}
+    />
   );
 }
 
@@ -168,7 +169,7 @@ export function NumberStepper({
   /** TV only. First control on a setup screen. */
   preferred?: boolean;
   /** TV only. Down from both buttons on this cluster. */
-  focusDown?: TvFocusTag | null;
+  focusDown?: TvFocusTag | ComponentRef<typeof Pressable> | null;
   /** TV only. Up from both buttons on this cluster. */
   focusUp?: TvFocusTag | null;
   /** TV only. Native host of the minus button, for a focus guide. */
@@ -383,7 +384,7 @@ export function TimeField({
           onLinks={rememberMinutes}
           onDecNode={exit ? (node) => publishExit('md', node) : undefined}
           onIncNode={exit ? (node) => publishExit('mi', node) : undefined}
-          focusDown={exit ? setup?.down ?? null : null}
+          focusDown={exit ? setup?.startHost ?? setup?.down ?? null : null}
           onChange={(next) => onChange(next * 60 + remainder)}
         />
         <NumberStepper
@@ -398,10 +399,9 @@ export function TimeField({
           onLinks={rememberSeconds}
           onDecNode={exit ? (node) => publishExit('sd', node) : undefined}
           onIncNode={exit ? (node) => publishExit('si', node) : undefined}
-          focusDown={exit ? setup?.down ?? null : null}
+          focusDown={exit ? setup?.startHost ?? setup?.down ?? null : null}
           onChange={(next) => onChange(minutes * 60 + next)}
         />
-        {exit ? <TvDownToStart /> : null}
       </View>
     );
   }
