@@ -2,7 +2,9 @@
 #
 # Manual only. Nothing is signed and nothing is uploaded to App Store Connect.
 # The iPhone project is prebuilt the same way as iphone-signed-testflight.yml,
-# then only the AmericanaWatch target is built for the watchOS simulator.
+# then the AmericanaWatch scheme is built from the Xcode project for the
+# booted watchOS simulator. The watch app does not link CocoaPods, so the
+# workspace is not used.
 #
 # Apple's screenshot specifications, read 21 November 2026:
 # https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/
@@ -130,6 +132,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
+          if [ -z "${WATCH_UDID:-}" ]; then
+            echo "::error::WATCH_UDID is empty. The watch simulator was not created."
+            exit 1
+          fi
           set -- ios/*.xcodeproj
           if [ "$#" -ne 1 ] || [ ! -d "$1" ] || [ "$(basename "$1")" = "Pods.xcodeproj" ]; then
             echo "::error::Expected one app xcodeproj under ios/, found $#."
@@ -138,16 +144,24 @@ jobs:
           PROJECT=$1
           DERIVED="$RUNNER_TEMP/watch-derived"
           echo "WATCH_DERIVED=$DERIVED" >> "$GITHUB_ENV"
-          echo "Building AmericanaWatch from $PROJECT for the watchOS simulator"
-          xcodebuild -project "$PROJECT" -list
+          # -derivedDataPath requires -scheme. -target is rejected before the build starts.
+          # The watch target links no Pods. A shared scheme builds only AmericanaWatch,
+          # with implicit dependencies off, so the iPhone app and its Pods are not built.
+          python3 scripts/ci-watch-screenshots.py scheme --project "$PROJECT"
+          echo "Building $(basename "$PROJECT") -scheme AmericanaWatch for the watchOS simulator"
+          xcodebuild -project "$PROJECT" -scheme AmericanaWatch -list | tee artifacts/xcodebuild-list.txt
+          if ! grep -q 'AmericanaWatch' artifacts/xcodebuild-list.txt; then
+            echo "::error::xcodebuild -list did not mention AmericanaWatch."
+            exit 1
+          fi
           set +e
           set -o pipefail
           xcodebuild build \
             -project "$PROJECT" \
-            -target AmericanaWatch \
+            -scheme AmericanaWatch \
             -configuration Debug \
             -sdk watchsimulator \
-            -destination 'generic/platform=watchOS Simulator' \
+            -destination "id=$WATCH_UDID" \
             -derivedDataPath "$DERIVED" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGNING_ALLOWED=NO \
@@ -164,6 +178,18 @@ jobs:
             echo "::error::Watch simulator build failed"
             exit "$status"
           fi
+          # Debug + -sdk watchsimulator writes the product under Debug-watchsimulator.
+          APP="$DERIVED/Build/Products/Debug-watchsimulator/AmericanaWatch.app"
+          if [ ! -d "$APP" ]; then
+            APP=$(find "$DERIVED/Build/Products" -type d -path '*/Debug-watchsimulator/AmericanaWatch.app' -print -quit)
+          fi
+          if [ -z "${APP:-}" ] || [ ! -d "$APP" ]; then
+            echo "::error::Debug watch build did not produce Debug-watchsimulator/AmericanaWatch.app"
+            find "$DERIVED/Build/Products" -type d -name '*.app' -print || true
+            exit 1
+          fi
+          echo "WATCH_APP=$APP" >> "$GITHUB_ENV"
+          echo "Built $APP"
 
       - name: Capture watch screenshots
         run: |
@@ -193,12 +219,16 @@ jobs:
             echo "watchOS did not accept simctl status_bar override. Screenshots keep the simulator clock."
           fi
           echo "STATUS_BAR=$STATUS_BAR" >> "$GITHUB_ENV"
-          APP=$(find "$WATCH_DERIVED/Build/Products" -type d -path '*/Debug-watchsimulator/AmericanaWatch.app' -print -quit)
-          if [ -z "$APP" ]; then
+          APP="${WATCH_APP:-$WATCH_DERIVED/Build/Products/Debug-watchsimulator/AmericanaWatch.app}"
+          if [ ! -d "$APP" ]; then
+            APP=$(find "$WATCH_DERIVED/Build/Products" -type d -path '*/Debug-watchsimulator/AmericanaWatch.app' -print -quit)
+          fi
+          if [ -z "${APP:-}" ] || [ ! -d "$APP" ]; then
             echo "::error::Debug-watchsimulator AmericanaWatch.app was not built"
             find "$WATCH_DERIVED/Build/Products" -name 'AmericanaWatch.app' -type d || true
             exit 1
           fi
+          echo "Installing $APP"
           if ! grep -a -F -q -- '-AmericanaWatchPreview' "$APP/AmericanaWatch"; then
             echo "::error::The watch binary is missing the DEBUG screenshot launch argument"
             exit 1
@@ -254,15 +284,21 @@ jobs:
           path: |
             artifacts/screenshots/*.png
             artifacts/screenshots/dimensions.txt
+            artifacts/xcodebuild-list.txt
+            artifacts/xcodebuild-tail.log
+            artifacts/xcodebuild.log
 
-      - name: Upload the build log tail
+      - name: Upload the build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: apple-watch-screenshot-log
           if-no-files-found: warn
           retention-days: 14
-          path: artifacts/xcodebuild-tail.log
+          path: |
+            artifacts/xcodebuild-list.txt
+            artifacts/xcodebuild-tail.log
+            artifacts/xcodebuild.log
 
       - name: Delete the screenshot simulator
         if: always()

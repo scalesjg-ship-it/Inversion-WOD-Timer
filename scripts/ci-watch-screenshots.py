@@ -481,6 +481,123 @@ def write_dimensions(
     return text
 
 
+def watch_target_id(project_text: str, name: str = "AmericanaWatch") -> str:
+    """Return the PBXNativeTarget id for the watch app. The iPhone target is ignored."""
+    pattern = re.compile(
+        r"(?P<id>[A-Fa-f0-9]{24})[^\n{]* = \{\s*isa = PBXNativeTarget;(?P<body>.*?)\n[ \t]*\};",
+        re.DOTALL,
+    )
+    found: list[str] = []
+    for match in pattern.finditer(project_text):
+        named = re.search(r"^[ \t]*name = \"?([^;\"]+)\"?;", match.group("body"), re.MULTILINE)
+        if named and named.group(1) == name:
+            found.append(match.group("id"))
+    if len(found) != 1:
+        fail(f"Expected one {name} native target in the Xcode project, found {len(found)}")
+    return found[0]
+
+
+def watch_scheme_xml(target_id: str, project_name: str, name: str = "AmericanaWatch") -> str:
+    """Shared scheme that builds only the watch app, with implicit dependencies off.
+
+    Opening the CocoaPods workspace and building this scheme otherwise compiles the
+    iPhone Pods for the watch simulator.
+    """
+    if name == "Americana" or "Pods" in name:
+        fail(f"Refusing to write a watch scheme for {name}")
+    reference = f"""<BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "{target_id}"
+               BuildableName = "{name}.app"
+               BlueprintName = "{name}"
+               ReferencedContainer = "container:{project_name}">
+            </BuildableReference>"""
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "2600"
+   version = "1.7">
+   <BuildAction
+      parallelizeBuildables = "NO"
+      buildImplicitDependencies = "NO">
+      <BuildActionEntries>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            {reference}
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES">
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         {reference}
+      </BuildableProductRunnable>
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         {reference}
+      </BuildableProductRunnable>
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>
+"""
+    names = re.findall(r'BlueprintName = "([^"]+)"', xml)
+    if names != [name, name, name]:
+        fail(f"Watch scheme must reference only {name}, found {names or '(none)'}")
+    if xml.count(f'BlueprintIdentifier = "{target_id}"') != 3:
+        fail("Watch scheme did not reference only the watch target")
+    if 'buildImplicitDependencies = "NO"' not in xml or 'parallelizeBuildables = "NO"' not in xml:
+        fail("Watch scheme still builds implicit dependencies")
+    if 'buildImplicitDependencies = "YES"' in xml or 'parallelizeBuildables = "YES"' in xml:
+        fail("Watch scheme still builds implicit dependencies")
+    return xml
+
+
+def write_watch_scheme(project: Path, name: str = "AmericanaWatch") -> Path:
+    """Write xcshareddata/xcschemes/AmericanaWatch.xcscheme for one watch target."""
+    if project.suffix != ".xcodeproj" or not project.is_dir():
+        fail(f"Expected an xcodeproj directory, got {project}")
+    pbx = project / "project.pbxproj"
+    if not pbx.is_file():
+        fail(f"Missing {pbx}")
+    target_id = watch_target_id(pbx.read_text(), name)
+    scheme_dir = project / "xcshareddata" / "xcschemes"
+    scheme_dir.mkdir(parents=True, exist_ok=True)
+    scheme_path = scheme_dir / f"{name}.xcscheme"
+    scheme_path.write_text(watch_scheme_xml(target_id, project.name, name))
+    return scheme_path
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -499,6 +616,9 @@ def build_parser() -> argparse.ArgumentParser:
     dimensions_cmd.add_argument("--runtime", required=True)
     dimensions_cmd.add_argument("--status-bar", required=True)
     dimensions_cmd.add_argument("--out", required=True)
+
+    scheme_cmd = sub.add_parser("scheme")
+    scheme_cmd.add_argument("--project", required=True)
     return parser
 
 
@@ -524,6 +644,10 @@ def main(argv: list[str] | None = None) -> int:
                 Path(args.out),
             )
             sys.stdout.write(text)
+            return 0
+        if args.cmd == "scheme":
+            scheme_path = write_watch_scheme(Path(args.project))
+            print(f"Wrote {scheme_path} for AmericanaWatch only")
             return 0
         fail(f"Unknown command {args.cmd}")
     except ScreenshotError as error:

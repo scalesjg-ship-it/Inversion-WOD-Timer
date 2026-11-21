@@ -7,6 +7,7 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -155,6 +156,63 @@ class PngTests(unittest.TestCase):
                 shots.prepare_png(path)
 
 
+class SchemeTests(unittest.TestCase):
+    def test_shared_scheme_builds_only_the_watch_target(self):
+        pbx = """
+		AABBCCDDEEFF001122334455 /* Americana */ = {
+			isa = PBXNativeTarget;
+			name = Americana;
+			productName = Americana;
+		};
+		00112233445566778899AABB /* AmericanaWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "AmericanaWatch" */;
+			dependencies = (
+			);
+			name = AmericanaWatch;
+			productName = AmericanaWatch;
+		};
+		FF00112233445566778899AA /* AmericanaWatch.app */ = {
+			isa = PBXFileReference;
+			name = AmericanaWatch.app;
+		};
+"""
+        self.assertEqual(shots.watch_target_id(pbx), "00112233445566778899AABB")
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "Americana.xcodeproj"
+            project.mkdir()
+            (project / "project.pbxproj").write_text(pbx)
+            scheme = shots.write_watch_scheme(project)
+            text = scheme.read_text()
+        ET.fromstring(text)
+        self.assertEqual(scheme.name, "AmericanaWatch.xcscheme")
+        self.assertIn("xcshareddata/xcschemes", str(scheme))
+        self.assertIn('buildImplicitDependencies = "NO"', text)
+        self.assertIn('parallelizeBuildables = "NO"', text)
+        self.assertNotIn('buildImplicitDependencies = "YES"', text)
+        blueprint_names = [line.strip() for line in text.splitlines() if "BlueprintName" in line]
+        self.assertEqual(blueprint_names, ['BlueprintName = "AmericanaWatch"'] * 3)
+        self.assertNotIn("AABBCCDDEEFF001122334455", text)
+        self.assertIn('BlueprintIdentifier = "00112233445566778899AABB"', text)
+        self.assertIn('ReferencedContainer = "container:Americana.xcodeproj"', text)
+        self.assertNotIn("Pods", text)
+
+    def test_scheme_rejects_a_missing_watch_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "Americana.xcodeproj"
+            project.mkdir()
+            (project / "project.pbxproj").write_text(
+                """
+		AABBCCDDEEFF001122334455 /* Americana */ = {
+			isa = PBXNativeTarget;
+			name = Americana;
+		};
+"""
+            )
+            with self.assertRaises(shots.ScreenshotError):
+                shots.write_watch_scheme(project)
+
+
 class WorkflowTests(unittest.TestCase):
     def test_workflow_is_manual_unsigned_and_captures_booted_screenshots(self):
         text = (ROOT / ".github" / "workflows" / "apple-watch-screenshots.yml").read_text()
@@ -175,11 +233,28 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("WATCHOS_DEPLOYMENT_TARGET", text)
         self.assertIn("verify-prebuild", text)
         self.assertIn("CODE_SIGNING_ALLOWED=NO", text)
+        self.assertIn("-scheme AmericanaWatch", text)
+        self.assertIn('-project "$PROJECT"', text)
+        self.assertNotIn("-workspace", text)
+        self.assertNotIn("xcworkspace", text)
+        self.assertIn("ci-watch-screenshots.py scheme --project", text)
+        self.assertIn("-sdk watchsimulator", text)
+        self.assertIn('-destination "id=$WATCH_UDID"', text)
+        self.assertIn("-configuration Debug", text)
+        self.assertIn('-derivedDataPath "$DERIVED"', text)
+        self.assertIn("Debug-watchsimulator/AmericanaWatch.app", text)
+        self.assertNotIn("-target AmericanaWatch", text)
+        self.assertNotIn("generic/platform=watchOS Simulator", text)
         self.assertIn("-AmericanaWatchPreview", text)
+        self.assertIn("xcrun simctl install booted", text)
+        self.assertIn('simctl launch booted "$WATCH_BUNDLE_ID" -AmericanaWatchPreview', text)
         self.assertIn("xcrun simctl io booted screenshot", text)
         self.assertIn("xcrun simctl status_bar booted override --time 9:41", text)
-        self.assertIn("apple-watch-screenshots", text)
+        self.assertIn("name: apple-watch-screenshots", text)
+        self.assertIn("if: always()", text)
         self.assertIn("dimensions.txt", text)
+        self.assertIn("artifacts/xcodebuild.log", text)
+        self.assertGreaterEqual(text.count("if: always()"), 2)
         self.assertIn('default: "waiting,work,rest,finished"', text)
         self.assertIn("ultra-410x502", text)
         self.assertIn("series-46mm-416x496", text)
