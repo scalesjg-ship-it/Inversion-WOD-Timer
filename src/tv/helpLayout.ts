@@ -9,9 +9,8 @@ export interface TvHelpColumn {
 }
 
 /**
- * Full-width rows stacked under the page title, the same place the WOD cards
- * sit under the tab bar. A narrow column leaves the Help tab (the rightmost
- * tab) with nothing beneath it, so Down stays on the tab.
+ * Short rows stacked under the tab bar, inside the safe area. The Help screen
+ * places this stack in the right third, under the Help tab.
  */
 export function tvHelpColumn(width: number, height: number, count: number, pageSize: number): TvHelpColumn {
   const rows = Math.max(count, 1);
