@@ -2,7 +2,9 @@
 #
 # Manual only. Nothing is signed and nothing is uploaded to App Store Connect.
 # The iPhone project is prebuilt the same way as iphone-signed-testflight.yml,
-# then the AmericanaWatch scheme is built for the booted watchOS simulator.
+# then the AmericanaWatch scheme is built from the Xcode project for the
+# booted watchOS simulator. The watch app does not link CocoaPods, so the
+# workspace is not used.
 #
 # Apple's screenshot specifications, read 21 November 2026:
 # https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/
@@ -140,31 +142,22 @@ jobs:
             exit 1
           fi
           PROJECT=$1
-          WORKSPACE="${PROJECT%.xcodeproj}.xcworkspace"
           DERIVED="$RUNNER_TEMP/watch-derived"
           echo "WATCH_DERIVED=$DERIVED" >> "$GITHUB_ENV"
           # -derivedDataPath requires -scheme. -target is rejected before the build starts.
-          # Prebuild installs CocoaPods for the iPhone project; use its workspace when Pods exist.
-          if [ -d ios/Pods ]; then
-            if [ ! -d "$WORKSPACE" ]; then
-              echo "::error::ios/Pods exists but $WORKSPACE is missing. Pod install did not finish."
-              exit 1
-            fi
-            container=(-workspace "$WORKSPACE")
-            echo "Pods are installed. Building $(basename "$WORKSPACE") -scheme AmericanaWatch"
-          else
-            container=(-project "$PROJECT")
-            echo "No Pods directory. Building $(basename "$PROJECT") -scheme AmericanaWatch"
-          fi
-          xcodebuild "${container[@]}" -list | tee artifacts/xcodebuild-list.txt
+          # The watch target links no Pods. A shared scheme builds only AmericanaWatch,
+          # with implicit dependencies off, so the iPhone app and its Pods are not built.
+          python3 scripts/ci-watch-screenshots.py scheme --project "$PROJECT"
+          echo "Building $(basename "$PROJECT") -scheme AmericanaWatch for the watchOS simulator"
+          xcodebuild -project "$PROJECT" -scheme AmericanaWatch -list | tee artifacts/xcodebuild-list.txt
           if ! grep -q 'AmericanaWatch' artifacts/xcodebuild-list.txt; then
-            echo "::error::xcodebuild -list did not mention AmericanaWatch. Expected schemes Americana and AmericanaWatch."
+            echo "::error::xcodebuild -list did not mention AmericanaWatch."
             exit 1
           fi
           set +e
           set -o pipefail
           xcodebuild build \
-            "${container[@]}" \
+            -project "$PROJECT" \
             -scheme AmericanaWatch \
             -configuration Debug \
             -sdk watchsimulator \
