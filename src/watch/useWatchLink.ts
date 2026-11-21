@@ -4,6 +4,14 @@ import type { TimerConfig, TimerSnapshot } from '@/src/timer/types';
 
 import { watchControl, type WatchClockAction } from './commands';
 import { buildWatchState, watchEvents } from './face';
+import {
+  logWatchLink,
+  watchButtonVisible,
+  watchLinkAfterPickerResult,
+  watchLinkMessage,
+  watchLinkPhaseFromEvent,
+  type WatchLinkPhase,
+} from './linkStatus';
 import { eventJson, watchNative } from './native';
 import { decodeMessage, encodeMessage } from './protocol';
 
@@ -16,6 +24,9 @@ interface UseWatchLinkInput {
 
 export function useWatchLink(input: UseWatchLinkInput): {
   connected: boolean;
+  phase: WatchLinkPhase;
+  message: string | null;
+  watchControlVisible: boolean;
   presentPicker: () => void;
 } {
   const snapshotRef = useRef(input.snapshot);
@@ -25,6 +36,7 @@ export function useWatchLink(input: UseWatchLinkInput): {
   const seqRef = useRef(0);
   const publishRef = useRef<() => void>(() => {});
   const [connected, setConnected] = useState(false);
+  const [phase, setPhase] = useState<WatchLinkPhase>('idle');
 
   useEffect(() => {
     snapshotRef.current = input.snapshot;
@@ -60,7 +72,12 @@ export function useWatchLink(input: UseWatchLinkInput): {
       );
     });
     const linkSub = native.addListener('link', (payload) => {
-      setConnected(eventJson(payload) === 'connected');
+      const raw = eventJson(payload);
+      const next = watchLinkPhaseFromEvent(raw);
+      logWatchLink(next ?? 'idle', `event ${raw || 'empty'}`);
+      if (!next) return;
+      setPhase(next);
+      setConnected(next === 'connected');
     });
 
     const nextSeq = () => {
@@ -87,6 +104,7 @@ export function useWatchLink(input: UseWatchLinkInput): {
       native.stop();
       previousRef.current = null;
       setConnected(false);
+      setPhase('idle');
     };
   }, [input.enabled]);
 
@@ -98,9 +116,32 @@ export function useWatchLink(input: UseWatchLinkInput): {
   const presentPicker = useCallback(() => {
     if (!input.enabled) return;
     const native = watchNative();
-    if (!native) return;
-    void native.presentPicker();
+    if (!native) {
+      logWatchLink('unavailable', 'module missing');
+      setPhase('unavailable');
+      setConnected(false);
+      return;
+    }
+    logWatchLink('looking', 'presentPicker');
+    setPhase('looking');
+    void native.presentPicker()
+      .then((opened) => {
+        logWatchLink(opened ? 'looking' : 'unsupported', `presentPicker returned ${opened}`);
+        setPhase((current) => watchLinkAfterPickerResult(current, opened));
+        if (!opened) setConnected(false);
+      })
+      .catch(() => {
+        logWatchLink('unavailable', 'presentPicker rejected');
+        setPhase((current) => (current === 'looking' || current === 'idle' ? 'unavailable' : current));
+        setConnected(false);
+      });
   }, [input.enabled]);
 
-  return { connected, presentPicker };
+  return {
+    connected,
+    phase,
+    message: watchLinkMessage(phase),
+    watchControlVisible: watchButtonVisible(phase),
+    presentPicker,
+  };
 }

@@ -32,6 +32,9 @@ final class AmericanaRemoteUITests: XCTestCase {
     step("tab WOD") { openWodTab() }
     step("tab Rounds") { openTab("tab-rounds", screen: "screen-rounds", direction: .right) }
     step("tab Brand") { openTab("tab-brand", screen: "screen-brand", direction: .right) }
+    step("tab Help") { openTab("tab-help", screen: "screen-help", direction: .right) }
+    step("Help sections") { walkHelp() }
+    step("remote left returns to Brand") { openTab("tab-brand", screen: "screen-brand", direction: .left) }
     step("remote left returns to Rounds") { openTab("tab-rounds", screen: "screen-rounds", direction: .left) }
     step("remote left returns to WOD") { openTab("tab-wod", screen: "screen-wod", direction: .left) }
     step("remote down leaves the tab bar") { downIntoContent() }
@@ -44,6 +47,7 @@ final class AmericanaRemoteUITests: XCTestCase {
     }
     step("clock reaches For Time work") { waitForWorkPhase() }
     step("Select pauses and focus stays on Resume") { selectPausesOntoResume() }
+    step("paused For Time shows Watch") { pausedForTimeShowsWatch() }
     step("Resume continues") { resumeContinues() }
     step("Play/Pause toggles") { playPauseToggles() }
     step("Stop (For Time)") { stopForTime() }
@@ -53,6 +57,19 @@ final class AmericanaRemoteUITests: XCTestCase {
       return menuPausesAndStays()
     }
     step("second Menu leaves the timer") { secondMenuLeaves() }
+  }
+
+  /// Relaunches with `-AmericanaWatchStatus unsupported`, the same message an
+  /// Apple TV HD gets when DeviceDiscoveryUI `isSupported` is false.
+  func testWatchUnsupportedMessage() {
+    app.terminate()
+    app.launchArguments += ["-AmericanaWatchStatus", "unsupported"]
+    app.launch()
+    XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "App did not stay in the foreground")
+    step("unsupported opens For Time") { startForTime() }
+    step("unsupported reaches work") { waitForWorkPhase() }
+    step("unsupported pauses") { selectPausesOntoResume() }
+    step("unsupported Apple TV HD message") { unsupportedWatchMessage() }
   }
 
   /// Down from the lead-in minutes minus must leave that button. Save preset
@@ -178,6 +195,57 @@ final class AmericanaRemoteUITests: XCTestCase {
     XCTAssertTrue(ready, "For Time did not reach work. face=\(faceLabel()) \(snapshot())")
     XCTAssertTrue(any("timer-stop").waitForExistence(timeout: 5), "Stop was not on the For Time clock. \(snapshot())")
     return "face=\(faceLabel())"
+  }
+
+  private func walkHelp() -> String {
+    press(.down, settle: 0.7)
+    if !focused("help-watch") {
+      XCTAssertTrue(nudge("help-watch", directions: [.down, .up], limit: 6), "Down did not reach Apple Watch. \(snapshot())")
+    }
+    XCTAssertTrue(nudge("help-remote", directions: [.down], limit: 3), "Could not focus Remote. \(snapshot())")
+    XCTAssertTrue(nudge("help-version", directions: [.down], limit: 14), "Could not focus the version line. \(snapshot())")
+    let version = any("help-version").label
+    XCTAssertTrue(version.contains("Version"), "Version line was \(version). \(snapshot())")
+    for _ in 0..<16 {
+      if focused("tab-help") { break }
+      press(.up, settle: 0.35)
+    }
+    XCTAssertTrue(focused("tab-help"), "Up did not return to Help. \(snapshot())")
+    return "version=\(version) focus=\(focusedIdentifier())"
+  }
+
+  private func pausedForTimeShowsWatch() -> String {
+    let watch = any("timer-watch")
+    XCTAssertTrue(watch.waitForExistence(timeout: 5), "Watch was not on the paused clock. \(snapshot())")
+    let screen = app.frame
+    for id in ["timer-pause", "timer-stop", "timer-reset", "timer-watch"] {
+      let button = any(id)
+      XCTAssertTrue(button.exists, "\(id) missing on the paused clock. \(snapshot())")
+      XCTAssertGreaterThanOrEqual(button.frame.minX, -1, "\(id) is off the left edge \(button.frame)")
+      XCTAssertLessThanOrEqual(button.frame.maxX, screen.maxX + 1, "\(id) is off the right edge \(button.frame)")
+    }
+    var union = CGRect.null
+    for id in ["timer-pause", "timer-stop", "timer-reset", "timer-watch"] {
+      union = union.union(any(id).frame)
+    }
+    XCTAssertLessThan(abs(union.midX - screen.midX), 80, "Transport row is not centered. union=\(union) screen=\(screen)")
+    let face = any("timer-face")
+    if face.exists {
+      XCTAssertLessThanOrEqual(face.frame.maxY, watch.frame.minY + 2, "Clock face overlaps Watch. face=\(face.frame) watch=\(watch.frame)")
+    }
+    return "watch=\(watch.frame) union=\(union)"
+  }
+
+  private func unsupportedWatchMessage() -> String {
+    let status = any("timer-watch-status")
+    XCTAssertTrue(status.waitForExistence(timeout: 8), "Watch status did not appear. \(snapshot())")
+    XCTAssertTrue(status.label.contains("Apple TV 4K"), "Status was \(status.label). \(snapshot())")
+    XCTAssertFalse(any("timer-watch").exists, "Watch stayed on screen after unsupported. \(snapshot())")
+    let face = any("timer-face")
+    if face.exists && status.exists {
+      XCTAssertLessThanOrEqual(face.frame.maxY, status.frame.minY + 2, "Clock face overlaps the watch status. face=\(face.frame) status=\(status.frame)")
+    }
+    return status.label
   }
 
   private func selectPausesOntoResume() -> String {
@@ -363,7 +431,7 @@ final class AmericanaRemoteUITests: XCTestCase {
   }
 
   private func focusedTab() -> String? {
-    for id in ["tab-wod", "tab-rounds", "tab-brand"] where focused(id) {
+    for id in ["tab-wod", "tab-rounds", "tab-brand", "tab-help"] where focused(id) {
       return id
     }
     return nil

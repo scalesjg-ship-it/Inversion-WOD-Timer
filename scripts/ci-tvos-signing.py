@@ -66,6 +66,56 @@ def fail(message: str) -> None:
     raise SystemExit(f"::error::{message}")
 
 
+WATCH_SERVICE = "Americana-Timer"
+
+
+def assert_watch_browse(plist: dict) -> None:
+    """The generated tvOS Info.plist must browse the watch application service.
+
+    Apple's DeviceDiscoveryUI article requires NSApplicationServices.Browses with
+    the service identifier, a usage description, and NSApplicationServicePlatformSupport
+    containing watchOS. No entitlement is required.
+    """
+    services = plist.get("NSApplicationServices")
+    if not isinstance(services, dict):
+        fail("tvOS Info.plist is missing NSApplicationServices")
+    browses = services.get("Browses")
+    if not isinstance(browses, list) or not browses:
+        fail("tvOS Info.plist NSApplicationServices.Browses is empty")
+    match = None
+    for entry in browses:
+        if isinstance(entry, dict) and entry.get("NSApplicationServiceIdentifier") == WATCH_SERVICE:
+            match = entry
+            break
+    if match is None:
+        fail(f"tvOS Info.plist does not browse {WATCH_SERVICE}")
+    description = match.get("NSApplicationServiceUsageDescription")
+    if not isinstance(description, str) or not description.strip():
+        fail("tvOS Info.plist browse entry is missing NSApplicationServiceUsageDescription")
+    platforms = match.get("NSApplicationServicePlatformSupport")
+    if not isinstance(platforms, list) or "watchOS" not in platforms:
+        fail(f"tvOS Info.plist platform support is {platforms!r}, expected watchOS")
+
+
+def check_watch_browse(ios_dir: Path) -> None:
+    info_files = [path for path in sorted(ios_dir.glob("*/Info.plist")) if path.parent.name != "Pods"]
+    if not info_files:
+        fail("Prebuild did not write an app Info.plist")
+    checked = 0
+    for path in info_files:
+        plist = load_plist(path)
+        bundle = plist.get("CFBundleIdentifier")
+        if bundle not in (None, BUNDLE_ID, "$(PRODUCT_BUNDLE_IDENTIFIER)"):
+            continue
+        if "CFBundleExecutable" not in plist and "CFBundleIdentifier" not in plist and "NSApplicationServices" not in plist:
+            continue
+        assert_watch_browse(plist)
+        checked += 1
+        print(f"NSApplicationServices Browses {WATCH_SERVICE} for watchOS in {path}")
+    if checked != 1:
+        fail(f"Expected one tvOS Info.plist browsing {WATCH_SERVICE}, found {checked}")
+
+
 def read_plugin_tvos_build_number(root: Path) -> str:
     """The committed default. The upload build can override it."""
     text = (root / "plugins" / "withTvBuildNumber.js").read_text()
@@ -553,6 +603,7 @@ def verify_prebuild(
     if len(matched_plists) != 1:
         fail(f"Expected one Info.plist with CFBundleVersion {build}, found {len(matched_plists)}")
     info_path, matched = matched_plists[0]
+    assert_watch_browse(matched)
     short = str(matched.get("CFBundleShortVersionString"))
     exported = source_version
     if marketing_version is None:
@@ -733,6 +784,7 @@ def verify_built_app(app: Path, root: Path, marketing_version: str | None = None
     reject_known_tvos_build(marketing, build)
     info = load_plist(app / "Info.plist")
     verify_built_plist(info, marketing, build)
+    assert_watch_browse(info)
     profile = app / "embedded.mobileprovision"
     if not profile.is_file():
         fail("Built app is missing embedded.mobileprovision")
@@ -765,6 +817,10 @@ def verify_built_app(app: Path, root: Path, marketing_version: str | None = None
         sys.stderr.write(verified.stderr or "")
         fail("codesign verification failed")
     print(f"Signed {BUNDLE_ID} build {build} ({marketing}) for team {TEAM_ID} (appletvos)")
+
+
+def cmd_check_watch_browse(args: argparse.Namespace) -> None:
+    check_watch_browse(Path(args.ios_dir).resolve())
 
 
 def cmd_verify_prebuild(args: argparse.Namespace) -> None:
@@ -857,6 +913,10 @@ def cmd_verify_built_app(args: argparse.Namespace) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
+
+    browse = sub.add_parser("check-watch-browse")
+    browse.add_argument("--ios-dir", default="ios")
+    browse.set_defaults(func=cmd_check_watch_browse)
 
     verify = sub.add_parser("verify-prebuild")
     verify.add_argument("--repo", default=str(repo_root()))

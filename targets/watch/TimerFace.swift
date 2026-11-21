@@ -2,12 +2,18 @@ import SwiftUI
 
 struct WatchRoot: View {
   @ObservedObject var session: WatchSession
+  @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
     TimerFace(model: session.model) { command in
       session.sendCommand(command)
     }
     .onAppear { session.start() }
+    .onChange(of: scenePhase) { phase in
+      if phase == .active {
+        session.noteForeground()
+      }
+    }
   }
 }
 

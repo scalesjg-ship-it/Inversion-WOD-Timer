@@ -77,6 +77,14 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabMark color={color} label="B" />,
         }}
       />
+      <Tabs.Screen
+        name="help"
+        options={{
+          title: 'Help',
+          tabBarButtonTestID: 'tab-help',
+          tabBarIcon: ({ color }) => <TabMark color={color} label="H" />,
+        }}
+      />
     </Tabs>
   );
 }
