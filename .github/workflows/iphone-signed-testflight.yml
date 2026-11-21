@@ -16,13 +16,16 @@
 # be greater than 18. app.json ios.buildNumber is not changed. Android
 # versionName and versionCode are not changed. EXPO_TV is not set, so this is
 # not a tvOS archive.
+#
+# confirm=VERIFY_ONLY archives, exports, and checks the signature, then stops.
+# confirm=UPLOAD does that and then sends the IPA to internal TestFlight.
 name: iPhone signed TestFlight
 
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: Type UPLOAD to build a signed iPhone and Watch archive and send it to internal TestFlight
+        description: Type UPLOAD to build, verify, and send to internal TestFlight. Type VERIFY_ONLY to build and verify the signed IPA without uploading.
         required: true
         type: string
       build_number:
@@ -65,12 +68,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Require an explicit UPLOAD confirmation
+      - name: Require an explicit confirmation
         run: |
           set -euo pipefail
-          if [ "$CONFIRM" != "UPLOAD" ]; then
-            echo "::error::Refusing to sign or upload. Re-run workflow_dispatch with confirm set to UPLOAD."
+          if [ "$CONFIRM" != "UPLOAD" ] && [ "$CONFIRM" != "VERIFY_ONLY" ]; then
+            echo "::error::Refusing to sign. Re-run workflow_dispatch with confirm set to UPLOAD or VERIFY_ONLY."
             exit 1
+          fi
+          if [ "$CONFIRM" = "VERIFY_ONLY" ]; then
+            echo "VERIFY_ONLY: the signed IPA will be checked and will not be uploaded."
           fi
 
       - name: Check secrets and pin the Apple team
@@ -214,7 +220,10 @@ jobs:
           rm -rf "$IPA_UNPACK_DIR"
           mkdir -p "$IPA_UNPACK_DIR"
           echo "IPA_UNPACK_DIR=$IPA_UNPACK_DIR" >> "$GITHUB_ENV"
-          unzip -q "$IPA_PATH" -d "$IPA_UNPACK_DIR"
+          # Xcode packages the IPA with ditto. Info-ZIP turns sealed symlinks
+          # into regular files and drops resource forks, so codesign --verify
+          # --deep --strict then reports a sealed resource missing or invalid.
+          ditto -x -k "$IPA_PATH" "$IPA_UNPACK_DIR"
           app_count=$(find "$IPA_UNPACK_DIR/Payload" -maxdepth 1 -type d -name '*.app' | wc -l | tr -d ' ')
           if [ "$app_count" -ne 1 ]; then
             echo "::error::Expected one .app in the IPA, found $app_count"
@@ -224,6 +233,7 @@ jobs:
           python3 scripts/ci-ios-signing.py verify-built-app --app "$APP"
 
       - name: Upload to TestFlight
+        if: inputs.confirm == 'UPLOAD'
         run: |
           set -euo pipefail
           KEY_DIR="$RUNNER_TEMP/asc-private-keys"
@@ -257,7 +267,24 @@ jobs:
               | tee artifacts/upload.log
           fi
 
+      - name: Report the verified IPA
+        if: inputs.confirm == 'VERIFY_ONLY'
+        run: |
+          set -euo pipefail
+          echo "Verified iOS ${MARKETING_VERSION} (${IOS_BUILD_NUMBER}) for ${BUNDLE_ID} and ${WATCH_BUNDLE_ID}."
+          echo "Team BNP9QFC679 (CrossFit Inversion LLC). The IPA was not uploaded."
+          {
+            echo "## Signed IPA verified"
+            echo
+            echo "- App: Americana (\`${BUNDLE_ID}\`) and watch (\`${WATCH_BUNDLE_ID}\`)"
+            echo "- Team: BNP9QFC679 (CrossFit Inversion LLC)"
+            echo "- CFBundleVersion: ${IOS_BUILD_NUMBER} (iPhone and watch)"
+            echo "- CFBundleShortVersionString: ${MARKETING_VERSION}"
+            echo "- Result: signature verified with codesign --verify --deep --strict. Not uploaded."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Report the TestFlight upload
+        if: inputs.confirm == 'UPLOAD'
         run: |
           set -euo pipefail
           echo "Uploaded iOS CFBundleVersion ${IOS_BUILD_NUMBER} (${MARKETING_VERSION}) for ${BUNDLE_ID} and ${WATCH_BUNDLE_ID}."

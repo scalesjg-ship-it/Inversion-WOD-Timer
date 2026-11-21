@@ -428,7 +428,7 @@ def _codesign(app: Path, bundle_id: str) -> None:
     )
     assert_codesign((details.stderr or "") + (details.stdout or ""), bundle_id)
     verified = subprocess.run(
-        ["codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app)],
+        ["codesign", "--verify", "--deep", "--strict", "--verbose=4", str(app)],
         check=False,
         capture_output=True,
         text=True,

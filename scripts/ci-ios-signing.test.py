@@ -225,6 +225,13 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("betaAppReview", text)
         self.assertIn("confirm", text)
         self.assertIn("UPLOAD", text)
+        self.assertIn("VERIFY_ONLY", text)
+        self.assertIn("inputs.confirm == 'UPLOAD'", text)
+        verify = text.split("Verify the signed iPhone and watch build", 1)[1].split("- name:", 1)[0]
+        self.assertIn("ditto -x -k", verify)
+        self.assertNotIn("unzip", verify)
+        helper = (ROOT / "scripts" / "ci-ios-signing.py").read_text()
+        self.assertIn('"--verify", "--deep", "--strict", "--verbose=4"', helper)
         self.assertIn("build_number:", text)
         self.assertIn('default: "19"', text)
         self.assertIn("IOS_BUILD_NUMBER: ${{ inputs.build_number }}", text)
