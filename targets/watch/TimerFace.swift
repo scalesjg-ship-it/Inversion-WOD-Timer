@@ -74,70 +74,83 @@ struct TimerFace: View {
   }
 }
 
+/// Sample faces for the SwiftUI canvas and for debug screenshot launches.
+/// The values match the timer labels the Apple TV already sends.
+enum WatchPreviewFace: String {
+  case waiting
+  case getReady
+  case work
+  case rest
+  case finished
+
+  var model: WatchFaceModel {
+    switch self {
+    case .waiting:
+      return .waiting
+    case .getReady:
+      return WatchFaceModel(
+        phase: "getReady",
+        phaseText: "GET READY",
+        timeText: "00:10",
+        roundText: "8 rounds",
+        primaryTitle: "Pause",
+        primaryCommand: "pause",
+        canReset: true,
+        status: "Apple TV",
+        connected: true
+      )
+    case .work:
+      return WatchFaceModel(
+        phase: "work",
+        phaseText: "WORK",
+        timeText: "00:42",
+        roundText: "Round 3 of 8",
+        primaryTitle: "Pause",
+        primaryCommand: "pause",
+        canReset: true,
+        status: "Apple TV",
+        connected: true
+      )
+    case .rest:
+      return WatchFaceModel(
+        phase: "rest",
+        phaseText: "REST",
+        timeText: "00:08",
+        roundText: "Round 3 of 8",
+        primaryTitle: "Pause",
+        primaryCommand: "pause",
+        canReset: true,
+        status: "Apple TV",
+        connected: true
+      )
+    case .finished:
+      return WatchFaceModel(
+        phase: "finished",
+        phaseText: "DONE",
+        timeText: "04:00",
+        roundText: "Round 8 of 8",
+        primaryTitle: "Start",
+        primaryCommand: "start",
+        canReset: true,
+        status: "Apple TV",
+        connected: true
+      )
+    }
+  }
+}
+
 #Preview("Get ready") {
-  TimerFace(
-    model: WatchFaceModel(
-      phase: "getReady",
-      phaseText: "GET READY",
-      timeText: "00:10",
-      roundText: "8 rounds",
-      primaryTitle: "Pause",
-      primaryCommand: "pause",
-      canReset: true,
-      status: "Apple TV",
-      connected: true
-    ),
-    onCommand: { _ in }
-  )
+  TimerFace(model: WatchPreviewFace.getReady.model, onCommand: { _ in })
 }
 
 #Preview("Work") {
-  TimerFace(
-    model: WatchFaceModel(
-      phase: "work",
-      phaseText: "WORK",
-      timeText: "00:42",
-      roundText: "Round 3 of 8",
-      primaryTitle: "Pause",
-      primaryCommand: "pause",
-      canReset: true,
-      status: "Apple TV",
-      connected: true
-    ),
-    onCommand: { _ in }
-  )
+  TimerFace(model: WatchPreviewFace.work.model, onCommand: { _ in })
 }
 
 #Preview("Rest") {
-  TimerFace(
-    model: WatchFaceModel(
-      phase: "rest",
-      phaseText: "REST",
-      timeText: "00:08",
-      roundText: "Round 3 of 8",
-      primaryTitle: "Pause",
-      primaryCommand: "pause",
-      canReset: true,
-      status: "Apple TV",
-      connected: true
-    ),
-    onCommand: { _ in }
-  )
+  TimerFace(model: WatchPreviewFace.rest.model, onCommand: { _ in })
 }
 
 #Preview("Finished") {
-  TimerFace(
-    model: WatchFaceModel(
-      phase: "finished",
-      phaseText: "DONE",
-      timeText: "04:00",
-      roundText: "Round 8 of 8",
-      primaryTitle: "Start",
-      primaryCommand: "start",
-      canReset: true,
-      status: "Apple TV",
-      connected: true
-    ),
-    onCommand: { _ in }
-  )
+  TimerFace(model: WatchPreviewFace.finished.model, onCommand: { _ in })
 }

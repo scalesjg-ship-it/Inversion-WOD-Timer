@@ -36,8 +36,23 @@ final class WatchSession: ObservableObject {
   private var listener: NWListener?
   private var connection: NWConnection?
   private let framer = WatchFramer()
+  /// Debug screenshot launches already show a preview face and must not open the listener.
+  private let showsLaunchPreview: Bool
+
+  init() {
+    #if DEBUG
+    let preview = WatchSession.launchPreviewModel()
+    showsLaunchPreview = preview != nil
+    if let face = preview {
+      model = face
+    }
+    #else
+    showsLaunchPreview = false
+    #endif
+  }
 
   func start() {
+    guard !showsLaunchPreview else { return }
     guard listener == nil else { return }
     guard #available(watchOS 9.0, *) else {
       model.status = "Needs watchOS 9"
@@ -185,6 +200,21 @@ final class WatchSession: ObservableObject {
       return "Start"
     }
   }
+
+  #if DEBUG
+  /// Screenshot runs pass `-AmericanaWatchPreview waiting|getReady|work|rest|finished`.
+  /// The faces are the SwiftUI previews. Release builds omit this path.
+  private static func launchPreviewModel() -> WatchFaceModel? {
+    let args = ProcessInfo.processInfo.arguments
+    let flag = "-AmericanaWatchPreview"
+    guard let index = args.firstIndex(of: flag),
+          index + 1 < args.count,
+          let face = WatchPreviewFace(rawValue: args[index + 1]) else {
+      return nil
+    }
+    return face.model
+  }
+  #endif
 
   private func play(_ name: String?) {
     switch name {
