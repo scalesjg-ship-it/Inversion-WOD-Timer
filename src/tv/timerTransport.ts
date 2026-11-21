@@ -52,9 +52,17 @@ export function preferredTransportRole(buttons: TransportButton[]): TransportRol
 }
 
 /**
- * The on-screen Back control is drawn on TV but is not in the focus order.
- * Select would activate a focused Back and leave the workout. Hardware Back
- * still uses `backStep`.
+ * Apple TV has no on-screen Back. Menu on the Siri Remote is the back button.
+ * Phones and Android TV / Fire TV keep the control.
+ * `Platform.OS` is `ios` on Apple TV and `android` on Fire TV and Android TV.
+ */
+export function showsOnScreenBack(tv: boolean, os: string): boolean {
+  return !(tv && os === 'ios');
+}
+
+/**
+ * Android TV still draws Back, but it stays out of the focus order.
+ * Select on a focused Back would leave the workout. Hardware Back uses `backStep`.
  */
 export function onScreenBackFocusable(tv: boolean): boolean {
   return !tv;
@@ -97,14 +105,35 @@ export function transportNeighbor(roles: TransportRole[], role: TransportRole, d
 }
 
 /**
- * Focus on the running clock. Back is above the row. Down from Back lands on
- * Pause/Resume. Left and Right move along the row and stop at the ends.
+ * Focus on the running clock. Left and Right move along the row and stop at the ends.
+ * When the on-screen Back control exists, it sits above the row and Up lands there.
+ * Apple TV does not draw that control, so Up and Down stay on the transport row.
  */
 export function nextRunningFocus(
   current: RunningFocus,
   direction: FocusDirection,
   roles: TransportRole[],
+  options?: { onScreenBack?: boolean },
 ): RunningFocus {
+  const onScreenBack = options?.onScreenBack !== false;
+  if (!onScreenBack) {
+    const first = roles[0];
+    if (first === undefined) return 'back';
+    const role: TransportRole = current === 'back' ? first : current;
+    switch (direction) {
+      case 'left':
+        return transportNeighbor(roles, role, -1);
+      case 'right':
+        return transportNeighbor(roles, role, 1);
+      case 'up':
+      case 'down':
+        return role;
+      default: {
+        const unexpected: never = direction;
+        return unexpected;
+      }
+    }
+  }
   if (roles.length === 0) return 'back';
   if (current === 'back') {
     switch (direction) {

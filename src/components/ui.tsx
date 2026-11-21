@@ -4,10 +4,12 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, 
 import { inkOn } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import type { TvFocusTag } from '@/src/components/TvTabFocus';
+import { useTvSetupFocus } from '@/src/components/TvSetupFocus';
 import { useTvFocusTag } from '@/src/tv/useTvFocusTag';
 import { chrome } from '@/src/theme/chrome';
 import { stepperControlSize, tvSetupScale } from '@/src/tv/controls';
 import { fitTvStyle, scaleTvStyle, tvScale } from '@/src/tv/layout';
+import { showsOnScreenBack } from '@/src/tv/timerTransport';
 import { stepperFocus, tvSetupMetrics, type StepperLinks } from '@/src/tv/setupLayout';
 
 export function BigButton({
@@ -25,6 +27,7 @@ export function BigButton({
   onFocus,
   focusable,
   roomy = false,
+  fill = false,
 }: {
   label: string;
   onPress: () => void;
@@ -32,8 +35,8 @@ export function BigButton({
   testID?: string;
   variant?: 'solid' | 'ghost';
   /** TV only. Down from this button moves to the tab bar. */
-  focusDown?: TvFocusTag | null;
-  focusUp?: TvFocusTag | null;
+  focusDown?: TvFocusTag | ComponentRef<typeof Pressable> | null;
+  focusUp?: TvFocusTag | ComponentRef<typeof Pressable> | null;
   focusLeft?: TvFocusTag | null;
   focusRight?: TvFocusTag | null;
   hasTVPreferredFocus?: boolean;
@@ -42,6 +45,8 @@ export function BigButton({
   focusable?: boolean;
   /** TV setup and Rounds. A larger Start control. Phones ignore it. */
   roomy?: boolean;
+  /** TV only. Stretch across the row so Down from the left edge can land here. */
+  fill?: boolean;
 }) {
   const solid = variant === 'solid';
   const tv = Platform.isTV === true;
@@ -78,7 +83,7 @@ export function BigButton({
       style={({ pressed }) => [
         styles.big,
         tv && scaleTvStyle(tvButton, scale),
-        tv && { alignSelf: 'center', maxWidth: '100%' },
+        tv && (fill ? { alignSelf: 'stretch', width: '100%' } : { alignSelf: 'center', maxWidth: '100%' }),
         solid
           ? { backgroundColor: color }
           : { backgroundColor: 'transparent', borderWidth: 1, borderColor: color },
@@ -99,6 +104,35 @@ export function BigButton({
   );
 }
 
+/** Television Start button. Up returns to the last stepper row. */
+export function TvLinkedStart({
+  label,
+  onPress,
+  color,
+  testID,
+  roomy = false,
+}: {
+  label: string;
+  onPress: () => void;
+  color: string;
+  testID?: string;
+  roomy?: boolean;
+}) {
+  const setup = useTvSetupFocus();
+  return (
+    <BigButton
+      label={label}
+      onPress={onPress}
+      color={color}
+      testID={testID}
+      roomy={roomy}
+      fill
+      onHost={setup?.bindStart}
+      focusUp={setup?.exitHosts[0] ?? setup?.lastEntry ?? null}
+    />
+  );
+}
+
 export function NumberStepper({
   value,
   onChange,
@@ -112,6 +146,10 @@ export function NumberStepper({
   outsideRight = null,
   onLinks,
   preferred = false,
+  focusDown = null,
+  focusUp = null,
+  onDecNode,
+  onIncNode,
 }: {
   value: number;
   onChange: (value: number) => void;
@@ -130,6 +168,14 @@ export function NumberStepper({
   onLinks?: (links: StepperLinks) => void;
   /** TV only. First control on a setup screen. */
   preferred?: boolean;
+  /** TV only. Down from both buttons on this cluster. */
+  focusDown?: TvFocusTag | ComponentRef<typeof Pressable> | null;
+  /** TV only. Up from both buttons on this cluster. */
+  focusUp?: TvFocusTag | null;
+  /** TV only. Native host of the minus button, for a focus guide. */
+  onDecNode?: (node: ComponentRef<typeof Pressable> | null) => void;
+  /** TV only. Native host of the plus button, for a focus guide. */
+  onIncNode?: (node: ComponentRef<typeof Pressable> | null) => void;
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
@@ -190,9 +236,18 @@ export function NumberStepper({
         accessibilityLabel={`Decrease ${suffix}`}
         testID={`${testID}-dec`}
         hasTVPreferredFocus={tv && preferred ? true : undefined}
-        onHost={tv ? onDecHost : undefined}
+        onHost={
+          tv
+            ? (node) => {
+                onDecHost(node);
+                onDecNode?.(node);
+              }
+            : undefined
+        }
         focusLeft={tv ? focus.decLeft : null}
         focusRight={tv ? focus.decRight : null}
+        focusDown={tv ? focusDown : null}
+        focusUp={tv ? focusUp : null}
         onPress={() => commit(value - 1)}
         style={({ pressed }) => stepFace(pressed)}
       >
@@ -239,9 +294,18 @@ export function NumberStepper({
         accessibilityRole="button"
         accessibilityLabel={`Increase ${suffix}`}
         testID={`${testID}-inc`}
-        onHost={tv ? onIncHost : undefined}
+        onHost={
+          tv
+            ? (node) => {
+                onIncHost(node);
+                onIncNode?.(node);
+              }
+            : undefined
+        }
         focusLeft={tv ? focus.incLeft : null}
         focusRight={tv ? focus.incRight : null}
+        focusDown={tv ? focusDown : null}
+        focusUp={tv ? focusUp : null}
         onPress={() => commit(value + 1)}
         style={({ pressed }) => stepFace(pressed)}
       >
@@ -259,6 +323,7 @@ export function TimeField({
   accent,
   compact = false,
   preferred = false,
+  exit = false,
 }: {
   label: string;
   seconds: number;
@@ -268,8 +333,11 @@ export function TimeField({
   compact?: boolean;
   /** TV only. Focus starts on this row's minus button. */
   preferred?: boolean;
+  /** TV only. This is the last stepper row. Down moves to the next row. */
+  exit?: boolean;
 }) {
   const tv = Platform.isTV === true;
+  const setup = useTvSetupFocus();
   const { width, height } = useWindowDimensions();
   const scale = tv ? tvScale(width, height) : 1;
   const labelSize = compact ? 20 : 32;
@@ -283,6 +351,21 @@ export function TimeField({
   const rememberSeconds = (links: StepperLinks) => {
     setSecondLinks((current) => (current.dec === links.dec && current.inc === links.inc ? current : links));
   };
+  const exitNodes = useRef<{ md: ComponentRef<typeof Pressable> | null; mi: ComponentRef<typeof Pressable> | null; sd: ComponentRef<typeof Pressable> | null; si: ComponentRef<typeof Pressable> | null }>({
+    md: null,
+    mi: null,
+    sd: null,
+    si: null,
+  });
+  const publishExit = (key: 'md' | 'mi' | 'sd' | 'si', node: ComponentRef<typeof Pressable> | null) => {
+    exitNodes.current[key] = node;
+    if (!exit) return;
+    setup?.setExitHosts([exitNodes.current.md, exitNodes.current.mi, exitNodes.current.sd, exitNodes.current.si]);
+  };
+  useEffect(() => {
+    if (!exit) return;
+    setup?.bindLast(minuteLinks.dec);
+  }, [exit, minuteLinks.dec, setup]);
   if (tv) {
     const metrics = tvSetupMetrics(width, height);
     return (
@@ -299,6 +382,9 @@ export function TimeField({
           preferred={preferred}
           outsideRight={secondLinks.dec}
           onLinks={rememberMinutes}
+          onDecNode={exit ? (node) => publishExit('md', node) : undefined}
+          onIncNode={exit ? (node) => publishExit('mi', node) : undefined}
+          focusDown={exit ? setup?.startHost ?? setup?.down ?? null : null}
           onChange={(next) => onChange(next * 60 + remainder)}
         />
         <NumberStepper
@@ -311,6 +397,9 @@ export function TimeField({
           compact={compact}
           outsideLeft={minuteLinks.inc}
           onLinks={rememberSeconds}
+          onDecNode={exit ? (node) => publishExit('sd', node) : undefined}
+          onIncNode={exit ? (node) => publishExit('si', node) : undefined}
+          focusDown={exit ? setup?.startHost ?? setup?.down ?? null : null}
           onChange={(next) => onChange(minutes * 60 + next)}
         />
       </View>
@@ -484,6 +573,7 @@ export function Chip({
   color,
   testID,
   preferred = false,
+  bridge = false,
 }: {
   label: string;
   selected: boolean;
@@ -492,8 +582,11 @@ export function Chip({
   testID?: string;
   /** TV only. Focus starts here when this chip is the first control. */
   preferred?: boolean;
+  /** TV only. This chip is the row under the last stepper. `entry` is the Down target. */
+  bridge?: boolean | 'entry';
 }) {
   const tv = Platform.isTV === true;
+  const setup = useTvSetupFocus();
   const { width, height } = useWindowDimensions();
   const scale = tv ? tvScale(width, height) : 1;
   const grown = tvSetupScale(height);
@@ -504,6 +597,9 @@ export function Chip({
       accessibilityState={{ selected }}
       testID={testID}
       hasTVPreferredFocus={tv && preferred ? true : undefined}
+      onHost={tv && bridge === 'entry' ? setup?.bindBridge : undefined}
+      focusUp={tv && bridge ? setup?.lastEntry ?? null : null}
+      focusDown={tv && bridge ? setup?.bridgeDown ?? null : null}
       onPress={onPress}
       style={() => [
         styles.chip,
@@ -542,6 +638,7 @@ export function HeaderBack({
   label?: string;
 }) {
   const tv = Platform.isTV === true;
+  if (!showsOnScreenBack(tv, Platform.OS)) return null;
   return (
     <TvFocusPressable
       accent={color}

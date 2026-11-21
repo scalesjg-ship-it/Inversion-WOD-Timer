@@ -6,16 +6,19 @@ import { chrome } from '@/src/theme/chrome';
 
 export default function NotFoundScreen() {
   const androidPhone = Platform.OS === 'android' && Platform.isTV !== true;
+  const appleTv = Platform.isTV === true && Platform.OS === 'ios';
   const insets = useSafeAreaInsets();
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Americana', headerShown: true }} />
+      <Stack.Screen options={{ title: 'Americana', headerShown: !appleTv }} />
       <View style={[styles.container, androidPhone ? { paddingBottom: 24 + insets.bottom } : null]}>
         <Text style={styles.title}>That screen is not on the clock.</Text>
-        <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Back to Americana</Text>
-        </Link>
+        {appleTv ? null : (
+          <Link href="/" style={styles.link}>
+            <Text style={styles.linkText}>Back to Americana</Text>
+          </Link>
+        )}
       </View>
     </>
   );

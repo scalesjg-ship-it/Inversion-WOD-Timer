@@ -3,6 +3,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import CountdownScreen from '../app/countdown';
 import SetupScreen from '../app/setup';
+import TimerScreen from '../app/timer';
 import BrandScreen from '../app/(tabs)/brand';
 import WodScreen from '../app/(tabs)/index';
 import RoundsScreen from '../app/(tabs)/rounds';
@@ -17,26 +18,41 @@ Object.defineProperty(Platform, 'isTV', {
   get: () => true,
 });
 
+// Apple TV reports ios. The preview matches that so the on-screen Back button stays off.
+try {
+  Object.defineProperty(Platform, 'OS', {
+    configurable: true,
+    get: () => (globalThis as { __TV_OS__?: string }).__TV_OS__ ?? 'ios',
+  });
+} catch {
+  (Platform as { OS: string }).OS = 'ios';
+}
+
 function Screen() {
   const tab = (globalThis as { __TV_TAB__?: string }).__TV_TAB__ ?? 'wod';
   if (tab === 'rounds' || tab === 'rounds-confirm') return <RoundsScreen />;
   if (tab === 'brand') return <BrandScreen />;
   if (tab === 'setup') return <SetupScreen />;
   if (tab === 'countdown') return <CountdownScreen />;
+  if (tab === 'timer') return <TimerScreen />;
   return <WodScreen />;
 }
 
 function Frame() {
   const tab = (globalThis as { __TV_TAB__?: string }).__TV_TAB__ ?? 'wod';
-  const stacked = tab === 'setup' || tab === 'countdown';
+  const frame = (globalThis as { __TV_FRAME__?: { width: number; height: number } }).__TV_FRAME__ ?? {
+    width: 1920,
+    height: 1080,
+  };
+  const stacked = tab === 'setup' || tab === 'countdown' || tab === 'timer';
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1, backgroundColor: chrome.bg }}>
+      <View style={{ width: frame.width, height: frame.height, backgroundColor: chrome.bg }}>
         <BrandingProvider>
           <TimerSessionProvider>
             <TvTabFocusProvider>
               {stacked ? null : <TvTabBar />}
-              <View style={{ flex: 1, overflow: 'hidden' }}>
+              <View style={{ flex: 1, width: frame.width, height: stacked ? frame.height : undefined }}>
                 <Screen />
               </View>
             </TvTabFocusProvider>

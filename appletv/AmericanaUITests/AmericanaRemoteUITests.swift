@@ -55,6 +55,41 @@ final class AmericanaRemoteUITests: XCTestCase {
     step("second Menu leaves the timer") { secondMenuLeaves() }
   }
 
+  /// Down from the lead-in minutes minus must leave that button. Save preset
+  /// sits above Start, so a second Down reaches Start. Up returns to the row.
+  func testDownFromLeadInMinusReachesStart() {
+    step("open Tabata setup") { openTabataSetup() }
+    step("focus lead-in minus") {
+      XCTAssertTrue(
+        nudge("lead-in-minutes-dec", directions: [.down, .left], limit: 16),
+        "Could not focus lead-in minutes minus. \(snapshot())"
+      )
+      return focusedIdentifier()
+    }
+    step("Down from lead-in minus reaches Start") {
+      press(.down, settle: 0.7)
+      if !focused("start-timer") {
+        press(.down, settle: 0.7)
+      }
+      if !focused("start-timer") {
+        press(.down, settle: 0.7)
+      }
+      XCTAssertTrue(focused("start-timer"), "Down from lead-in minus did not reach Start. \(snapshot())")
+      XCTAssertEqual(app.state, .runningForeground, "Down left the app")
+      return focusedIdentifier()
+    }
+    step("Up from Start returns to the lead-in row") {
+      press(.up, settle: 0.7)
+      let onLeadIn = leadInFocused()
+      if !onLeadIn {
+        press(.up, settle: 0.7)
+      }
+      XCTAssertTrue(leadInFocused(), "Up from Start did not return to lead-in. \(snapshot())")
+      XCTAssertEqual(app.state, .runningForeground, "Up left the app")
+      return focusedIdentifier()
+    }
+  }
+
   // MARK: - Steps
 
   private func openWodTab() -> String {
@@ -258,6 +293,31 @@ final class AmericanaRemoteUITests: XCTestCase {
   }
 
   // MARK: - Navigation
+
+  private func openTabataSetup() -> String {
+    if any("screen-setup").exists && any("lead-in-minutes-dec").exists {
+      return "already on setup"
+    }
+    _ = ensureTabFocused()
+    for _ in 0..<4 where !any("screen-wod").exists && !any("mode-tabata").exists {
+      press(.left, settle: 0.7)
+    }
+    XCTAssertTrue(
+      nudge("mode-tabata", directions: [.down, .right, .left], limit: 10),
+      "Could not focus Tabata. \(snapshot())"
+    )
+    press(.select, settle: 0.9)
+    XCTAssertTrue(any("screen-setup").waitForExistence(timeout: 12), "Tabata setup did not open. \(snapshot())")
+    XCTAssertTrue(any("lead-in-minutes-dec").waitForExistence(timeout: 8), "Lead-in minus missing. \(snapshot())")
+    return "face=\(focusedIdentifier())"
+  }
+
+  private func leadInFocused() -> Bool {
+    for id in ["lead-in-minutes-dec", "lead-in-minutes-inc", "lead-in-seconds-dec", "lead-in-seconds-inc"] where focused(id) {
+      return true
+    }
+    return false
+  }
 
   @discardableResult
   private func startForTime() -> String {

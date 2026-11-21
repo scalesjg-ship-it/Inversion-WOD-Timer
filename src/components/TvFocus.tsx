@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import {
   Platform,
   Pressable,
@@ -17,6 +17,9 @@ import { tvParallaxProps } from '@/src/tv/pressable';
 import { usePointerFocus } from '@/src/tv/usePointerFocus';
 
 type FocusStyle = (state: { pressed: boolean; focused: boolean }) => StyleProp<ViewStyle>;
+
+/** A native tag, or the pressable host Pressable will resolve when it renders. */
+type FocusDest = number | ComponentRef<typeof Pressable> | null;
 
 /**
  * Pressable with one TV focus treatment: yellow ring, scale, glow, and dimmed neighbors.
@@ -43,10 +46,10 @@ export function TvFocusPressable({
   scale?: boolean;
   style?: StyleProp<ViewStyle> | FocusStyle;
   children?: ReactNode;
-  /** TV only. Native tag focused by Down. */
-  focusDown?: TvFocusTag | null;
-  /** TV only. Native tag focused by Up. The first row points this at the open tab. */
-  focusUp?: TvFocusTag | null;
+  /** TV only. Native tag or host focused by Down. */
+  focusDown?: FocusDest;
+  /** TV only. Native tag or host focused by Up. The first row points this at the open tab. */
+  focusUp?: FocusDest;
   /** TV only. Native tag focused by Left. */
   focusLeft?: TvFocusTag | null;
   /** TV only. Native tag focused by Right. */
@@ -76,8 +79,8 @@ export function TvFocusPressable({
   return (
     <Pressable
       {...rest}
-      {...(tv && !locked && focusDown != null ? { nextFocusDown: focusDown } : {})}
-      {...(tv && !locked && focusUp != null ? { nextFocusUp: focusUp } : {})}
+      {...(tv && !locked && focusDown != null ? { nextFocusDown: focusDown as number } : {})}
+      {...(tv && !locked && focusUp != null ? { nextFocusUp: focusUp as number } : {})}
       {...(tv && !locked && focusLeft != null ? { nextFocusLeft: focusLeft } : {})}
       {...(tv && !locked && focusRight != null ? { nextFocusRight: focusRight } : {})}
       {...(linked || focusable === true ? { focusable: true as const } : {})}
@@ -112,15 +115,18 @@ export function TvTextField({
   onFocus,
   onBlur,
   focusUp = null,
+  focusDown = null,
   ...rest
-}: TextInputProps & { accent?: string; focusUp?: TvFocusTag | null }) {
+}: TextInputProps & { accent?: string; focusUp?: TvFocusTag | null; focusDown?: TvFocusTag | null }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
   const [focused, setFocused] = useState(false);
   return (
     <TextInput
       {...rest}
-      {...(tv && focusUp != null ? { nextFocusUp: focusUp, focusable: true as const } : {})}
+      {...(tv && (focusUp != null || focusDown != null) ? { focusable: true as const } : {})}
+      {...(tv && focusUp != null ? { nextFocusUp: focusUp } : {})}
+      {...(tv && focusDown != null ? { nextFocusDown: focusDown } : {})}
       onFocus={(event) => {
         if (tv) setFocused(true);
         onFocus?.(event);

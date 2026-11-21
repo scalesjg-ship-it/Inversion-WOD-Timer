@@ -25,6 +25,7 @@ import {
   backStep,
   onScreenBackFocusable,
   onScreenBackPress,
+  showsOnScreenBack,
   transportNeighbor,
   tvTransportButtons,
   type TransportRole,
@@ -48,6 +49,7 @@ export default function TimerScreen() {
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   const landscape = width > height;
   const tv = Platform.isTV === true;
+  const showBack = showsOnScreenBack(tv, Platform.OS);
   const tenFoot = isTenFootLayout(width, height, tv);
   const overscan = tvSafeInset(tenFoot);
   const box = tvSafeBox(tv, width, height);
@@ -217,14 +219,14 @@ export default function TimerScreen() {
     useCallback(() => {
       if (!tv) return undefined;
       // Without this, tvOS still pops the stack on Menu after JavaScript pauses.
-      TVEventControl.enableTVMenuKey();
+      TVEventControl?.enableTVMenuKey();
       const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
         onTvBackRef.current();
         return true;
       });
       return () => {
         subscription.remove();
-        TVEventControl.disableTVMenuKey();
+        TVEventControl?.disableTVMenuKey();
       };
     }, [tv]),
   );
@@ -589,7 +591,7 @@ export default function TimerScreen() {
               {branding.gymName}
             </Text>
           )}
-          <TvFocusPressable
+          {showBack ? <TvFocusPressable
             accent={palette.text}
             accessibilityRole="button"
             testID="timer-back"
@@ -638,7 +640,7 @@ export default function TimerScreen() {
             ]}
           >
             <Text style={[styles.back, tv && scaleTvStyle(backTv, typeScale), { color: palette.text }]}>Back</Text>
-          </TvFocusPressable>
+          </TvFocusPressable> : null}
           {tv ? null : (
             <View style={[styles.cornerSlot, { right: Math.max(18, safe.right) }]}>
               <CornerLogo branding={branding} />

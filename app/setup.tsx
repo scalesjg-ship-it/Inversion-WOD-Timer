@@ -6,12 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
-import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvCountRow, TvToggle } from '@/src/components/ui';
+import { TvSetupFocus } from '@/src/components/TvSetupFocus';
+import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvCountRow, TvLinkedStart, TvToggle } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
 import { chrome } from '@/src/theme/chrome';
 import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, tvSafeBox } from '@/src/tv/layout';
-import { tvSetupMetrics, tvSetupScaled } from '@/src/tv/setupLayout';
+import { tvSetupFrame, tvSetupMetrics, tvSetupScaled } from '@/src/tv/setupLayout';
+import { showsOnScreenBack } from '@/src/tv/timerTransport';
 import { normalizeConfig } from '@/src/timer/engine';
 import { modeTitle } from '@/src/timer/labels';
 import { defaultConfig } from '@/src/timer/presets';
@@ -45,10 +47,11 @@ export default function SetupScreen() {
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
 
   if (!mode) {
+    const showBack = showsOnScreenBack(Platform.isTV === true, Platform.OS);
     return (
       <SafeAreaView style={styles.safe}>
         <Text style={styles.title}>Pick a conditioning mode.</Text>
-        <BigButton label="Back" color={accent} onPress={() => router.back()} />
+        {showBack ? <BigButton label="Back" color={accent} onPress={() => router.back()} /> : null}
       </SafeAreaView>
     );
   }
@@ -149,15 +152,18 @@ function SetupForm({
 
   if (tv) {
     const metrics = tvSetupMetrics(width, height);
+    const frame = tvSetupFrame(width, height);
     const titleSize = tvSetupScaled(40, width, height);
-    const formWidth = Math.min(metrics.timeRow, Math.max(1, width - box.horizontal * 2));
+    const formWidth = frame.formWidth;
+    const appleTv = !showsOnScreenBack(true, Platform.OS);
     return (
-      <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical }]}>
-        <View style={styles.header}>
+      <TvSetupFocus>
+      <View style={[styles.safe, { paddingHorizontal: frame.horizontal, paddingTop: frame.vertical }]}>
+        <View style={[styles.header, appleTv && styles.headerApple]}>
           <HeaderBack onPress={() => router.back()} color={accent} />
           <Text style={[styles.kicker, styles.kickerTv]} numberOfLines={1}>Americana</Text>
         </View>
-        <View style={[styles.tvBody, { paddingBottom: box.vertical, gap: metrics.rowGap }]}>
+        <View style={[styles.tvBody, { paddingBottom: frame.vertical, gap: metrics.rowGap }]}>
           <Text testID="screen-setup" style={[styles.title, styles.titleCenter, { fontSize: titleSize, lineHeight: titleSize + 6 }]}>{modeTitle(mode)}</Text>
           <Text style={[styles.summary, styles.summaryTv, styles.titleCenter]}>{summary}</Text>
           <View style={[styles.tvForm, { width: formWidth, gap: metrics.rowGap }]}>
@@ -217,6 +223,7 @@ function SetupForm({
             ) : null}
             <TimeField
               compact
+              exit
               label="Lead-in"
               seconds={leadInSeconds}
               onChange={(value) => setLeadInSeconds(Math.min(600, value))}
@@ -226,10 +233,11 @@ function SetupForm({
           </View>
           <View style={styles.tvShelf}>{shelf}</View>
           <View style={styles.footer}>
-            <BigButton roomy testID="start-timer" label="Start" color={accent} onPress={() => onStart(config, runLabel)} />
+            <TvLinkedStart roomy testID="start-timer" label="Start" color={accent} onPress={() => onStart(config, runLabel)} />
           </View>
         </View>
       </View>
+      </TvSetupFocus>
     );
   }
 
@@ -405,6 +413,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 8,
+  },
+  headerApple: {
+    justifyContent: 'flex-end',
   },
   kicker: {
     color: chrome.muted,

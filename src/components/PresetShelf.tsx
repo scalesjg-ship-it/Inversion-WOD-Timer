@@ -1,8 +1,10 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View, type Pressable } from 'react-native';
 
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
+import { useTvSetupFocus } from '@/src/components/TvSetupFocus';
+import type { TvFocusTag } from '@/src/components/TvTabFocus';
 import { chrome } from '@/src/theme/chrome';
 import { isTenFootLayout, tvScaled } from '@/src/tv/layout';
 import { tvSetupScaled } from '@/src/tv/setupLayout';
@@ -38,6 +40,7 @@ export function PresetShelf({
   onClearSelection: () => void;
 }) {
   const { width, height } = useWindowDimensions();
+  const setup = useTvSetupFocus();
   const tv = Platform.isTV === true;
   const tenFoot = isTenFootLayout(width, height, tv);
   const [presets, setPresets] = useState<SavedPreset[]>([]);
@@ -211,6 +214,8 @@ export function PresetShelf({
   if (tv) {
     const rowHeight = Math.max(36, tvScaled(44, width, height));
     const labelSize = Math.max(14, tvScaled(18, width, height));
+    const shelfUp = setup?.exitHosts[0] ?? setup?.abovePreset ?? null;
+    const shelfDown = setup?.startHost ?? setup?.startTag ?? null;
     const pending = presets.find((preset) => preset.id === confirmDeleteId);
     const confirming = pending != null && pending.id === selected?.id;
     return (
@@ -218,7 +223,17 @@ export function PresetShelf({
         <View style={styles.tvRow}>
           <Text style={[styles.fieldLabel, { fontSize: labelSize }]}>Presets</Text>
           {editor ? null : (
-            <TextButton testID="save-preset" label="Save preset" color={accent} tenFoot={false} dense onPress={openCreate} />
+            <TextButton
+              testID="save-preset"
+              label="Save preset"
+              color={accent}
+              tenFoot={false}
+              dense
+              onPress={openCreate}
+              onHost={setup?.bindPreset}
+              focusUp={shelfUp}
+              focusDown={shelfDown}
+            />
           )}
           {editor ? null : (
             <ScrollView
@@ -239,6 +254,8 @@ export function PresetShelf({
                     color={preset.id === selectedId ? accent : chrome.text}
                     tenFoot={false}
                     dense
+                    focusUp={shelfUp}
+                    focusDown={shelfDown}
                     onPress={() => {
                       setConfirmDeleteId(null);
                       onLoad(preset);
@@ -248,14 +265,16 @@ export function PresetShelf({
               )}
               {selected && !confirming ? (
                 <>
-                  <TextButton testID="update-preset" label="Update" color={accent} tenFoot={false} dense onPress={() => void updateSelected()} />
-                  <TextButton testID={`preset-rename-${selected.id}`} label="Rename" color={accent} tenFoot={false} dense onPress={() => openRename(selected)} />
+                  <TextButton testID="update-preset" label="Update" color={accent} tenFoot={false} dense focusUp={shelfUp} focusDown={shelfDown} onPress={() => void updateSelected()} />
+                  <TextButton testID={`preset-rename-${selected.id}`} label="Rename" color={accent} tenFoot={false} dense focusUp={shelfUp} focusDown={shelfDown} onPress={() => openRename(selected)} />
                   <TextButton
                     testID={`preset-delete-${selected.id}`}
                     label="Delete"
                     color="#FF8A7A"
                     tenFoot={false}
                     dense
+                    focusUp={shelfUp}
+                    focusDown={shelfDown}
                     onPress={() => confirmDelete(selected)}
                   />
                 </>
@@ -269,6 +288,8 @@ export function PresetShelf({
               color="#FF8A7A"
               tenFoot={false}
               dense
+              focusUp={shelfUp}
+              focusDown={shelfDown}
               onPress={() => void remove(selected)}
             />
           ) : null}
@@ -287,6 +308,8 @@ export function PresetShelf({
                 autoCapitalize="words"
                 returnKeyType="done"
                 onSubmitEditing={() => void commit(editor.confirmOverwrite)}
+                focusUp={setup?.lastEntry ?? null}
+                focusDown={setup?.startTag ?? null}
                 style={[styles.nameInput, { minHeight: rowHeight, fontSize: labelSize, flex: 1 }]}
               />
             ) : (
@@ -301,13 +324,16 @@ export function PresetShelf({
                 color={accent}
                 tenFoot={false}
                 dense
+                onHost={setup?.bindPreset}
+                focusUp={shelfUp}
+                focusDown={shelfDown}
                 onPress={() => setEditor({ ...editor, showInput: true })}
               />
             )}
             {editor.confirmOverwrite ? (
-              <TextButton testID="preset-overwrite" label="Update" color={accent} tenFoot={false} dense onPress={() => void commit(true)} />
+              <TextButton testID="preset-overwrite" label="Update" color={accent} tenFoot={false} dense focusUp={shelfUp} focusDown={shelfDown} onPress={() => void commit(true)} />
             ) : null}
-            <TextButton testID="preset-name-cancel" label="Cancel" color={accent} tenFoot={false} dense onPress={() => { setEditor(null); setNotice(null); }} />
+            <TextButton testID="preset-name-cancel" label="Cancel" color={accent} tenFoot={false} dense focusUp={shelfUp} focusDown={shelfDown} onPress={() => { setEditor(null); setNotice(null); }} />
             {editor.confirmOverwrite ? null : (
               <TextButton
                 testID="preset-name-confirm"
@@ -315,6 +341,9 @@ export function PresetShelf({
                 color={accent}
                 tenFoot={false}
                 dense
+                onHost={editor.showInput ? setup?.bindPreset : undefined}
+                focusUp={shelfUp}
+                focusDown={shelfDown}
                 onPress={() => void commit(false)}
               />
             )}
@@ -508,6 +537,9 @@ function TextButton({
   accessibilityLabel,
   prominent = false,
   dense = false,
+  focusUp = null,
+  focusDown = null,
+  onHost,
 }: {
   label: string;
   onPress: () => void;
@@ -519,6 +551,9 @@ function TextButton({
   prominent?: boolean;
   /** Television shelf. A short focusable control so the setup still fits on one screen. */
   dense?: boolean;
+  focusUp?: TvFocusTag | ComponentRef<typeof Pressable> | null;
+  focusDown?: TvFocusTag | ComponentRef<typeof Pressable> | null;
+  onHost?: (node: ComponentRef<typeof Pressable> | null) => void;
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
@@ -532,6 +567,9 @@ function TextButton({
       accessibilityLabel={accessibilityLabel ?? label}
       testID={testID}
       onPress={onPress}
+      onHost={onHost}
+      focusUp={focusUp}
+      focusDown={focusDown}
       style={({ pressed }) => [
         styles.textButton,
         tenFoot && !dense && styles.textButtonTv,

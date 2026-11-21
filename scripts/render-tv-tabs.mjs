@@ -114,6 +114,7 @@ const frames = [
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-emom-1920x1080.png', seed: true, mode: 'emom' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-intervals-1920x1080.png', seed: true, mode: 'intervals' },
   { tab: 'countdown', width: 1920, height: 1080, file: 'tv-countdown-1920x1080.png', seed: true },
+  { tab: 'timer', width: 1920, height: 1080, file: 'tv-timer-running-1920x1080.png' },
   { tab: 'rounds-confirm', width: 1920, height: 1080, file: 'tv-rounds-delete-1920x1080.png', seed: true, confirm: true },
   { tab: 'wod', width: 960, height: 540, file: 'tv-tab-wod-960x540.png' },
   { tab: 'rounds', width: 960, height: 540, file: 'tv-tab-rounds-960x540.png', seed: true },
@@ -159,7 +160,7 @@ function pageFor(tab, width, height, seed, confirm, mode) {
 <style>
   @font-face { font-family: Oswald; src: url(/assets/fonts/Oswald-Bold.ttf); font-weight: 700; }
   @font-face { font-family: OswaldMedium; src: url(/assets/fonts/Oswald-Medium.ttf); font-weight: 500; }
-  html, body, #root { margin: 0; width: ${width}px; height: ${height}px; background: #07080A; overflow: hidden; }
+  html, body, #root { margin: 0; width: ${width}px; height: ${height}px; background: #07080A; overflow: hidden; display: flex; flex-direction: column; }
 </style>
 </head>
 <body>
@@ -169,6 +170,7 @@ ${storage}
 ${preview}
 globalThis.__TV_TAB__ = ${JSON.stringify(tab)};
 globalThis.__TV_SETUP_MODE__ = ${JSON.stringify(mode ?? '')};
+globalThis.__TV_FRAME__ = { width: ${width}, height: ${height} };
 </script>
 <script src="/bundle.js"></script>
 </body>

@@ -1,5 +1,5 @@
 import { TV_FOCUS_BORDER, TV_FOCUS_SCALE, stepperControlSize, tvSetupScale, tvTabBarHeight } from './controls';
-import { TV_OVERSCAN, tvFocusGutter, tvSafeBox, tvScaled } from './layout';
+import { TV_OVERSCAN, TV_REF_HEIGHT, TV_REF_WIDTH, tvFocusGutter, tvSafeBox, tvScaled } from './layout';
 
 /** 1080p setup length, grown so the form fills more of the television. */
 export function tvSetupScaled(at1080: number, width: number, height: number): number {
@@ -71,6 +71,39 @@ export function tvSetupMetrics(width: number, height: number): TvSetupMetrics {
     cluster,
     timeRow: labelWidth + controlGap + cluster * 2 + controlGap,
     durationRow: labelWidth + controlGap + cluster * 3 + controlGap * 2,
+  };
+}
+
+export interface TvSetupFrame {
+  horizontal: number;
+  vertical: number;
+  /** Width inside the overscan inset, before the focus ring's bleed. */
+  contentWidth: number;
+  /** Minutes + seconds row. Capped to the safe area; the 1080p size is unchanged when it fits. */
+  formWidth: number;
+  /** Hours + minutes + seconds row. Same cap. */
+  durationWidth: number;
+}
+
+/**
+ * Where the setup form sits on a television.
+ * Button and type sizes stay on `tvSetupMetrics`. This only keeps that row,
+ * including the focus scale, inside the overscan inset.
+ */
+export function tvSetupFrame(width: number, height: number): TvSetupFrame {
+  const safeWidth = width > 0 ? width : TV_REF_WIDTH;
+  const safeHeight = height > 0 ? height : TV_REF_HEIGHT;
+  const safe = tvSafeBox(true, safeWidth, safeHeight);
+  const metrics = tvSetupMetrics(safeWidth, safeHeight);
+  const bleed = Math.ceil((metrics.button * (TV_FOCUS_SCALE - 1)) / 2);
+  const contentWidth = Math.max(1, safeWidth - safe.horizontal * 2);
+  const limit = Math.max(1, contentWidth - bleed * 2);
+  return {
+    horizontal: safe.horizontal,
+    vertical: safe.vertical,
+    contentWidth,
+    formWidth: Math.min(metrics.timeRow, limit),
+    durationWidth: Math.min(metrics.durationRow, limit),
   };
 }
 
@@ -194,6 +227,6 @@ export function tvRoundsLayout(screenWidth: number, screenHeight: number, preset
     contentHeight: fitted.contentHeight,
     viewportHeight,
     scrolls: fitted.contentHeight > viewportHeight,
-    formWidth: Math.min(metrics.timeRow, innerWidth),
+    formWidth: Math.min(metrics.timeRow, Math.max(1, innerWidth - Math.ceil((metrics.button * (TV_FOCUS_SCALE - 1)) / 2) * 2)),
   };
 }
