@@ -10,12 +10,14 @@ becomes CFBundleVersion on the iPhone app and the embedded watch app.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import os
 import plistlib
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -419,56 +421,246 @@ def verify_built_plist(plist: dict, bundle_id: str, build_number: str, platform:
         fail(f"{bundle_id} DTPlatformName is {name!r}, expected {platform}")
 
 
-def _codesign(app: Path, bundle_id: str) -> None:
-    details = subprocess.run(
-        ["codesign", "-dv", "--verbose=4", str(app)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert_codesign((details.stderr or "") + (details.stdout or ""), bundle_id)
-    verified = subprocess.run(
-        ["codesign", "--verify", "--deep", "--strict", "--verbose=4", str(app)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+def decoded_profile_destination(app: Path) -> Path:
+    """A new plist path outside every bundle.
+
+    The watch app lives at Americana.app/Watch/AmericanaWatch.app. Decoding its
+    profile next to that bundle writes Americana.app/Watch/*.plist into the
+    already-signed iPhone app and breaks the outer seal.
+    """
+    fd, name = tempfile.mkstemp(prefix=f"{app.stem}-embedded-", suffix=".plist")
+    os.close(fd)
+    return Path(name)
+
+
+def path_is_inside(path: Path, bundle: Path) -> bool:
+    try:
+        path.resolve().relative_to(bundle.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def containing_bundle(path: Path) -> Path | None:
+    """The outermost .app, .appex, or .framework that contains path."""
+    current = path.resolve().parent
+    found = None
+    while current != current.parent:
+        if current.suffix in {".app", ".appex", ".framework"}:
+            found = current
+        current = current.parent
+    return found
+
+
+def _resource_entries(resources: dict) -> dict:
+    files2 = resources.get("files2")
+    if isinstance(files2, dict) and files2:
+        return files2
+    files = resources.get("files")
+    return files if isinstance(files, dict) else {}
+
+
+def _nested_prefixes(entries: dict) -> list[str]:
+    prefixes = []
+    for rel, info in entries.items():
+        if isinstance(info, dict) and ("cdhash" in info or info.get("requirement")):
+            prefixes.append(rel.strip("/") + "/")
+    return prefixes
+
+
+def seal_problems(app: Path) -> list[str]:
+    """Read-only comparison of _CodeSignature/CodeResources to the bundle on disk."""
+    signature = app / "_CodeSignature" / "CodeResources"
+    if not signature.is_file():
+        return [f"{app.name} is missing _CodeSignature/CodeResources"]
+    entries = _resource_entries(load_plist(signature))
+    nested = _nested_prefixes(entries)
+    problems: list[str] = []
+    sealed: set[str] = set()
+    for rel, info in entries.items():
+        rel = str(rel)
+        sealed.add(rel)
+        target = app / rel
+        if isinstance(info, dict) and ("cdhash" in info or info.get("requirement")):
+            if not target.exists():
+                problems.append(f"nested code missing: {rel}")
+            continue
+        optional = isinstance(info, dict) and bool(info.get("optional"))
+        if isinstance(info, dict) and "symlink" in info:
+            if target.is_symlink():
+                if os.readlink(target) != info["symlink"]:
+                    problems.append(f"symlink mismatch: {rel}")
+            elif not optional:
+                problems.append(f"symlink missing: {rel}")
+            continue
+        digest = info
+        algo = "sha1"
+        if isinstance(info, dict):
+            if "hash2" in info:
+                digest = info["hash2"]
+                algo = "sha256"
+            elif "hash" in info:
+                digest = info["hash"]
+            else:
+                continue
+        if not isinstance(digest, (bytes, bytearray)):
+            problems.append(f"unreadable seal entry: {rel}")
+            continue
+        if not target.exists():
+            if not optional:
+                problems.append(f"file missing: {rel}")
+            continue
+        if target.is_symlink():
+            problems.append(f"symlink where a file was sealed: {rel}")
+            continue
+        if not target.is_file():
+            problems.append(f"sealed path is not a file: {rel}")
+            continue
+        actual = hashlib.new(algo, target.read_bytes()).digest()
+        if actual != bytes(digest):
+            problems.append(f"file modified: {rel}")
+    executable = ""
+    info_plist = app / "Info.plist"
+    if info_plist.is_file():
+        executable = str(load_plist(info_plist).get("CFBundleExecutable") or "")
+    for dirpath, dirnames, filenames in os.walk(app, followlinks=False):
+        current = Path(dirpath)
+        rel_dir = "" if current == app else _posix_rel(app, current)
+        if rel_dir == "_CodeSignature" or rel_dir.startswith("_CodeSignature/"):
+            dirnames[:] = []
+            continue
+        kept = []
+        for name in dirnames:
+            child = f"{rel_dir}/{name}" if rel_dir else name
+            if any(child == prefix[:-1] or child.startswith(prefix) for prefix in nested):
+                continue
+            kept.append(name)
+        dirnames[:] = kept
+        for name in filenames:
+            rel = f"{rel_dir}/{name}" if rel_dir else name
+            if rel.startswith("_CodeSignature/") or rel in sealed or rel == executable:
+                continue
+            if any(rel.startswith(prefix) for prefix in nested):
+                continue
+            problems.append(f"file added: {rel}")
+    return problems
+
+
+def _posix_rel(root: Path, path: Path) -> str:
+    return path.relative_to(root).as_posix()
+
+
+def _run_codesign(args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(args, check=False, capture_output=True, text=True)
+
+
+def _command_text(result: subprocess.CompletedProcess[str]) -> str:
+    return (result.stdout or "") + (result.stderr or "")
+
+
+def _signed_children(directory: Path) -> list[Path]:
+    if not directory.is_dir():
+        return []
+    found = []
+    for child in sorted(directory.iterdir()):
+        if child.suffix in {".framework", ".app", ".appex"} and (child / "_CodeSignature").is_dir():
+            found.append(child)
+    return found
+
+
+def _check_bundle(bundle: Path, bundle_id: str | None, errors: list[str]) -> None:
+    label = str(bundle)
+    problems = seal_problems(bundle)
+    if problems:
+        sys.stderr.write(f"CodeResources mismatch in {label}:\n")
+        for problem in problems:
+            sys.stderr.write(f"  {problem}\n")
+        # "file added" is printed so the log names it. codesign --strict is the
+        # gate for that case, because stock seal rules omit a few filenames.
+        hard = [problem for problem in problems if not problem.startswith("file added:")]
+        if hard:
+            errors.append(f"CodeResources mismatch in {bundle.name}")
+    else:
+        sys.stderr.write(f"CodeResources matches {label}\n")
+    details = _run_codesign(["codesign", "-dv", "--verbose=4", str(bundle)])
+    detail_text = _command_text(details)
+    if bundle_id is not None:
+        identity = None
+        try:
+            assert_codesign(detail_text, bundle_id)
+        except SystemExit as exc:
+            identity = str(exc).removeprefix("::error::")
+        if identity:
+            sys.stderr.write(detail_text)
+            errors.append(identity)
+    verified = _run_codesign(["codesign", "--verify", "--strict", "--verbose=4", str(bundle)])
     if details.returncode != 0 or verified.returncode != 0:
-        sys.stderr.write(details.stderr or "")
-        sys.stderr.write(verified.stderr or "")
-        fail(f"codesign verification failed for {bundle_id}")
+        sys.stderr.write(f"codesign --verify --strict --verbose=4 {label}\n")
+        sys.stderr.write(detail_text)
+        sys.stderr.write(_command_text(verified))
+        errors.append(f"codesign --verify --strict failed for {bundle.name}")
+    else:
+        sys.stderr.write(f"codesign --verify --strict passed for {label}\n")
 
 
 def _embedded_profile(app: Path, expected_bundle: str) -> None:
     profile = app / "embedded.mobileprovision"
     if not profile.is_file():
         fail(f"{expected_bundle} is missing embedded.mobileprovision")
-    decoded = app.parent / f"{app.stem}-embedded.plist"
-    decode = subprocess.run(
-        ["security", "cms", "-D", "-i", str(profile), "-o", str(decoded)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if decode.returncode != 0 or not decoded.is_file():
-        fail(f"Could not decode the provisioning profile embedded in {expected_bundle}")
-    validate_profile(load_plist(decoded), expected_bundle)
+    decoded = decoded_profile_destination(app)
+    host = containing_bundle(decoded)
+    if host is not None:
+        decoded.unlink(missing_ok=True)
+        fail(f"Refusing to decode a profile inside {host.name}")
+    try:
+        decode = subprocess.run(
+            ["security", "cms", "-D", "-i", str(profile), "-o", str(decoded)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if decode.returncode != 0 or not decoded.is_file():
+            fail(f"Could not decode the provisioning profile embedded in {expected_bundle}")
+        validate_profile(load_plist(decoded), expected_bundle)
+    finally:
+        decoded.unlink(missing_ok=True)
 
 
 def verify_built_app(app: Path, root: Path) -> None:
+    """Check the exported app without writing into it or re-signing it.
+
+    codesign -dv and codesign --verify do not sign. Profile decoding goes to a
+    temporary file outside the bundle. --deep --strict on the iPhone app remains
+    the gate; inner bundles are checked first so a failure names its bundle.
+    """
     assert_repo_identity(root)
     build = read_ios_build_number()
     phone = load_plist(app / "Info.plist")
     verify_built_plist(phone, PHONE_BUNDLE, build, "iphoneos")
-    watches = sorted((app / "Watch").glob("*.app")) if (app / "Watch").is_dir() else []
+    watches = sorted(path for path in (app / "Watch").glob("*.app") if path.is_dir()) if (app / "Watch").is_dir() else []
     if len(watches) != 1:
         fail(f"Expected one embedded watch app, found {len(watches)}")
     watch = watches[0]
     verify_built_plist(load_plist(watch / "Info.plist"), WATCH_BUNDLE, build, "watchos")
     _embedded_profile(app, PHONE_BUNDLE)
     _embedded_profile(watch, WATCH_BUNDLE)
-    _codesign(app, PHONE_BUNDLE)
-    _codesign(watch, WATCH_BUNDLE)
+    errors: list[str] = []
+    for embedded in watches:
+        _check_bundle(embedded, WATCH_BUNDLE, errors)
+    for folder in ("Frameworks", "PlugIns"):
+        for embedded in _signed_children(app / folder):
+            _check_bundle(embedded, None, errors)
+    _check_bundle(app, PHONE_BUNDLE, errors)
+    deep = _run_codesign(["codesign", "--verify", "--deep", "--strict", "--verbose=4", str(app)])
+    if deep.returncode != 0:
+        sys.stderr.write(f"codesign --verify --deep --strict --verbose=4 {app}\n")
+        sys.stderr.write(_command_text(deep))
+        traced = _run_codesign(["codesign", "--verify", "--deep", "--strict", "-vvvv", str(app)])
+        sys.stderr.write(f"codesign --verify --deep --strict -vvvv {app}\n")
+        sys.stderr.write(_command_text(traced))
+        errors.append(f"codesign --verify --deep --strict failed for {PHONE_BUNDLE}")
+    if errors:
+        fail("; ".join(errors))
     print(
         f"Signed {PHONE_BUNDLE} and {WATCH_BUNDLE} build {build} ({IOS_MARKETING}) "
         f"for team {TEAM_ID}. Not submitted for App Review."

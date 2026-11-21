@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import os
 import plistlib
@@ -191,6 +192,50 @@ class SigningProjectTests(unittest.TestCase):
         tv["DTPlatformName"] = "appletvos"
         expect_fail(self, "Apple TV", lambda: signing.verify_built_plist(tv, PHONE, "19", "iphoneos"))
 
+    def test_profile_decode_stays_outside_the_iphone_app(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            phone = Path(tmp) / "Payload" / "Americana.app"
+            watch = phone / "Watch" / "AmericanaWatch.app"
+            watch.mkdir(parents=True)
+            dest = signing.decoded_profile_destination(watch)
+            try:
+                self.assertFalse(signing.path_is_inside(dest, phone))
+                self.assertFalse(signing.path_is_inside(dest, watch))
+                self.assertIsNone(signing.containing_bundle(dest))
+                self.assertEqual(signing.containing_bundle(watch.parent / "decoded.plist"), phone)
+            finally:
+                dest.unlink(missing_ok=True)
+
+    def test_code_resources_names_a_modified_or_added_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = Path(tmp) / "Americana.app"
+            (app / "_CodeSignature").mkdir(parents=True)
+            (app / "Watch" / "AmericanaWatch.app").mkdir(parents=True)
+            payload = b"watch-icon"
+            (app / "Assets.car").write_bytes(payload)
+            (app / "Info.plist").write_bytes(plistlib.dumps({"CFBundleExecutable": "Americana"}))
+            (app / "Americana").write_bytes(b"executable")
+            nested = app / "Watch" / "AmericanaWatch.app" / "Info.plist"
+            nested.write_bytes(b"nested")
+            extra = app / "Watch" / "AmericanaWatch-embedded.plist"
+            extra.write_bytes(b"decoded-outside-the-watch-but-inside-the-phone")
+            resources = {
+                "files2": {
+                    "Assets.car": {"hash2": hashlib.sha256(payload).digest()},
+                    "Watch/AmericanaWatch.app": {"cdhash": b"\x11" * 20, "requirement": "anchor apple"},
+                }
+            }
+            with (app / "_CodeSignature" / "CodeResources").open("wb") as handle:
+                plistlib.dump(resources, handle)
+            problems = signing.seal_problems(app)
+            self.assertIn("file added: Watch/AmericanaWatch-embedded.plist", problems)
+            self.assertNotIn("file added: Americana", problems)
+            self.assertNotIn("file added: Watch/AmericanaWatch.app/Info.plist", problems)
+            extra.unlink()
+            (app / "Assets.car").write_bytes(b"changed")
+            problems = signing.seal_problems(app)
+            self.assertIn("file modified: Assets.car", problems)
+
 
 class WorkflowContractTests(unittest.TestCase):
     def test_workflow_is_manual_testflight_only(self):
@@ -231,7 +276,11 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("ditto -x -k", verify)
         self.assertNotIn("unzip", verify)
         helper = (ROOT / "scripts" / "ci-ios-signing.py").read_text()
+        self.assertIn('"--verify", "--strict", "--verbose=4"', helper)
         self.assertIn('"--verify", "--deep", "--strict", "--verbose=4"', helper)
+        self.assertIn('"--verify", "--deep", "--strict", "-vvvv"', helper)
+        self.assertNotIn('codesign", "--force"', helper)
+        self.assertNotIn('"-s"', helper)
         self.assertIn("build_number:", text)
         self.assertIn('default: "19"', text)
         self.assertIn("IOS_BUILD_NUMBER: ${{ inputs.build_number }}", text)

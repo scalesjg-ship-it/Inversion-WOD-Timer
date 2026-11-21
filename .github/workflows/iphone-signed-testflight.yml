@@ -220,9 +220,7 @@ jobs:
           rm -rf "$IPA_UNPACK_DIR"
           mkdir -p "$IPA_UNPACK_DIR"
           echo "IPA_UNPACK_DIR=$IPA_UNPACK_DIR" >> "$GITHUB_ENV"
-          # Xcode packages the IPA with ditto. Info-ZIP turns sealed symlinks
-          # into regular files and drops resource forks, so codesign --verify
-          # --deep --strict then reports a sealed resource missing or invalid.
+          # ditto keeps the symlinks and resource forks Xcode sealed into the IPA.
           ditto -x -k "$IPA_PATH" "$IPA_UNPACK_DIR"
           app_count=$(find "$IPA_UNPACK_DIR/Payload" -maxdepth 1 -type d -name '*.app' | wc -l | tr -d ' ')
           if [ "$app_count" -ne 1 ]; then
