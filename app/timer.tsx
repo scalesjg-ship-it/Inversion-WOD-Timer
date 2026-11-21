@@ -31,6 +31,8 @@ import {
 } from '@/src/tv/timerTransport';
 import { useRemoteCommands } from '@/src/tv/useRemoteCommands';
 import { useTvFocusTag } from '@/src/tv/useTvFocusTag';
+import { useWatchLink } from '@/src/watch/useWatchLink';
+import { watchLinkEnabled } from '@/src/watch/gate';
 
 const KEEP_AWAKE = 'americana-timer';
 const FocusGuide = TVFocusGuideView ?? View;
@@ -74,6 +76,8 @@ export default function TimerScreen() {
   const [primaryNode, setPrimaryNode] = useState<ComponentRef<typeof Pressable> | null>(null);
   const [stopTag, onStopHost] = useTvFocusTag();
   const [resetTag, onResetHost] = useTvFocusTag();
+  const [watchTag, onWatchHost] = useTvFocusTag();
+  const appleTv = watchLinkEnabled({ os: Platform.OS, tv });
   const [confirmResetTag, onConfirmResetHost] = useTvFocusTag();
   const [confirmCancelTag, onConfirmCancelHost] = useTvFocusTag();
   const confirmKindRef = useRef(confirmKind);
@@ -289,6 +293,38 @@ export default function TimerScreen() {
     onRemote,
   );
 
+  // Wrist commands call the same start, pause, resume, and reset functions as
+  // Select. leaveArmed stays clear, so hardware Back still follows backStep.
+  const { presentPicker } = useWatchLink({
+    enabled: appleTv,
+    snapshot: timer.snapshot,
+    config,
+    onAction: (action) => {
+      if (action === 'ignore') return;
+      leaveArmed.current = false;
+      if (confirmKindRef.current) closeConfirm();
+      switch (action) {
+        case 'start':
+          timer.startTimer();
+          return;
+        case 'pause':
+          pauseOnResume();
+          return;
+        case 'resume':
+          timer.toggle();
+          setPreferPrimary(true);
+          return;
+        case 'reset':
+          timer.resetTimer();
+          return;
+        default: {
+          const unexpected: never = action;
+          return unexpected;
+        }
+      }
+    },
+  });
+
   const transport = tvTransportButtons({
     phase: timer.snapshot.phase,
     running: timer.snapshot.running,
@@ -490,10 +526,28 @@ export default function TimerScreen() {
                 hasTVPreferredFocus={preferPrimary && confirmKind === null && button.role === 'primary'}
                 onFocus={button.role === 'primary' ? () => setPreferPrimary(false) : undefined}
                 focusLeft={tagFor(transportNeighbor(transportRoles, button.role, -1))}
-                focusRight={tagFor(transportNeighbor(transportRoles, button.role, 1))}
+                focusRight={
+                  appleTv && button.role === transportRoles[transportRoles.length - 1]
+                    ? watchTag
+                    : tagFor(transportNeighbor(transportRoles, button.role, 1))
+                }
                 focusUp={null}
               />
             ))}
+            {appleTv ? (
+              <BigButton
+                label="Watch"
+                color={digits}
+                variant="ghost"
+                testID="timer-watch"
+                onPress={presentPicker}
+                onHost={onWatchHost}
+                focusable={confirmKind === null}
+                focusLeft={tagFor(transportRoles[transportRoles.length - 1])}
+                focusRight={watchTag}
+                focusUp={null}
+              />
+            ) : null}
           </View>
         ) : null}
         <View style={[styles.top, tv ? { height: brandHeight } : null]} pointerEvents="box-none">

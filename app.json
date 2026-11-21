@@ -127,7 +127,8 @@
         }
       ],
       "./plugins/withAndroidSystemBars",
-      "./plugins/withAndroidResourceKeeps"
+      "./plugins/withAndroidResourceKeeps",
+      "./plugins/withAppleWatch"
     ],
     "experiments": {
       "typedRoutes": true
