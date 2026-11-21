@@ -9,7 +9,8 @@ import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { useTvTabFocus } from '@/src/components/TvTabFocus';
-import { BigButton, Chip, NumberStepper, TimeField, TvCountRow } from '@/src/components/ui';
+import { TvSetupFocus } from '@/src/components/TvSetupFocus';
+import { BigButton, Chip, NumberStepper, TimeField, TvCountRow, TvLinkedStart } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import {
@@ -97,6 +98,7 @@ export default function RoundsScreen() {
   if (tv) {
     const layout = tvRoundsLayout(width, height, BUILTIN_PRESETS.length);
     return (
+      <TvSetupFocus>
       <View
         style={[
           styles.safe,
@@ -170,6 +172,7 @@ export default function RoundsScreen() {
             />
             <TimeField
               compact
+              exit
               label="Lead-in"
               seconds={draft.leadInSeconds}
               onChange={(leadInSeconds) => edit({ leadInSeconds: Math.min(600, leadInSeconds) })}
@@ -179,9 +182,10 @@ export default function RoundsScreen() {
             <View style={[styles.warningRow, styles.warningCenter]}>
               <Text style={[styles.fieldLabel, styles.fieldLabelTv]}>Warning</Text>
               <View style={[styles.chips, styles.chipsCentered]}>
-                {WARNING_CHOICES.map((seconds) => (
+                {WARNING_CHOICES.map((seconds, index) => (
                   <Chip
                     key={seconds}
+                    bridge={index === 0 ? 'entry' : true}
                     label={seconds === 0 ? 'Off' : `${seconds}s`}
                     selected={draft.warningSeconds === seconds}
                     onPress={() => edit({ warningSeconds: seconds })}
@@ -204,9 +208,10 @@ export default function RoundsScreen() {
               onClearSelection={() => apply(BUILTIN_PRESETS[0])}
             />
           </View>
-          <BigButton roomy testID="start-rounds" label="Start rounds" color={accent} onPress={() => start()} />
+          <TvLinkedStart roomy testID="start-rounds" label="Start rounds" color={accent} onPress={() => start()} />
         </View>
       </View>
+      </TvSetupFocus>
     );
   }
 

@@ -6,6 +6,7 @@ import {
   nextRunningFocus,
   onScreenBackFocusable,
   onScreenBackPress,
+  showsOnScreenBack,
   preferredTransportRole,
   tvTransportButtons,
 } from './timerTransport';
@@ -69,6 +70,21 @@ describe('TV timer focus', () => {
     expect(onScreenBackFocusable(true)).toBe(false);
     expect(onScreenBackFocusable(false)).toBe(true);
     expect(preferredTransportRole(tvTransportButtons({ ...running, mode: 'forTime' }))).not.toBe('back');
+  });
+
+  it('drops the on-screen Back button on Apple TV and keeps it on Fire TV and iPhone', () => {
+    expect(showsOnScreenBack(true, 'ios')).toBe(false);
+    expect(showsOnScreenBack(true, 'android')).toBe(true);
+    expect(showsOnScreenBack(false, 'ios')).toBe(true);
+    expect(showsOnScreenBack(false, 'android')).toBe(true);
+  });
+
+  it('stays on the transport row when Apple TV has no on-screen Back', () => {
+    expect(nextRunningFocus('primary', 'up', [...amrap], { onScreenBack: false })).toBe('primary');
+    expect(nextRunningFocus('primary', 'down', [...amrap], { onScreenBack: false })).toBe('primary');
+    expect(nextRunningFocus('primary', 'right', [...forTime], { onScreenBack: false })).toBe('stop');
+    expect(nextRunningFocus('reset', 'left', [...forTime], { onScreenBack: false })).toBe('stop');
+    expect(preferredTransportRole(tvTransportButtons({ ...running, mode: 'amrap' }))).toBe('primary');
   });
 
   it('treats Select on the on-screen Back control as pause or resume', () => {

@@ -7,11 +7,13 @@ import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
-import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvDurationRow } from '@/src/components/ui';
+import { TvSetupFocus } from '@/src/components/TvSetupFocus';
+import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvDurationRow, TvLinkedStart } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, tvSafeBox } from '@/src/tv/layout';
-import { tvSetupMetrics, tvSetupScaled } from '@/src/tv/setupLayout';
+import { tvSetupFrame, tvSetupMetrics, tvSetupScaled } from '@/src/tv/setupLayout';
+import { showsOnScreenBack } from '@/src/tv/timerTransport';
 import {
   WARNING_MARK_CHOICES,
   addCountdownSeconds,
@@ -115,15 +117,18 @@ export default function CountdownScreen() {
 
   if (tv) {
     const metrics = tvSetupMetrics(width, height);
+    const frame = tvSetupFrame(width, height);
     const titleSize = tvSetupScaled(40, width, height);
-    const formWidth = Math.min(metrics.durationRow, Math.max(1, width - box.horizontal * 2));
+    const formWidth = frame.durationWidth;
+    const appleTv = !showsOnScreenBack(true, Platform.OS);
     return (
-      <View style={[styles.safe, { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical }]} testID="screen-countdown">
-        <View style={styles.header}>
+      <TvSetupFocus>
+      <View style={[styles.safe, { paddingHorizontal: frame.horizontal, paddingTop: frame.vertical }]} testID="screen-countdown">
+        <View style={[styles.header, appleTv && styles.headerApple]}>
           <HeaderBack testID="countdown-back" onPress={() => router.back()} color={accent} />
           <Text style={[styles.kicker, styles.kickerTv]} numberOfLines={1}>Americana</Text>
         </View>
-        <View style={[styles.tvBody, { paddingBottom: box.vertical, gap: metrics.rowGap }]}>
+        <View style={[styles.tvBody, { paddingBottom: frame.vertical, gap: metrics.rowGap }]}>
           <Text style={[styles.title, styles.titleCenter, { fontSize: titleSize, lineHeight: titleSize + 6 }]}>Countdown</Text>
           <Text style={[styles.summary, styles.summaryTv, styles.titleCenter]}>
             {formatSeconds(config.workSeconds)}
@@ -146,13 +151,14 @@ export default function CountdownScreen() {
               <Chip label="+1m" color={accent} selected={false} testID="add-60" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 60))} />
               <Chip label="+5m" color={accent} selected={false} testID="add-300" onPress={() => applyDuration(addCountdownSeconds(durationSeconds, 300))} />
             </View>
-            <TimeField compact label="Lead-in" seconds={leadInSeconds} onChange={(value) => setLeadInSeconds(Math.min(600, value))} testID="lead-in" accent={accent} />
+            <TimeField compact exit label="Lead-in" seconds={leadInSeconds} onChange={(value) => setLeadInSeconds(Math.min(600, value))} testID="lead-in" accent={accent} />
             <View style={styles.field}>
               <Text style={[styles.fieldLabel, styles.fieldLabelTv, styles.titleCenter]}>Warning beeps</Text>
               <View style={[styles.chips, styles.chipsCentered]}>
-                {WARNING_MARK_CHOICES.map((choice) => (
+                {WARNING_MARK_CHOICES.map((choice, index) => (
                   <Chip
                     key={choice.id}
+                    bridge={index === 0 ? 'entry' : true}
                     label={choice.label}
                     color={accent}
                     selected={marks.includes(choice.seconds)}
@@ -167,6 +173,7 @@ export default function CountdownScreen() {
                   />
                 ))}
                 <Chip
+                  bridge
                   label="Last 3s"
                   color={accent}
                   selected={finalBeepsEnabled(marks)}
@@ -178,10 +185,11 @@ export default function CountdownScreen() {
           </View>
           <View style={styles.tvShelf}>{shelf}</View>
           <View style={styles.footer}>
-            <BigButton roomy testID="start-countdown" label="Start countdown" color={accent} onPress={() => start(config, runLabel)} />
+            <TvLinkedStart roomy testID="start-countdown" label="Start countdown" color={accent} onPress={() => start(config, runLabel)} />
           </View>
         </View>
       </View>
+      </TvSetupFocus>
     );
   }
 
@@ -272,6 +280,7 @@ export default function CountdownScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: chrome.bg, paddingHorizontal: 20 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 },
+  headerApple: { justifyContent: 'flex-end' },
   kicker: { color: chrome.muted, fontFamily: 'OswaldMedium', letterSpacing: 2, textTransform: 'uppercase', fontSize: 13 },
   kickerTv: { color: chrome.text, fontSize: TV_SECTION_FONT },
   tvStack: { flex: 1, justifyContent: 'space-evenly' },

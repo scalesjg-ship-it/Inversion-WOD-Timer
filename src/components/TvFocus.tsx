@@ -112,15 +112,18 @@ export function TvTextField({
   onFocus,
   onBlur,
   focusUp = null,
+  focusDown = null,
   ...rest
-}: TextInputProps & { accent?: string; focusUp?: TvFocusTag | null }) {
+}: TextInputProps & { accent?: string; focusUp?: TvFocusTag | null; focusDown?: TvFocusTag | null }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
   const [focused, setFocused] = useState(false);
   return (
     <TextInput
       {...rest}
-      {...(tv && focusUp != null ? { nextFocusUp: focusUp, focusable: true as const } : {})}
+      {...(tv && (focusUp != null || focusDown != null) ? { focusable: true as const } : {})}
+      {...(tv && focusUp != null ? { nextFocusUp: focusUp } : {})}
+      {...(tv && focusDown != null ? { nextFocusDown: focusDown } : {})}
       onFocus={(event) => {
         if (tv) setFocused(true);
         onFocus?.(event);

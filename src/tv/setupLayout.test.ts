@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { TV_FOCUS_SCALE, tvTabBarHeight } from './controls';
 import { TV_OVERSCAN, tvFocusGutter } from './layout';
-import { stepperFocus, tvRoundsLayout, tvSetupMetrics } from './setupLayout';
+import { stepperFocus, tvRoundsLayout, tvSetupFrame, tvSetupMetrics } from './setupLayout';
 
 describe('TV setup form', () => {
   it('groups each stepper on its value instead of the screen width', () => {
@@ -25,6 +25,29 @@ describe('TV setup form', () => {
     expect(hd.labelSize).toBeGreaterThanOrEqual(32);
     expect(fire.labelSize).toBeLessThan(hd.labelSize);
     expect(hd.rowGap).toBeGreaterThanOrEqual(Math.ceil(hd.button * (TV_FOCUS_SCALE - 1)));
+  });
+
+  it('keeps the 1080p control size and the focused row inside the safe area', () => {
+    const hd = tvSetupMetrics(1920, 1080);
+    expect(hd.button).toBe(70);
+    expect(hd.labelSize).toBeGreaterThanOrEqual(32);
+    for (const [width, height] of [
+      [1920, 1080],
+      [1280, 720],
+    ] as const) {
+      const frame = tvSetupFrame(width, height);
+      const metrics = tvSetupMetrics(width, height);
+      const bleed = Math.ceil((metrics.button * (TV_FOCUS_SCALE - 1)) / 2);
+      expect(frame.formWidth).toBe(metrics.timeRow);
+      expect(frame.durationWidth).toBe(metrics.durationRow);
+      expect(frame.horizontal).toBeGreaterThanOrEqual(Math.round(width * TV_OVERSCAN));
+      const left = frame.horizontal + (frame.contentWidth - frame.formWidth) / 2;
+      const focusedRight = left + frame.formWidth + bleed;
+      expect(left).toBeGreaterThanOrEqual(frame.horizontal);
+      expect(focusedRight).toBeLessThanOrEqual(width - frame.horizontal);
+      const durationLeft = frame.horizontal + (frame.contentWidth - frame.durationWidth) / 2;
+      expect(durationLeft + frame.durationWidth + bleed).toBeLessThanOrEqual(width - frame.horizontal);
+    }
   });
 
   it('keeps left and right inside a cluster and joins the neighbor cluster', () => {

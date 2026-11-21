@@ -32,6 +32,9 @@ export function useRouter(): typeof router {
   return router;
 }
 
+/** The timer screen registers this so a hardware Back can pause before leaving. */
+export function usePreventRemove(_active: boolean, _onPrevent: (info: { repeat: () => void }) => void): void {}
+
 /** Runs the screen's focus loader once for a static preview. */
 export function useFocusEffect(effect: () => void | (() => void)): void {
   useEffect(() => {
