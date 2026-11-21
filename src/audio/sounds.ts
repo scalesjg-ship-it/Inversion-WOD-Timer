@@ -2,6 +2,7 @@ import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-aud
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
 
+import { cueAudioMode } from '@/src/audio/mode';
 import { soundsForCues, type Cue, type SoundName } from '@/src/timer/engine';
 import { allowsDeviceHaptics } from '@/src/tv/controls';
 import bell from '../../assets/sounds/bell.wav';
@@ -21,12 +22,7 @@ let modeReady = false;
 
 async function ensureMode(): Promise<void> {
   if (modeReady) return;
-  await setAudioModeAsync({
-    playsInSilentMode: true,
-    // Phones can keep cues going on the lock screen. A TV only sounds while this app is open.
-    shouldPlayInBackground: Platform.isTV !== true,
-    interruptionMode: 'duckOthers',
-  });
+  await setAudioModeAsync(cueAudioMode(Platform.OS, Platform.isTV === true));
   modeReady = true;
 }
 
