@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View, type ScrollViewInstance } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
@@ -10,8 +10,8 @@ import { TvFocusPressable } from '@/src/components/TvFocus';
 import { useTvTabFocus, type TvFocusTag } from '@/src/components/TvTabFocus';
 import { helpNeighbors, helpPlatform, helpSections, helpVersionLine, type HelpBlock } from '@/src/help/copy';
 import { chrome } from '@/src/theme/chrome';
+import { tvHelpColumn } from '@/src/tv/helpLayout';
 import { tvSafeBox, tvScaled } from '@/src/tv/layout';
-import { scrollOffsetForFocus } from '@/src/tv/scroll';
 import { useTvFocusTag } from '@/src/tv/useTvFocusTag';
 
 export function ErrorBoundary(props: { error: Error; retry: () => Promise<void> }) {
@@ -88,150 +88,168 @@ function HelpList({
   paddingTop: number;
   paddingBottom: number;
 }) {
-  const tabFocus = useTvTabFocus();
-  const scrollRef = useRef<ScrollViewInstance>(null);
-  const offset = useRef(0);
-  const viewport = useRef(0);
-  const places = useRef<Record<string, { y: number; height: number }>>({});
-  const [tags, setTags] = useState<Record<string, TvFocusTag | null>>({});
-  const [scrollEnabled, setScrollEnabled] = useState(false);
-  const ids = [...sections.map((section) => section.id), 'help-version'];
-  const links = helpNeighbors(ids);
-  const remember = useCallback((id: string, tag: TvFocusTag | null) => {
-    setTags((current) => (current[id] === tag ? current : { ...current, [id]: tag }));
-  }, []);
-
-  const reveal = (id: string) => {
-    setScrollEnabled(id !== sections[0]?.id);
-    const place = places.current[id];
-    if (!place) return;
-    const next = scrollOffsetForFocus(place.y, place.height, viewport.current, offset.current);
-    if (next === offset.current) return;
-    offset.current = next;
-    scrollRef.current?.scrollTo({ y: next, animated: true });
-  };
-
+  const items: HelpBlock[] = [...sections, { id: 'help-version', title: 'Version', body: version }];
+  if (tv) {
+    return (
+      <TvHelp
+        items={items}
+        accent={accent}
+        titleSize={titleSize}
+        bodySize={bodySize}
+        bodyLine={bodyLine}
+        pageSize={pageSize}
+        paddingHorizontal={paddingHorizontal}
+        paddingTop={paddingTop}
+        paddingBottom={paddingBottom}
+      />
+    );
+  }
   return (
     <ScrollView
-      ref={scrollRef}
       style={styles.scroll}
       contentContainerStyle={{
         paddingHorizontal,
         paddingTop,
         paddingBottom,
-        gap: tv ? 18 : 22,
+        gap: 22,
       }}
-      onLayout={(event) => {
-        viewport.current = event.nativeEvent.layout.height;
-      }}
-      onScroll={(event) => {
-        offset.current = event.nativeEvent.contentOffset.y;
-      }}
-      scrollEventThrottle={16}
-      scrollEnabled={!tv || scrollEnabled}
     >
       <Text style={[styles.pageTitle, { color: accent, fontSize: pageSize }]}>Help</Text>
-      {sections.map((section) => {
-        const link = links.find((item) => item.id === section.id);
-        return (
-          <HelpSection
-            key={section.id}
-            section={section}
-            tv={tv}
-            accent={accent}
-            titleSize={titleSize}
-            bodySize={bodySize}
-            bodyLine={bodyLine}
-            focusUp={link?.up == null ? (tabFocus?.upTag ?? null) : (tags[link.up] ?? null)}
-            focusDown={link?.down == null || link.down === section.id ? (tags[section.id] ?? null) : (tags[link.down] ?? null)}
-            onTag={remember}
-            onFocus={() => reveal(section.id)}
-            onLayout={(y, height) => {
-              places.current[section.id] = { y, height };
-            }}
-          />
-        );
-      })}
-      <HelpSection
-        section={{ id: 'help-version', title: 'Version', body: version }}
-        tv={tv}
-        accent={accent}
-        titleSize={titleSize}
-        bodySize={bodySize}
-        bodyLine={bodyLine}
-        focusUp={tags[links[links.length - 1]?.up ?? ''] ?? null}
-        focusDown={tags['help-version'] ?? null}
-        onTag={remember}
-        onFocus={() => reveal('help-version')}
-        onLayout={(y, height) => {
-          places.current['help-version'] = { y, height };
-        }}
-      />
+      {items.map((section) => (
+        <View key={section.id} testID={section.id}>
+          <Text style={[styles.title, { color: accent, fontSize: titleSize, lineHeight: titleSize + 6 }]}>{section.title}</Text>
+          <Text style={[styles.body, { color: chrome.text, fontSize: bodySize, lineHeight: bodyLine }]}>{section.body}</Text>
+        </View>
+      ))}
     </ScrollView>
   );
 }
 
-function HelpSection({
-  section,
-  tv,
+/**
+ * Titles stay in one column outside any scroller. The Up guide sits one pixel
+ * above the focused row, and a ScrollView clips that guide, so Up never reached
+ * the Help tab. The focused section's text is beside the list.
+ */
+function TvHelp({
+  items,
   accent,
   titleSize,
   bodySize,
   bodyLine,
-  focusUp,
-  focusDown,
-  onTag,
-  onFocus,
-  onLayout,
+  pageSize,
+  paddingHorizontal,
+  paddingTop,
+  paddingBottom,
 }: {
-  section: HelpBlock;
-  tv: boolean;
+  items: HelpBlock[];
   accent: string;
   titleSize: number;
   bodySize: number;
   bodyLine: number;
+  pageSize: number;
+  paddingHorizontal: number;
+  paddingTop: number;
+  paddingBottom: number;
+}) {
+  const tabFocus = useTvTabFocus();
+  const { width, height } = useWindowDimensions();
+  const [tags, setTags] = useState<Record<string, TvFocusTag | null>>({});
+  const [focusedId, setFocusedId] = useState(items[0]?.id ?? 'help-version');
+  const links = helpNeighbors(items.map((item) => item.id));
+  const focused = items.find((item) => item.id === focusedId) ?? items[0];
+  const column = tvHelpColumn(width, height, items.length, pageSize);
+  const remember = useCallback((id: string, tag: TvFocusTag | null) => {
+    setTags((current) => (current[id] === tag ? current : { ...current, [id]: tag }));
+  }, []);
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        paddingHorizontal,
+        paddingTop,
+        paddingBottom,
+      }}
+    >
+      <Text style={[styles.pageTitle, { color: accent, fontSize: pageSize }]}>Help</Text>
+      <View style={[styles.tvRow, { marginTop: column.gap }]}>
+        <View style={[styles.tvList, { gap: column.gap }]} collapsable={false}>
+          {items.map((section) => {
+            const link = links.find((item) => item.id === section.id);
+            const self = tags[section.id] ?? null;
+            return (
+              <TvHelpRow
+                key={section.id}
+                section={section}
+                accent={accent}
+                titleSize={Math.max(18, Math.round(column.rowHeight * 0.46))}
+                rowHeight={column.rowHeight}
+                focusUp={link?.up == null ? (tabFocus?.upTag ?? null) : (tags[link.up] ?? null)}
+                focusDown={link?.down == null ? self : (tags[link.down] ?? null)}
+                focusSide={self}
+                onTag={remember}
+                onFocus={() => setFocusedId(section.id)}
+              />
+            );
+          })}
+        </View>
+        {focused ? (
+          <View style={styles.tvReading}>
+            <Text style={[styles.title, { color: accent, fontSize: titleSize, lineHeight: titleSize + 6 }]}>{focused.title}</Text>
+            <Text style={[styles.body, { color: chrome.text, fontSize: bodySize, lineHeight: bodyLine }]}>{focused.body}</Text>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function TvHelpRow({
+  section,
+  accent,
+  titleSize,
+  rowHeight,
+  focusUp,
+  focusDown,
+  focusSide,
+  onTag,
+  onFocus,
+}: {
+  section: HelpBlock;
+  accent: string;
+  titleSize: number;
+  rowHeight: number;
   focusUp: TvFocusTag | null;
   focusDown: TvFocusTag | null;
+  focusSide: TvFocusTag | null;
   onTag: (id: string, tag: TvFocusTag | null) => void;
   onFocus: () => void;
-  onLayout: (y: number, height: number) => void;
 }) {
   const [tag, onHost] = useTvFocusTag();
   useEffect(() => {
     onTag(section.id, tag);
   }, [onTag, section.id, tag]);
-  const body = (
-    <View>
-      <Text style={[styles.title, { color: accent, fontSize: titleSize, lineHeight: titleSize + 6 }]}>{section.title}</Text>
-      <Text style={[styles.body, { color: chrome.text, fontSize: bodySize, lineHeight: bodyLine }]}>{section.body}</Text>
-    </View>
-  );
-  if (!tv) {
-    return (
-      <View
-        testID={section.id}
-        onLayout={(event) => onLayout(event.nativeEvent.layout.y, event.nativeEvent.layout.height)}
-      >
-        {body}
-      </View>
-    );
-  }
   return (
-    <View onLayout={(event) => onLayout(event.nativeEvent.layout.y, event.nativeEvent.layout.height)}>
-      <TvFocusPressable
-        testID={section.id}
-        accessibilityRole="button"
-        accessibilityLabel={`${section.title}. ${section.body}`}
-        scale={false}
-        onHost={onHost}
-        focusUp={focusUp}
-        focusDown={focusDown}
-        onFocus={onFocus}
-        style={styles.section}
+    <TvFocusPressable
+      testID={section.id}
+      accessibilityRole="button"
+      accessibilityLabel={`${section.title}. ${section.body}`}
+      scale={false}
+      onHost={onHost}
+      focusUp={focusUp}
+      focusDown={focusDown}
+      focusLeft={focusSide}
+      focusRight={focusSide}
+      onFocus={onFocus}
+      style={[styles.section, { minHeight: rowHeight, height: rowHeight }]}
+    >
+      <Text
+        numberOfLines={1}
+        style={[styles.title, { color: accent, fontSize: titleSize, lineHeight: titleSize + 4 }]}
       >
-        {body}
-      </TvFocusPressable>
-    </View>
+        {section.title}
+      </Text>
+    </TvFocusPressable>
   );
 }
 
@@ -242,10 +260,22 @@ const styles = StyleSheet.create({
     fontFamily: 'Oswald',
     letterSpacing: 0.4,
   },
+  tvRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 28,
+  },
+  tvList: {
+    width: '38%',
+  },
+  tvReading: {
+    flex: 1,
+  },
   section: {
     borderRadius: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
   },
   title: {
     fontFamily: 'Oswald',
