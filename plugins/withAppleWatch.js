@@ -25,6 +25,25 @@ function isTvBuild(env = process.env) {
   return env.EXPO_TV === '1' || env.EXPO_TV === 'true';
 }
 
+const IOS_BUILD_NUMBER_PATTERN = /^[1-9]\d{0,8}$/;
+
+/**
+ * iPhone TestFlight passes IOS_BUILD_NUMBER. app.json stays 1.0.0 (18).
+ * A tvOS prebuild ignores it so the Apple TV workflow is unchanged.
+ */
+function resolveIosArchiveBuild(env = process.env) {
+  if (isTvBuild(env)) return null;
+  const raw = env.IOS_BUILD_NUMBER;
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  if (!text) return null;
+  if (!IOS_BUILD_NUMBER_PATTERN.test(text)) {
+    throw new Error(
+      `IOS_BUILD_NUMBER must be a positive integer CFBundleVersion with no leading zero (got ${JSON.stringify(text)})`,
+    );
+  }
+  return text;
+}
+
 function tvApplicationServices() {
   return {
     Browses: [
@@ -202,10 +221,16 @@ function linkWatchTarget(project, versions) {
 
 function withAppleWatch(config) {
   const marketingVersion = config.version || '1.0.0';
-  const buildNumber = config.ios?.buildNumber || '1';
+  const archiveBuild = resolveIosArchiveBuild();
+  const buildNumber = archiveBuild || config.ios?.buildNumber || '1';
   config = withInfoPlist(config, (mod) => {
-    if (!isTvBuild()) return mod;
-    mod.modResults.NSApplicationServices = tvApplicationServices();
+    if (isTvBuild()) {
+      mod.modResults.NSApplicationServices = tvApplicationServices();
+      return mod;
+    }
+    if (archiveBuild) {
+      mod.modResults.CFBundleVersion = archiveBuild;
+    }
     return mod;
   });
   return withXcodeProject(config, (mod) => {
@@ -221,3 +246,4 @@ module.exports.tvApplicationServices = tvApplicationServices;
 module.exports.linkWatchTarget = linkWatchTarget;
 module.exports.WATCH_BUNDLE_ID = WATCH_BUNDLE_ID;
 module.exports.WATCH_SERVICE = WATCH_SERVICE;
+module.exports.resolveIosArchiveBuild = resolveIosArchiveBuild;

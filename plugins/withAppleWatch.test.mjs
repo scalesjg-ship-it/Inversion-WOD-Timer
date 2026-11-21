@@ -23,6 +23,16 @@ describe('withAppleWatch', () => {
     expect(JSON.stringify(services)).not.toMatch(/heart|HealthKit/i);
   });
 
+  it('uses IOS_BUILD_NUMBER only for an iPhone archive', () => {
+    expect(plugin.resolveIosArchiveBuild({})).toBeNull();
+    expect(plugin.resolveIosArchiveBuild({ IOS_BUILD_NUMBER: '19' })).toBe('19');
+    expect(plugin.resolveIosArchiveBuild({ EXPO_TV: '1', IOS_BUILD_NUMBER: '19' })).toBeNull();
+    expect(() => plugin.resolveIosArchiveBuild({ IOS_BUILD_NUMBER: '0' })).toThrow(/IOS_BUILD_NUMBER/);
+    expect(() => plugin.resolveIosArchiveBuild({ IOS_BUILD_NUMBER: '018' })).toThrow(/IOS_BUILD_NUMBER/);
+    expect(app.expo.version).toBe('1.0.0');
+    expect(app.expo.ios.buildNumber).toBe('18');
+  });
+
   it('embeds the watch app in an iPhone project and not as a second tvOS bundle', () => {
     const project = xcode.project('ios/Americana.xcodeproj/project.pbxproj');
     // The fixture is created by the test runner when prebuild has not run.
