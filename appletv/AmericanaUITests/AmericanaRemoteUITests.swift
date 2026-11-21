@@ -208,9 +208,13 @@ final class AmericanaRemoteUITests: XCTestCase {
     XCTAssertTrue(nudge("help-version", directions: [.down], limit: 14), "Could not focus the version line. \(snapshot())")
     let version = any("help-version").label
     XCTAssertTrue(version.contains("Version"), "Version line was \(version). \(snapshot())")
-    for _ in 0..<16 {
+    for _ in 0..<24 {
       if focused("tab-help") { break }
-      press(.up, settle: 0.35)
+      if focused("help-watch") {
+        press(.up, settle: 0.8)
+        if focused("tab-help") { break }
+      }
+      press(.up, settle: 0.4)
     }
     XCTAssertTrue(focused("tab-help"), "Up did not return to Help. \(snapshot())")
     return "version=\(version) focus=\(focusedIdentifier())"

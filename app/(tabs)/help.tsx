@@ -94,6 +94,7 @@ function HelpList({
   const viewport = useRef(0);
   const places = useRef<Record<string, { y: number; height: number }>>({});
   const [tags, setTags] = useState<Record<string, TvFocusTag | null>>({});
+  const [scrollEnabled, setScrollEnabled] = useState(false);
   const ids = [...sections.map((section) => section.id), 'help-version'];
   const links = helpNeighbors(ids);
   const remember = useCallback((id: string, tag: TvFocusTag | null) => {
@@ -101,6 +102,7 @@ function HelpList({
   }, []);
 
   const reveal = (id: string) => {
+    setScrollEnabled(id !== sections[0]?.id);
     const place = places.current[id];
     if (!place) return;
     const next = scrollOffsetForFocus(place.y, place.height, viewport.current, offset.current);
@@ -126,6 +128,7 @@ function HelpList({
         offset.current = event.nativeEvent.contentOffset.y;
       }}
       scrollEventThrottle={16}
+      scrollEnabled={!tv || scrollEnabled}
     >
       <Text style={[styles.pageTitle, { color: accent, fontSize: pageSize }]}>Help</Text>
       {sections.map((section) => {
