@@ -69,7 +69,6 @@ export function TvTabBar() {
           left: tags[link.left],
           right: tags[link.right],
           up: tags[link.up],
-          down: index === selected ? tabFocus?.entryTag : null,
         });
         return (
           <TvFocusPressable
@@ -83,7 +82,6 @@ export function TvTabBar() {
             nextFocusLeft={links.nextFocusLeft}
             nextFocusRight={links.nextFocusRight}
             nextFocusUp={links.nextFocusUp}
-            nextFocusDown={links.nextFocusDown}
             onFocus={() => open(index)}
             onPress={() => open(index)}
             style={({ pressed }) => [

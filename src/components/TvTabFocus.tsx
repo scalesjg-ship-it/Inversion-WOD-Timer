@@ -9,12 +9,9 @@ type PressableHost = React.ComponentRef<typeof Pressable>;
 interface TvTabFocusApi {
   /** Tag of the open tab. Up from the first content row targets it. */
   upTag: TvFocusTag | null;
-  /** Tag of the first control on the open screen. Down from the open tab targets it. */
-  entryTag: TvFocusTag | null;
   tabTags: (TvFocusTag | null)[];
   selectedTab: number;
   bindTab: (index: number, node: PressableHost | null) => void;
-  bindEntry: (tag: TvFocusTag | null) => void;
   reportSelected: (index: number) => void;
 }
 
@@ -50,7 +47,6 @@ function readTag(node: PressableHost | null, apply: (tag: TvFocusTag | null) => 
 export function TvTabFocusProvider({ children }: { children: ReactNode }) {
   const [tabTags, setTabTags] = useState<(TvFocusTag | null)[]>([]);
   const [selectedTab, setSelectedTab] = useState(0);
-  const [entryTag, setEntryTag] = useState<TvFocusTag | null>(null);
 
   const bindTab = useCallback((index: number, node: PressableHost | null) => {
     const apply = (tag: TvFocusTag | null) => {
@@ -69,22 +65,16 @@ export function TvTabFocusProvider({ children }: { children: ReactNode }) {
     setSelectedTab((current) => (current === index ? current : index));
   }, []);
 
-  const bindEntry = useCallback((tag: TvFocusTag | null) => {
-    setEntryTag((current) => (current === tag ? current : tag));
-  }, []);
-
   const upTag = tabTags[selectedTab] ?? null;
   const api = useMemo<TvTabFocusApi>(
     () => ({
       upTag,
-      entryTag,
       tabTags,
       selectedTab,
       bindTab,
-      bindEntry,
       reportSelected,
     }),
-    [upTag, entryTag, tabTags, selectedTab, bindTab, bindEntry, reportSelected],
+    [upTag, tabTags, selectedTab, bindTab, reportSelected],
   );
 
   return <TvTabFocusContext.Provider value={api}>{children}</TvTabFocusContext.Provider>;

@@ -126,9 +126,9 @@ function HelpList({
 }
 
 /**
- * Titles stay in one column outside any scroller. The Up guide sits one pixel
- * above the focused row, and a ScrollView clips that guide, so Up never reached
- * the Help tab. The focused section's text is beside the list.
+ * Same shell as the WOD screen when the menu fits: a plain view, not a scroller,
+ * and every row stretches the full width under the tab bar. The Help tab is the
+ * rightmost tab, so a narrow left column leaves Down with nothing to land on.
  */
 function TvHelp({
   items,
@@ -158,18 +158,10 @@ function TvHelp({
   const links = helpNeighbors(items.map((item) => item.id));
   const focused = items.find((item) => item.id === focusedId) ?? items[0];
   const column = tvHelpColumn(width, height, items.length, pageSize);
-  const entryId = items[0]?.id ?? null;
-  const entryTag = entryId ? (tags[entryId] ?? null) : null;
   const remember = useCallback((id: string, tag: TvFocusTag | null) => {
     setTags((current) => (current[id] === tag ? current : { ...current, [id]: tag }));
   }, []);
-  useEffect(() => {
-    tabFocus?.bindEntry(entryTag);
-  }, [entryTag, tabFocus]);
-  useEffect(() => {
-    const clear = tabFocus?.bindEntry;
-    return () => clear?.(null);
-  }, [tabFocus?.bindEntry]);
+  const readingLines = Math.max(2, Math.floor(column.readingHeight / Math.max(bodyLine, 1)));
 
   return (
     <View
@@ -179,36 +171,41 @@ function TvHelp({
         paddingTop,
         paddingBottom,
       }}
+      collapsable={false}
     >
       <Text style={[styles.pageTitle, { color: accent, fontSize: pageSize }]}>Help</Text>
-      <View style={[styles.tvRow, { marginTop: column.gap }]}>
-        <View style={[styles.tvList, { gap: column.gap }]} collapsable={false}>
-          {items.map((section) => {
-            const link = links.find((item) => item.id === section.id);
-            const self = tags[section.id] ?? null;
-            return (
-              <TvHelpRow
-                key={section.id}
-                section={section}
-                accent={accent}
-                titleSize={Math.max(18, Math.round(column.rowHeight * 0.46))}
-                rowHeight={column.rowHeight}
-                focusUp={link?.up == null ? (tabFocus?.upTag ?? null) : (tags[link.up] ?? null)}
-                focusDown={link?.down == null ? self : (tags[link.down] ?? null)}
-                focusSide={self}
-                onTag={remember}
-                onFocus={() => setFocusedId(section.id)}
-              />
-            );
-          })}
-        </View>
-        {focused ? (
-          <View style={styles.tvReading}>
-            <Text style={[styles.title, { color: accent, fontSize: titleSize, lineHeight: titleSize + 6 }]}>{focused.title}</Text>
-            <Text style={[styles.body, { color: chrome.text, fontSize: bodySize, lineHeight: bodyLine }]}>{focused.body}</Text>
-          </View>
-        ) : null}
+      <View style={[styles.tvList, { gap: column.gap, marginTop: column.gap }]} collapsable={false}>
+        {items.map((section) => {
+          const link = links.find((item) => item.id === section.id);
+          const self = tags[section.id] ?? null;
+          return (
+            <TvHelpRow
+              key={section.id}
+              section={section}
+              accent={accent}
+              titleSize={Math.max(18, Math.round(column.rowHeight * 0.46))}
+              rowHeight={column.rowHeight}
+              focusUp={link?.up == null ? (tabFocus?.upTag ?? null) : (tags[link.up] ?? null)}
+              focusDown={link?.down == null ? self : (tags[link.down] ?? null)}
+              onTag={remember}
+              onFocus={() => setFocusedId(section.id)}
+            />
+          );
+        })}
       </View>
+      {focused ? (
+        <View style={[styles.tvReading, { height: column.readingHeight }]}>
+          <Text style={[styles.title, { color: accent, fontSize: titleSize, lineHeight: titleSize + 6 }]} numberOfLines={1}>
+            {focused.title}
+          </Text>
+          <Text
+            style={[styles.body, { color: chrome.text, fontSize: bodySize, lineHeight: bodyLine }]}
+            numberOfLines={readingLines}
+          >
+            {focused.body}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -220,7 +217,6 @@ function TvHelpRow({
   rowHeight,
   focusUp,
   focusDown,
-  focusSide,
   onTag,
   onFocus,
 }: {
@@ -230,7 +226,6 @@ function TvHelpRow({
   rowHeight: number;
   focusUp: TvFocusTag | null;
   focusDown: TvFocusTag | null;
-  focusSide: TvFocusTag | null;
   onTag: (id: string, tag: TvFocusTag | null) => void;
   onFocus: () => void;
 }) {
@@ -243,15 +238,12 @@ function TvHelpRow({
       testID={section.id}
       accessibilityRole="button"
       accessibilityLabel={`${section.title}. ${section.body}`}
-      focusable
       scale={false}
       onHost={onHost}
       focusUp={focusUp}
       focusDown={focusDown}
-      focusLeft={focusSide}
-      focusRight={focusSide}
       onFocus={onFocus}
-      style={[styles.section, { minHeight: rowHeight, height: rowHeight }]}
+      style={[styles.section, { minHeight: rowHeight, height: rowHeight, alignSelf: 'stretch' }]}
     >
       <Text
         numberOfLines={1}
@@ -270,17 +262,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Oswald',
     letterSpacing: 0.4,
   },
-  tvRow: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 28,
-  },
   tvList: {
-    width: '38%',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   tvReading: {
-    flex: 1,
+    width: '100%',
+    alignSelf: 'stretch',
+    overflow: 'hidden',
   },
   section: {
     borderRadius: 16,
