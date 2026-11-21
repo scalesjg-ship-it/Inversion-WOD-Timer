@@ -1,0 +1,274 @@
+# Captures Apple Watch screenshots for the iOS 1.0 App Store record.
+#
+# Manual only. Nothing is signed and nothing is uploaded to App Store Connect.
+# The iPhone project is prebuilt the same way as iphone-signed-testflight.yml,
+# then only the AmericanaWatch target is built for the watchOS simulator.
+#
+# Apple's screenshot specifications, read 21 November 2026:
+# https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/
+# Accepted Apple Watch pixels, one size for every localization:
+#   422x514 Ultra 4, Ultra 3
+#   410x502 Ultra 2, Ultra
+#   416x496 Series 12, Series 11, Series 10 (46mm)
+#   396x484 Series 9, Series 8, Series 7
+#   368x448 Series 6, Series 5, Series 4, SE
+#   312x390 Series 3, Series 2, Series 1
+# auto prefers 410x502, then a 46mm Series at 416x496.
+#
+# IOS_BUILD_NUMBER is only the value verify-prebuild already requires. This job
+# does not archive, export, or upload that build.
+name: Apple Watch screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: Simulator. auto prefers Apple Watch Ultra 410x502, then a 46mm Series at 416x496.
+        required: false
+        default: auto
+        type: choice
+        options:
+          - auto
+          - ultra-410x502
+          - series-46mm-416x496
+      states:
+        description: 3 or 4 DEBUG preview names. waiting is the not-connected screen. getReady, work, rest, and finished are the SwiftUI preview faces.
+        required: false
+        default: "waiting,work,rest,finished"
+        type: string
+
+concurrency:
+  group: apple-watch-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  apple-watch-screenshots:
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      EXPO_NO_TELEMETRY: "1"
+      COCOAPODS_DISABLE_STATS: "1"
+      IOS_BUILD_NUMBER: "19"
+      WATCH_BUNDLE_ID: "com.garrettscales.americana.watchkitapp"
+      DEVICE: ${{ inputs.device }}
+      STATES: ${{ inputs.states }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode 26.4 or newer
+        run: |
+          set -euo pipefail
+          DEVELOPER_DIR=$(python3 scripts/ci-select-xcode.py)
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR
+          sudo xcode-select -s "$DEVELOPER_DIR"
+          xcodebuild -version
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild the iPhone app
+        run: |
+          set -euo pipefail
+          if [ -n "${EXPO_TV:-}" ]; then
+            echo "::error::EXPO_TV must be unset for the iPhone and Watch project."
+            exit 1
+          fi
+          npx expo prebuild --platform ios
+          if ! grep -q 'SDKROOT = iphoneos;' ios/*.xcodeproj/project.pbxproj; then
+            echo "::error::expo prebuild did not produce an iPhone project"
+            exit 1
+          fi
+          if ! grep -q 'WATCHOS_DEPLOYMENT_TARGET' ios/*.xcodeproj/project.pbxproj; then
+            echo "::error::expo prebuild did not embed the Apple Watch app"
+            exit 1
+          fi
+          python3 scripts/ci-ios-signing.py verify-prebuild --ios-dir ios --env-file "$RUNNER_TEMP/prebuild.env"
+          # shellcheck disable=SC1091
+          source "$RUNNER_TEMP/prebuild.env"
+          echo "workspace=$WORKSPACE scheme=$SCHEME"
+          echo "CFBundleVersion=$IOS_BUILD_NUMBER marketing=$MARKETING_VERSION"
+
+      - name: Boot an App Store-sized Apple Watch simulator
+        run: |
+          set -euo pipefail
+          python3 scripts/ci-watch-screenshots.py choose --preference "$DEVICE" > "$RUNNER_TEMP/watch-sim.env"
+          # shellcheck disable=SC1091
+          source "$RUNNER_TEMP/watch-sim.env"
+          {
+            echo "WATCH_DEVICE_NAME=$WATCH_DEVICE_NAME"
+            echo "WATCH_DEVICE_TYPE=$WATCH_DEVICE_TYPE"
+            echo "WATCH_RUNTIME_ID=$WATCH_RUNTIME_ID"
+            echo "WATCH_RUNTIME_NAME=$WATCH_RUNTIME_NAME"
+            echo "WATCH_EXPECTED_WIDTH=$WATCH_EXPECTED_WIDTH"
+            echo "WATCH_EXPECTED_HEIGHT=$WATCH_EXPECTED_HEIGHT"
+            echo "WATCH_SIZE_LABEL=$WATCH_SIZE_LABEL"
+          } >> "$GITHUB_ENV"
+          echo "Simulator: $WATCH_DEVICE_NAME"
+          echo "Runtime: $WATCH_RUNTIME_NAME"
+          echo "Expected pixels: ${WATCH_EXPECTED_WIDTH}x${WATCH_EXPECTED_HEIGHT} ($WATCH_SIZE_LABEL)"
+          xcrun simctl shutdown all || true
+          xcrun simctl delete AmericanaWatchScreenshots || true
+          WATCH_UDID=$(xcrun simctl create "AmericanaWatchScreenshots" "$WATCH_DEVICE_TYPE" "$WATCH_RUNTIME_ID")
+          echo "WATCH_UDID=$WATCH_UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$WATCH_UDID"
+
+      - name: Build the watch app for the watchOS simulator
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          set -- ios/*.xcodeproj
+          if [ "$#" -ne 1 ] || [ ! -d "$1" ] || [ "$(basename "$1")" = "Pods.xcodeproj" ]; then
+            echo "::error::Expected one app xcodeproj under ios/, found $#."
+            exit 1
+          fi
+          PROJECT=$1
+          DERIVED="$RUNNER_TEMP/watch-derived"
+          echo "WATCH_DERIVED=$DERIVED" >> "$GITHUB_ENV"
+          echo "Building AmericanaWatch from $PROJECT for the watchOS simulator"
+          xcodebuild -project "$PROJECT" -list
+          set +e
+          set -o pipefail
+          xcodebuild build \
+            -project "$PROJECT" \
+            -target AmericanaWatch \
+            -configuration Debug \
+            -sdk watchsimulator \
+            -destination 'generic/platform=watchOS Simulator' \
+            -derivedDataPath "$DERIVED" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=- \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ONLY_ACTIVE_ARCH=YES \
+            | tee artifacts/xcodebuild.log
+          status=${PIPESTATUS[0]}
+          set -e
+          tail -n 160 artifacts/xcodebuild.log > artifacts/xcodebuild-tail.log || true
+          if [ "$status" -ne 0 ]; then
+            echo "::error::Watch simulator build failed"
+            exit "$status"
+          fi
+
+      - name: Capture watch screenshots
+        run: |
+          set -euo pipefail
+          xcrun simctl bootstatus "$WATCH_UDID" -b
+          python3 - "$WATCH_UDID" <<'PY'
+          import json, subprocess, sys
+          watch = sys.argv[1]
+          raw = subprocess.check_output(["xcrun", "simctl", "list", "devices", "booted", "-j"], text=True)
+          for entries in json.loads(raw)["devices"].values():
+              for entry in entries:
+                  if entry.get("udid") != watch and entry.get("state") == "Booted":
+                      print(f"Shutting down {entry.get('name')} so simctl io booted is the watch")
+                      subprocess.run(["xcrun", "simctl", "shutdown", entry["udid"]], check=False)
+          PY
+          xcrun simctl bootstatus "$WATCH_UDID" -b
+          booted=$(xcrun simctl list devices booted | grep -c '(Booted)' || true)
+          if [ "$booted" -ne 1 ]; then
+            echo "::error::simctl io booted needs exactly one booted simulator, found $booted"
+            xcrun simctl list devices booted
+            exit 1
+          fi
+          STATUS_BAR="not-supported"
+          if xcrun simctl status_bar booted override --time 9:41; then
+            STATUS_BAR="9:41"
+          else
+            echo "watchOS did not accept simctl status_bar override. Screenshots keep the simulator clock."
+          fi
+          echo "STATUS_BAR=$STATUS_BAR" >> "$GITHUB_ENV"
+          APP=$(find "$WATCH_DERIVED/Build/Products" -type d -path '*/Debug-watchsimulator/AmericanaWatch.app' -print -quit)
+          if [ -z "$APP" ]; then
+            echo "::error::Debug-watchsimulator AmericanaWatch.app was not built"
+            find "$WATCH_DERIVED/Build/Products" -name 'AmericanaWatch.app' -type d || true
+            exit 1
+          fi
+          if ! grep -a -F -q -- '-AmericanaWatchPreview' "$APP/AmericanaWatch"; then
+            echo "::error::The watch binary is missing the DEBUG screenshot launch argument"
+            exit 1
+          fi
+          xcrun simctl install booted "$APP"
+          mkdir -p artifacts/screenshots
+          states=()
+          while IFS= read -r state; do
+            [ -n "$state" ] || continue
+            states+=("$state")
+          done < <(python3 scripts/ci-watch-screenshots.py states --text "$STATES")
+          n=1
+          for state in "${states[@]}"; do
+            case "$state" in
+              waiting) slug="waiting-for-apple-tv" ;;
+              getReady) slug="get-ready" ;;
+              work) slug="work" ;;
+              rest) slug="rest" ;;
+              finished) slug="finished" ;;
+              *)
+                echo "::error::unexpected state $state"
+                exit 1
+                ;;
+            esac
+            shot=$(printf 'artifacts/screenshots/%02d-%s.png' "$n" "$slug")
+            xcrun simctl terminate booted "$WATCH_BUNDLE_ID" || true
+            xcrun simctl launch booted "$WATCH_BUNDLE_ID" -AmericanaWatchPreview "$state"
+            sleep 5
+            if [ "$STATUS_BAR" = "9:41" ]; then
+              xcrun simctl status_bar booted override --time 9:41 || true
+              sleep 1
+            fi
+            xcrun simctl io booted screenshot "$shot"
+            echo "Captured $shot"
+            n=$((n + 1))
+          done
+          python3 scripts/ci-watch-screenshots.py dimensions \
+            --dir artifacts/screenshots \
+            --width "$WATCH_EXPECTED_WIDTH" \
+            --height "$WATCH_EXPECTED_HEIGHT" \
+            --device "$WATCH_DEVICE_NAME" \
+            --runtime "$WATCH_RUNTIME_NAME" \
+            --status-bar "$STATUS_BAR" \
+            --out artifacts/screenshots/dimensions.txt
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-watch-screenshots
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            artifacts/screenshots/*.png
+            artifacts/screenshots/dimensions.txt
+
+      - name: Upload the build log tail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-watch-screenshot-log
+          if-no-files-found: warn
+          retention-days: 14
+          path: artifacts/xcodebuild-tail.log
+
+      - name: Delete the screenshot simulator
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -n "${WATCH_UDID:-}" ]; then
+            xcrun simctl shutdown "$WATCH_UDID" || true
+            xcrun simctl delete "$WATCH_UDID" || true
+          fi

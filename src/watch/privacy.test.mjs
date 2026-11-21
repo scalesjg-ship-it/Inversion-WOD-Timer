@@ -36,6 +36,23 @@ describe('watch privacy and platform gate', () => {
     expect(source('plugins/withAppleWatch.js')).not.toContain('NSBonjourServices');
   });
 
+  it('shows preview faces only from a DEBUG screenshot launch argument', () => {
+    const session = source('targets/watch/WatchSession.swift');
+    const regions = [...session.matchAll(/#if DEBUG([\s\S]*?)#endif/g)].map((match) => match[1]);
+    expect(regions.length).toBeGreaterThan(0);
+    expect(regions.some((region) => region.includes('-AmericanaWatchPreview'))).toBe(true);
+    expect(regions.some((region) => region.includes('launchPreviewModel'))).toBe(true);
+    expect(session.replace(/#if DEBUG[\s\S]*?#endif/g, '')).not.toContain('-AmericanaWatchPreview');
+    const face = source('targets/watch/TimerFace.swift');
+    expect(face).toContain('enum WatchPreviewFace');
+    for (const name of ['waiting', 'getReady', 'work', 'rest', 'finished']) {
+      expect(face).toContain(`case ${name}`);
+    }
+    expect(face).toContain('WatchPreviewFace.getReady.model');
+    expect(session).toContain('showsLaunchPreview');
+    expect(session).toContain('Waiting for Apple TV');
+  });
+
   it('runs on Apple TV only', () => {
     expect(watchLinkEnabled({ os: 'ios', tv: true })).toBe(true);
     expect(watchLinkEnabled({ os: 'android', tv: true })).toBe(false);
