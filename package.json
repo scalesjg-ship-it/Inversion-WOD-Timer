@@ -53,6 +53,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "vitest run",
+    "check:ios-background-modes": "node scripts/check-ios-background-modes.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
   },

@@ -34,7 +34,7 @@ describe('tvOS foreground audio', () => {
     expect(stripBackgroundAudioMode(plist)).toBe(plist);
   });
 
-  it('is registered before expo-audio so the tvOS removal runs last', () => {
+  it('is registered before expo-audio so the removal runs last on iPhone and tvOS', () => {
     const plugins = app.expo.plugins.map((plugin) => (Array.isArray(plugin) ? plugin[0] : plugin));
     const strip = plugins.indexOf('./plugins/withTvForegroundAudio');
     const audio = plugins.indexOf('expo-audio');
@@ -46,7 +46,9 @@ describe('tvOS foreground audio', () => {
     expect(app.expo.ios.buildNumber).toBe('18');
     expect(app.expo.version).toBe('1.0.0');
     expect(app.expo.android.versionCode).toBe(12);
-    expect(app.expo.ios.infoPlist.UIBackgroundModes).toEqual(['audio']);
+    expect(app.expo.ios.infoPlist.UIBackgroundModes).toBeUndefined();
+    const audioPlugin = app.expo.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === 'expo-audio');
+    expect(audioPlugin[1].enableBackgroundPlayback).toBe(true);
     expect(TVOS_BUILD_NUMBER).toBe('24');
     expect(applyTvBuildNumber({ ios: { buildNumber: '18' } }, {}).ios.buildNumber).toBe('18');
     expect(applyTvBuildNumber({ ios: { buildNumber: '18' } }, { TVOS_BUILD_NUMBER: '25' }).ios.buildNumber).toBe('18');
