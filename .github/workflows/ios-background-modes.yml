@@ -1,0 +1,38 @@
+# Fails if a non-TV iPhone prebuild still declares the audio background mode.
+# Does not build, sign, or upload. Store and TestFlight workflows stay manual.
+name: iOS background modes
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  iphone-info-plist:
+    name: iPhone Info.plist has no audio background mode
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPO_NO_TELEMETRY: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Prebuild the iPhone app and read Info.plist
+        run: node scripts/check-ios-background-modes.mjs

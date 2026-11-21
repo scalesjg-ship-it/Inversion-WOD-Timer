@@ -1,9 +1,15 @@
 const { withInfoPlist } = require('@expo/config-plugins');
 
 /**
- * tvOS builds (EXPO_TV=1) do not keep playing after the app leaves the foreground.
- * Timer cues are in-app sounds. Strip the audio background mode the shared iOS
- * plist and expo-audio plugin add, and leave phone iOS builds alone.
+ * Timer cues are short sounds while the app is open, plus local notifications
+ * on a locked phone. That is not persistent background audio. Apple Guideline
+ * 2.5.4 rejects an `audio` UIBackgroundMode without that feature.
+ *
+ * `ios.infoPlist` is shared by iPhone and tvOS. expo-audio's
+ * `enableBackgroundPlayback` stays on for the Android media foreground service,
+ * and that option also pushes `audio` onto the Apple Info.plist. Strip it for
+ * every Apple prebuild. tvOS already shipped without the key; the phone binary
+ * must match. Other background modes, if any, are left in place.
  *
  * Info.plist mods run in reverse registration order, so list this plugin before
  * expo-audio. This mod then runs last and its removal sticks.
@@ -17,8 +23,6 @@ function stripBackgroundAudioMode(infoPlist) {
 }
 
 function withTvForegroundAudio(config) {
-  const tv = process.env.EXPO_TV;
-  if (tv !== '1' && tv !== 'true') return config;
   return withInfoPlist(config, (mod) => {
     stripBackgroundAudioMode(mod.modResults);
     return mod;
