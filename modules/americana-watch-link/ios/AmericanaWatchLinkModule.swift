@@ -85,10 +85,13 @@ final class WatchTvLink: @unchecked Sendable {
           self.emitLink("unsupported")
           return false
         }
-        let picker = DDDevicePickerViewController(
+        guard let picker = DDDevicePickerViewController(
           browseDescriptor: .applicationService(name: WatchWire.serviceName),
           parameters: .applicationService
-        )
+        ) else {
+          self.emitLink("picker-unavailable")
+          return false
+        }
         picker.modalPresentationStyle = .fullScreen
         picker.modalTransitionStyle = .coverVertical
         guard let host = Self.topViewController() else {
