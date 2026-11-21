@@ -26,7 +26,7 @@ export interface RemoteContext {
   running: boolean;
 }
 
-const ROUND_STEP_MODES = new Set<TimerMode>(['rounds', 'intervals', 'tabata']);
+const ROUND_STEP_MODES = new Set<TimerMode>(['intervals']);
 
 function nudge(mode: TimerMode, direction: -1 | 1): RemoteCommand {
   if (ROUND_STEP_MODES.has(mode)) return { type: 'stepRound', direction };

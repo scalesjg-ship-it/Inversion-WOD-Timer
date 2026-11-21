@@ -6,7 +6,7 @@ import { buildWatchState, watchEvents, watchPhaseText } from './face';
 import { decodeMessage } from './protocol';
 
 const config: TimerConfig = {
-  mode: 'tabata',
+  mode: 'intervals',
   leadInSeconds: 10,
   workSeconds: 20,
   restSeconds: 10,

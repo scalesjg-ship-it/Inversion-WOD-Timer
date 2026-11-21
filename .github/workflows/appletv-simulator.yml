@@ -2,7 +2,8 @@
 # macos-26 is the hosted image that carries Xcode 26.4+ (Expo SDK 58) and a tvOS simulator runtime.
 # workflow_dispatch has no inputs. Run it on the branch under test.
 # Screenshots land in the appletv-simulator artifact, one per step name:
-# "tab Help", "paused For Time shows Watch", and "unsupported Apple TV HD message".
+# "tab Settings", "tab Help", "Intervals presets", "paused For Time shows Watch",
+# and "unsupported Apple TV HD message".
 name: Apple TV simulator
 
 on:

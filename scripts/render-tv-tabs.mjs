@@ -105,26 +105,21 @@ await esbuild.build({
 
 const frames = [
   { tab: 'wod', width: 1920, height: 1080, file: 'tv-tab-wod-1920x1080.png' },
-  { tab: 'rounds', width: 1920, height: 1080, file: 'tv-tab-rounds-1920x1080.png', seed: true },
   { tab: 'brand', width: 1920, height: 1080, file: 'tv-tab-brand-1920x1080.png' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-fortime-1920x1080.png', seed: true, mode: 'forTime' },
-  { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-tabata-1920x1080.png', seed: true, mode: 'tabata' },
+  { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-intervals-preset-1920x1080.png', seed: true, mode: 'intervals' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-amrap-1920x1080.png', seed: true, mode: 'amrap' },
   { tab: 'setup', width: 960, height: 540, file: 'tv-setup-amrap-960x540.png', seed: true, mode: 'amrap' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-emom-1920x1080.png', seed: true, mode: 'emom' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-intervals-1920x1080.png', seed: true, mode: 'intervals' },
   { tab: 'countdown', width: 1920, height: 1080, file: 'tv-countdown-1920x1080.png', seed: true },
   { tab: 'timer', width: 1920, height: 1080, file: 'tv-timer-running-1920x1080.png' },
-  { tab: 'rounds-confirm', width: 1920, height: 1080, file: 'tv-rounds-delete-1920x1080.png', seed: true, confirm: true },
   { tab: 'wod', width: 960, height: 540, file: 'tv-tab-wod-960x540.png' },
-  { tab: 'rounds', width: 960, height: 540, file: 'tv-tab-rounds-960x540.png', seed: true },
-  { tab: 'rounds', width: 1280, height: 720, file: 'tv-tab-rounds-1280x720.png', seed: true },
   { tab: 'brand', width: 960, height: 540, file: 'tv-tab-brand-960x540.png' },
   { tab: 'setup', width: 960, height: 540, file: 'tv-setup-fortime-960x540.png', seed: true, mode: 'forTime' },
-  { tab: 'setup', width: 960, height: 540, file: 'tv-setup-tabata-960x540.png', seed: true, mode: 'tabata' },
-  { tab: 'setup', width: 1280, height: 720, file: 'tv-setup-tabata-1280x720.png', seed: true, mode: 'tabata' },
+  { tab: 'setup', width: 960, height: 540, file: 'tv-setup-intervals-preset-960x540.png', seed: true, mode: 'intervals' },
+  { tab: 'setup', width: 1280, height: 720, file: 'tv-setup-intervals-preset-1280x720.png', seed: true, mode: 'intervals' },
   { tab: 'countdown', width: 960, height: 540, file: 'tv-countdown-960x540.png', seed: true },
-  { tab: 'rounds-confirm', width: 960, height: 540, file: 'tv-rounds-delete-960x540.png', seed: true, confirm: true },
 ];
 
 const outDir = '/opt/cursor/artifacts';
@@ -135,9 +130,9 @@ function presetDocument() {
   return {
     version: 2,
     presets: [
-      item('preset-spar', 'Sparring', 'rounds', { mode: 'rounds', leadInSeconds: 10, workSeconds: 180, restSeconds: 60, rounds: 5, warningSeconds: 10 }, 3),
-      item('preset-morning', 'Morning roll', 'rounds', { mode: 'rounds', leadInSeconds: 10, workSeconds: 300, restSeconds: 60, rounds: 6, warningSeconds: 30 }, 2),
-      item('preset-open', 'Open mat', 'rounds', { mode: 'rounds', leadInSeconds: 0, workSeconds: 600, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 1),
+      item('preset-spar', 'Sparring', 'intervals', { mode: 'intervals', leadInSeconds: 10, workSeconds: 180, restSeconds: 60, rounds: 5, warningSeconds: 10 }, 3),
+      item('preset-morning', 'Morning roll', 'intervals', { mode: 'intervals', leadInSeconds: 10, workSeconds: 300, restSeconds: 60, rounds: 6, warningSeconds: 30 }, 2),
+      item('preset-open', 'Open mat', 'intervals', { mode: 'intervals', leadInSeconds: 0, workSeconds: 600, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 1),
       item('preset-ft12', 'For Time 12', 'forTime', { mode: 'forTime', leadInSeconds: 10, workSeconds: 720, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 6),
       item('preset-ft20', 'For Time 20', 'forTime', { mode: 'forTime', leadInSeconds: 10, workSeconds: 1200, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 5),
       item('preset-cap', 'Cap 8', 'forTime', { mode: 'forTime', leadInSeconds: 10, workSeconds: 480, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 4),

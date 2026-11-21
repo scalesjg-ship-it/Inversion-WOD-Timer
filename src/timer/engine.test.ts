@@ -22,7 +22,7 @@ import type { Cue, TimerConfig } from './types';
 
 function roundsConfig(overrides: Partial<TimerConfig> = {}): TimerConfig {
   return normalizeConfig({
-    mode: 'rounds',
+    mode: 'intervals',
     leadInSeconds: 10,
     workSeconds: 60,
     restSeconds: 20,
@@ -49,7 +49,7 @@ function cuesWhileRunning(config: TimerConfig, stepMs = 100): Cue[] {
 describe('normalizeConfig', () => {
   it('clamps invalid durations and drops a warning that would fire immediately', () => {
     const config = normalizeConfig({
-      mode: 'rounds',
+      mode: 'intervals',
       leadInSeconds: -4,
       workSeconds: 30,
       restSeconds: -5,
@@ -130,7 +130,7 @@ describe('segment timeline', () => {
 
   it('builds classic Tabata as eight work segments and seven rests', () => {
     const state = createInitial({
-      mode: 'tabata',
+      mode: 'intervals',
       leadInSeconds: 10,
       workSeconds: 20,
       restSeconds: 10,
@@ -408,7 +408,7 @@ describe('remote seek and round changes', () => {
 
   it('steps to the next and previous work round', () => {
     let state = start(createInitial({
-      mode: 'tabata',
+      mode: 'intervals',
       leadInSeconds: 10,
       workSeconds: 20,
       restSeconds: 10,

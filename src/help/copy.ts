@@ -26,13 +26,11 @@ export const HELP_MODE_LINES: Record<TimerMode, string> = {
   forTime: 'Count up until you finish. Add a cap when the workout has one.',
   amrap: 'Countdown. As many reps or rounds as possible.',
   emom: 'Every X minutes. The clock resets when the interval does.',
-  tabata: '20 seconds on, 10 seconds off, eight rounds.',
-  intervals: 'Your own work, rest, and number of rounds.',
-  rounds: 'Work and rest rounds. BJJ, boxing, MMA, and Muay Thai start on the Rounds tab.',
+  intervals: 'Work, rest, and rounds. Tabata is 20 seconds on and 10 seconds off for eight rounds. BJJ, boxing, MMA, and Muay Thai are one tap.',
   countdown: 'Any length, with warning beeps. Save it with your other presets.',
 };
 
-const MODE_ORDER: TimerMode[] = ['forTime', 'amrap', 'emom', 'tabata', 'intervals', 'rounds', 'countdown'];
+const MODE_ORDER: TimerMode[] = ['forTime', 'amrap', 'emom', 'intervals', 'countdown'];
 
 function watchBlock(platform: HelpPlatform): HelpBlock {
   switch (platform) {
@@ -90,7 +88,7 @@ function logoBlock(platform: HelpPlatform): HelpBlock {
       return {
         id: 'help-logo',
         title: 'Gym logo',
-        body: 'On the Brand tab, scan the QR code with your phone camera. The phone and this TV need the same Wi-Fi. The photo is saved on this TV and is not sent to a server.',
+        body: 'On the Settings tab, open More and scan the QR code with your phone camera. The phone and this TV need the same Wi-Fi. The photo is saved on this TV and is not sent to a server.',
       };
     case 'phone':
       return {

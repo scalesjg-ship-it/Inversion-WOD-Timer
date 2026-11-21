@@ -5,7 +5,7 @@ import type { TimerMode } from '../timer/types';
 
 import { HELP_MODE_LINES, helpNeighbors, helpPlatform, helpSections, helpVersionLine } from './copy';
 
-const MODES: TimerMode[] = ['forTime', 'amrap', 'emom', 'tabata', 'intervals', 'rounds', 'countdown'];
+const MODES: TimerMode[] = ['forTime', 'amrap', 'emom', 'intervals', 'countdown'];
 
 describe('help copy', () => {
   it('picks a platform from the runtime', () => {
@@ -47,13 +47,14 @@ describe('help copy', () => {
 
   it('describes the QR logo on TV and the photo picker on the phone', () => {
     const tv = helpSections('appletv').find((section) => section.id === 'help-logo');
+    expect(tv?.body).toContain('Settings tab');
     expect(tv?.body).toContain('QR code');
     expect(tv?.body).toContain('same Wi-Fi');
     expect(tv?.body).toContain('not sent to a server');
     const phone = helpSections('phone').find((section) => section.id === 'help-logo');
     expect(phone?.body).toContain('Photo library');
     expect(phone?.body).toContain('Files');
-    expect(phone?.body).toContain('QR code');
+    expect(phone?.body).toContain('Brand tab');
   });
 
   it('describes save, load, update, rename, and delete', () => {
@@ -73,6 +74,10 @@ describe('help copy', () => {
       expect(section?.title).toBe(modeTitle(mode));
       expect(section?.body).toBe(HELP_MODE_LINES[mode]);
     }
+    expect(HELP_MODE_LINES.intervals).toContain('Tabata');
+    expect(HELP_MODE_LINES.intervals).toContain('BJJ');
+    expect(helpSections('appletv').some((section) => section.id === 'help-mode-tabata')).toBe(false);
+    expect(helpSections('appletv').some((section) => section.id === 'help-mode-rounds')).toBe(false);
     const ids = helpSections('appletv').map((section) => section.id);
     expect(new Set(ids).size).toBe(ids.length);
   });

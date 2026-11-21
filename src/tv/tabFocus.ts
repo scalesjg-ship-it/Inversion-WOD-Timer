@@ -66,11 +66,10 @@ export function tvTabLink(index: number, count: number): TvTabLink {
   };
 }
 
-/** WOD, Rounds, Brand, Help. Any other path is the WOD tab. */
+/** WOD, Brand, Help. Any other path is the WOD tab. */
 export const TV_TAB_ROUTES = [
   { path: '/', title: 'WOD', testID: 'tab-wod' },
-  { path: '/rounds', title: 'Rounds', testID: 'tab-rounds' },
-  { path: '/brand', title: 'Brand', testID: 'tab-brand' },
+  { path: '/brand', title: 'Settings', testID: 'tab-settings' },
   { path: '/help', title: 'Help', testID: 'tab-help' },
 ] as const;
 

@@ -46,15 +46,15 @@ describe('TV tab focus graph', () => {
   });
 
   it('maps the routes onto the bar, with Help last', () => {
-    expect(TV_TAB_ROUTES.map((tab) => tab.testID)).toEqual(['tab-wod', 'tab-rounds', 'tab-brand', 'tab-help']);
+    expect(TV_TAB_ROUTES.map((tab) => tab.testID)).toEqual(['tab-wod', 'tab-settings', 'tab-help']);
     expect(tvTabIndex('/')).toBe(0);
-    expect(tvTabIndex('/rounds')).toBe(1);
-    expect(tvTabIndex('/brand')).toBe(2);
-    expect(tvTabIndex('/brand/')).toBe(2);
-    expect(tvTabIndex('/help')).toBe(3);
-    expect(tvTabIndex('/help/')).toBe(3);
+    expect(tvTabIndex('/brand')).toBe(1);
+    expect(tvTabIndex('/brand/')).toBe(1);
+    expect(tvTabIndex('/help')).toBe(2);
+    expect(tvTabIndex('/help/')).toBe(2);
+    expect(tvTabIndex('/rounds')).toBe(0);
     expect(tvTabIndex('/setup')).toBe(0);
-    expect(tvTabLink(3, 4)).toMatchObject({ left: 2, right: 3, up: 3, down: 'content' });
+    expect(tvTabLink(2, 3)).toMatchObject({ left: 1, right: 2, up: 2, down: 'content' });
   });
 
   it('treats the first row as the way up to the tab bar', () => {
