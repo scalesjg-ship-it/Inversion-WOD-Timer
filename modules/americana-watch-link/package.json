@@ -1,0 +1,13 @@
+{
+  "name": "americana-watch-link",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Apple TV to Apple Watch timer link. No-op on Android and Fire TV.",
+  "license": "UNLICENSED",
+  "main": "index.ts",
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}
