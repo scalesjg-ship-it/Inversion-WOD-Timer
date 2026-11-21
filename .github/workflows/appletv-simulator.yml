@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - cursor/appletv-sim-uitest-8dd8
+      - cursor/appletv-back-and-focus-eace
 
 concurrency:
   group: appletv-simulator-${{ github.ref }}
