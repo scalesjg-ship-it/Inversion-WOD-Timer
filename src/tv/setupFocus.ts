@@ -10,23 +10,19 @@ export interface SetupFocusChain {
 
 /**
  * Vertical focus on a television setup screen.
- * Down from every control on the last stepper row lands on the next focusable
- * row (warning chips, then Save preset, otherwise Start).
+ * Down from every control on the last stepper row lands on Start.
  * Up from Start returns to the first control of that stepper row.
  */
 export function nextSetupVertical(current: string, direction: 'up' | 'down', chain: SetupFocusChain): string {
   const entry = chain.lastRow[0] ?? chain.start;
-  const fromLast = chain.bridge ?? chain.preset ?? chain.start;
-  const fromBridge = chain.preset ?? chain.start;
   if (chain.lastRow.includes(current)) {
-    return direction === 'down' ? fromLast : current;
+    return direction === 'down' ? chain.start : current;
   }
   if (chain.bridge != null && current === chain.bridge) {
-    return direction === 'down' ? fromBridge : entry;
+    return direction === 'down' ? chain.start : entry;
   }
   if (chain.preset != null && current === chain.preset) {
-    if (direction === 'down') return chain.start;
-    return chain.bridge ?? entry;
+    return direction === 'down' ? chain.start : entry;
   }
   if (current === chain.start) {
     return direction === 'up' ? entry : chain.start;

@@ -4,7 +4,7 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, 
 import { inkOn } from '@/src/branding/color';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import type { TvFocusTag } from '@/src/components/TvTabFocus';
-import { useTvSetupFocus } from '@/src/components/TvSetupFocus';
+import { TvDownToStart, TvUpToRow, useTvSetupFocus } from '@/src/components/TvSetupFocus';
 import { useTvFocusTag } from '@/src/tv/useTvFocusTag';
 import { chrome } from '@/src/theme/chrome';
 import { stepperControlSize, tvSetupScale } from '@/src/tv/controls';
@@ -117,15 +117,18 @@ export function TvLinkedStart({
 }) {
   const setup = useTvSetupFocus();
   return (
-    <BigButton
-      label={label}
-      onPress={onPress}
-      color={color}
-      testID={testID}
-      roomy={roomy}
-      onHost={setup?.bindStart}
-      focusUp={setup?.lastEntry ?? null}
-    />
+    <View>
+      <TvUpToRow />
+      <BigButton
+        label={label}
+        onPress={onPress}
+        color={color}
+        testID={testID}
+        roomy={roomy}
+        onHost={setup?.bindStart}
+        focusUp={setup?.lastEntry ?? null}
+      />
+    </View>
   );
 }
 
@@ -144,6 +147,8 @@ export function NumberStepper({
   preferred = false,
   focusDown = null,
   focusUp = null,
+  onDecNode,
+  onIncNode,
 }: {
   value: number;
   onChange: (value: number) => void;
@@ -166,6 +171,10 @@ export function NumberStepper({
   focusDown?: TvFocusTag | null;
   /** TV only. Up from both buttons on this cluster. */
   focusUp?: TvFocusTag | null;
+  /** TV only. Native host of the minus button, for a focus guide. */
+  onDecNode?: (node: ComponentRef<typeof Pressable> | null) => void;
+  /** TV only. Native host of the plus button, for a focus guide. */
+  onIncNode?: (node: ComponentRef<typeof Pressable> | null) => void;
 }) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
@@ -226,7 +235,14 @@ export function NumberStepper({
         accessibilityLabel={`Decrease ${suffix}`}
         testID={`${testID}-dec`}
         hasTVPreferredFocus={tv && preferred ? true : undefined}
-        onHost={tv ? onDecHost : undefined}
+        onHost={
+          tv
+            ? (node) => {
+                onDecHost(node);
+                onDecNode?.(node);
+              }
+            : undefined
+        }
         focusLeft={tv ? focus.decLeft : null}
         focusRight={tv ? focus.decRight : null}
         focusDown={tv ? focusDown : null}
@@ -277,7 +293,14 @@ export function NumberStepper({
         accessibilityRole="button"
         accessibilityLabel={`Increase ${suffix}`}
         testID={`${testID}-inc`}
-        onHost={tv ? onIncHost : undefined}
+        onHost={
+          tv
+            ? (node) => {
+                onIncHost(node);
+                onIncNode?.(node);
+              }
+            : undefined
+        }
         focusLeft={tv ? focus.incLeft : null}
         focusRight={tv ? focus.incRight : null}
         focusDown={tv ? focusDown : null}
@@ -327,6 +350,17 @@ export function TimeField({
   const rememberSeconds = (links: StepperLinks) => {
     setSecondLinks((current) => (current.dec === links.dec && current.inc === links.inc ? current : links));
   };
+  const exitNodes = useRef<{ md: ComponentRef<typeof Pressable> | null; mi: ComponentRef<typeof Pressable> | null; sd: ComponentRef<typeof Pressable> | null; si: ComponentRef<typeof Pressable> | null }>({
+    md: null,
+    mi: null,
+    sd: null,
+    si: null,
+  });
+  const publishExit = (key: 'md' | 'mi' | 'sd' | 'si', node: ComponentRef<typeof Pressable> | null) => {
+    exitNodes.current[key] = node;
+    if (!exit) return;
+    setup?.setExitHosts([exitNodes.current.md, exitNodes.current.mi, exitNodes.current.sd, exitNodes.current.si]);
+  };
   useEffect(() => {
     if (!exit) return;
     setup?.bindLast(minuteLinks.dec);
@@ -347,6 +381,8 @@ export function TimeField({
           preferred={preferred}
           outsideRight={secondLinks.dec}
           onLinks={rememberMinutes}
+          onDecNode={exit ? (node) => publishExit('md', node) : undefined}
+          onIncNode={exit ? (node) => publishExit('mi', node) : undefined}
           focusDown={exit ? setup?.down ?? null : null}
           onChange={(next) => onChange(next * 60 + remainder)}
         />
@@ -360,9 +396,12 @@ export function TimeField({
           compact={compact}
           outsideLeft={minuteLinks.inc}
           onLinks={rememberSeconds}
+          onDecNode={exit ? (node) => publishExit('sd', node) : undefined}
+          onIncNode={exit ? (node) => publishExit('si', node) : undefined}
           focusDown={exit ? setup?.down ?? null : null}
           onChange={(next) => onChange(minutes * 60 + next)}
         />
+        {exit ? <TvDownToStart /> : null}
       </View>
     );
   }
