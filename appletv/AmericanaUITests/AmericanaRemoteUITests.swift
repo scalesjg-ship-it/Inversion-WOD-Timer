@@ -269,10 +269,12 @@ final class AmericanaRemoteUITests: XCTestCase {
     if !focused("settings-category-brand") {
       _ = nudge("settings-category-brand", directions: [.up, .down], limit: 6)
     }
+    press(.down, settle: 0.6)
+    XCTAssertTrue(focused("settings-category-look"), "Could not focus Look before Menu. \(snapshot())")
     press(.right, settle: 0.7)
-    XCTAssertFalse(focused("settings-category-brand"), "Right did not enter Brand options. \(snapshot())")
+    XCTAssertFalse(focused("settings-category-look"), "Right did not enter Look options. \(snapshot())")
     press(.menu, settle: 0.9)
-    XCTAssertTrue(focused("settings-category-brand"), "Menu did not return to Brand. \(snapshot())")
+    XCTAssertTrue(focused("settings-category-look"), "Menu did not return to Look. \(snapshot())")
     XCTAssertTrue(any("screen-settings").exists, "Menu left Settings. \(snapshot())")
     XCTAssertEqual(app.state, .runningForeground, "Menu left the app")
     return focusedIdentifier()

@@ -168,7 +168,8 @@ export function TvSettings({
     (neighbor: SettingsNeighbor, selfId: string): TvFocusTag | null => {
       switch (neighbor.zone) {
         case 'tab':
-          return tabFocus?.upTag ?? null;
+          // The sidebar is under WOD. Up must name the Settings tab, not whichever tab is open.
+          return tabFocus?.tabTags[SETTINGS_TAB] ?? null;
         case 'self':
           return tags[selfId] ?? null;
         case 'sidebar':
@@ -181,7 +182,7 @@ export function TvSettings({
         }
       }
     },
-    [tabFocus?.upTag, tags],
+    [tabFocus?.tabTags, tags],
   );
 
   const linksFor = (place: SettingsPlace, selfId: string) => {
@@ -306,24 +307,29 @@ export function TvSettings({
     />
   );
 
-  const entryDestinations = selectedTag != null ? [selectedTag] : [];
+  const settingsTabTag = tabFocus?.tabTags[SETTINGS_TAB] ?? null;
   const firstOption = settingsNeighbor({ zone: 'sidebar', index: selected }, 'right', categoryRows);
   const detailTag = firstOption.zone === 'detail' ? (tags[firstOption.id] ?? null) : null;
   const detailDestinations = detailTag != null ? [detailTag] : [];
+  const guideProps = Guide === View;
 
   return (
     <View style={styles.screen} testID="screen-settings" collapsable={false}>
-      <Guide
-        style={[styles.split, { paddingHorizontal: metrics.padH, paddingVertical: metrics.padV, gap: metrics.gap }]}
-        collapsable={false}
-        {...(Guide === View ? null : { destinations: entryDestinations })}
-      >
-        <Guide
-          style={[styles.sidebar, { width: metrics.sidebarWidth, gap: metrics.gap }]}
-          collapsable={false}
-          {...(Guide === View ? null : { destinations: entryDestinations, trapFocusLeft: true })}
-        >
-          <Text style={[styles.title, { fontSize: metrics.title, lineHeight: metrics.title + 6, color: accent }]}>Settings</Text>
+      <View style={[styles.split, { paddingHorizontal: metrics.padH, paddingBottom: metrics.padV, gap: metrics.gap }]}>
+        <View style={[styles.sidebar, { width: metrics.sidebarWidth }]} collapsable={false}>
+          {/*
+            The category list is on the left, under the WOD tab. tvOS only draws a
+            1px guide for nextFocusUp, and the WOD tab wins that search. This
+            guide fills the gap under the tab bar so Up from Brand reaches Settings.
+          */}
+          <Guide
+            collapsable={false}
+            style={{ minHeight: metrics.padV, justifyContent: 'flex-end', paddingBottom: metrics.gap }}
+            {...(guideProps || settingsTabTag == null ? null : { destinations: [settingsTabTag] })}
+          >
+            <Text style={[styles.title, { fontSize: metrics.title, lineHeight: metrics.title + 6, color: accent }]}>Settings</Text>
+          </Guide>
+          <Guide style={{ gap: metrics.gap }} collapsable={false} {...(guideProps ? null : { trapFocusLeft: true })}>
           {TV_SETTINGS_CATEGORIES.map((item, index) => {
             const selfId = item.testID;
             const place: SettingsPlace = { zone: 'sidebar', index };
@@ -367,12 +373,13 @@ export function TvSettings({
               </TvFocusPressable>
             );
           })}
-        </Guide>
+          </Guide>
+        </View>
         <Guide
-          style={styles.detail}
+          style={[styles.detail, { paddingTop: metrics.padV }]}
           collapsable={false}
           testID={settingsDetailTestId(category.id)}
-          {...(Guide === View ? null : { destinations: detailDestinations, trapFocusUp: true, trapFocusDown: true, trapFocusRight: true })}
+          {...(guideProps ? null : { destinations: detailDestinations, trapFocusUp: true, trapFocusDown: true, trapFocusRight: true })}
           onLayout={(event) => {
             const next = Math.round(event.nativeEvent.layout.width);
             setPaneWidth((current) => (current === next ? current : next));
@@ -414,7 +421,7 @@ export function TvSettings({
             />
           </ScrollView>
         </Guide>
-      </Guide>
+      </View>
     </View>
   );
 }
