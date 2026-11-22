@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useState, type ComponentRef } from 'react';
+import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { hexToHue, hsvToHex, inkOn, normalizeHex, sameHex } from '@/src/branding/color';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
@@ -19,6 +19,11 @@ export function ColorPicker({
   testID,
   compact = false,
   focusDown = null,
+  focusUp = null,
+  focusLeft = null,
+  focusRight = null,
+  onHost,
+  onFocus,
 }: {
   label: string;
   value: string;
@@ -28,6 +33,11 @@ export function ColorPicker({
   compact?: boolean;
   /** TV only. Down from the closed row, or the last open swatch row, leaves for the tab bar. */
   focusDown?: TvFocusTag | null;
+  focusUp?: TvFocusTag | null;
+  focusLeft?: TvFocusTag | null;
+  focusRight?: TvFocusTag | null;
+  onHost?: (node: ComponentRef<typeof Pressable> | null) => void;
+  onFocus?: () => void;
 }) {
   const [text, setText] = useState(value);
   const [tracked, setTracked] = useState(value);
@@ -63,7 +73,12 @@ export function ColorPicker({
         accessibilityState={{ expanded: open }}
         accessibilityLabel={`${label}, ${value}. ${open ? 'Close colors' : 'Change color'}`}
         testID={`${testID}-toggle`}
+        focusUp={focusUp}
         focusDown={open ? null : focusDown}
+        focusLeft={focusLeft}
+        focusRight={focusRight}
+        onHost={onHost}
+        onFocus={onFocus}
         onPress={() => setOpen((current) => !current)}
         style={({ pressed }) => [
           styles.head,
