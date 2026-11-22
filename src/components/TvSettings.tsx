@@ -268,7 +268,6 @@ export function TvSettings({
     if (!decision.accept) return;
     if (type === 'left') {
       const edge = detailEdgeRef.current;
-      detailEdgeRef.current = null;
       if (!edge || edge.zone !== 'detail') return;
       const neighbor = settingsNeighbor(edge, 'left', settingsRows());
       if (neighbor.zone !== 'sidebar') return;
@@ -292,6 +291,8 @@ export function TvSettings({
 
   const onSidebar = (index: number) => {
     placeRef.current = { zone: 'sidebar', index };
+    const edge = detailEdgeRef.current;
+    if (edge?.zone === 'detail' && edge.index === index) detailEdgeRef.current = null;
     setSelected(index);
   };
 
@@ -326,9 +327,6 @@ export function TvSettings({
   );
 
   const settingsTabTag = tabFocus?.tabTags[SETTINGS_TAB] ?? null;
-  const firstOption = settingsNeighbor({ zone: 'sidebar', index: selected }, 'right', categoryRows);
-  const detailTag = firstOption.zone === 'detail' ? (tags[firstOption.id] ?? null) : null;
-  const detailDestinations = detailTag != null ? [detailTag] : [];
   const plain = Guide === View;
   const sidebarDestinations = selectedTag != null ? [selectedTag] : [];
   const tabDestinations = settingsTabTag != null ? [settingsTabTag] : [];
@@ -405,17 +403,28 @@ export function TvSettings({
             style={{ height: metrics.padV }}
             {...(plain || sidebarDestinations.length === 0 ? null : { destinations: sidebarDestinations })}
           />
-          <Guide
-          style={styles.detailBody}
-          collapsable={false}
-          testID={settingsDetailTestId(category.id)}
-          {...(plain ? null : { destinations: detailDestinations, trapFocusUp: true, trapFocusDown: true, trapFocusRight: true })}
-          onLayout={(event) => {
-            const next = Math.round(event.nativeEvent.layout.width);
-            setPaneWidth((current) => (current === next ? current : next));
-          }}
-        >
-          <ScrollView
+          <View style={styles.detailRow} collapsable={false}>
+            {/*
+              A text field keeps focus on an inner view, so nextFocusLeft never
+              runs. This band is the nearest thing to the left of every option
+              and sends Left back to the open category.
+            */}
+            <Guide
+              collapsable={false}
+              style={{ width: Math.max(48, metrics.gap) }}
+              {...(plain || sidebarDestinations.length === 0 ? null : { destinations: sidebarDestinations })}
+            />
+            <Guide
+            style={styles.detailBody}
+            collapsable={false}
+            testID={settingsDetailTestId(category.id)}
+            {...(plain ? null : { trapFocusUp: true, trapFocusDown: true, trapFocusRight: true })}
+            onLayout={(event) => {
+              const next = Math.round(event.nativeEvent.layout.width);
+              setPaneWidth((current) => (current === next ? current : next));
+            }}
+          >
+            <ScrollView
             ref={scrollRef}
             style={styles.detailScroll}
             contentContainerStyle={{ gap: metrics.gap, paddingBottom: metrics.gap }}
@@ -449,8 +458,9 @@ export function TvSettings({
               bind={bind}
               onDetail={onDetail}
             />
-          </ScrollView>
-          </Guide>
+            </ScrollView>
+            </Guide>
+          </View>
         </View>
       </View>
     </View>
@@ -757,6 +767,7 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   detail: { flex: 1, minWidth: 0 },
+  detailRow: { flex: 1, flexDirection: 'row', minWidth: 0 },
   detailBody: { flex: 1, minWidth: 0 },
   detailScroll: { flex: 1 },
   title: { fontFamily: 'Oswald' },
