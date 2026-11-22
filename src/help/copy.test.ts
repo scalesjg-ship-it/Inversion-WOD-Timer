@@ -42,7 +42,11 @@ describe('help copy', () => {
     expect(helpSections('androidtv').find((section) => section.id === 'help-remote')?.body).toBe(remote?.body);
     const phone = helpSections('phone').find((section) => section.id === 'help-remote');
     expect(phone?.body).toContain('Tap the clock to pause or resume');
+    expect(phone?.body).toContain('Finish ends a For Time workout');
+    expect(phone?.body).toContain('Are you sure?');
     expect(phone?.body).toContain('Back leaves the timer');
+    expect(remote?.body).toContain('Finish ends a For Time workout');
+    expect(remote?.body).toContain('Are you sure?');
   });
 
   it('describes the QR logo on TV and the photo picker on the phone', () => {
@@ -55,6 +59,18 @@ describe('help copy', () => {
     expect(phone?.body).toContain('Photo library');
     expect(phone?.body).toContain('Files');
     expect(phone?.body).toContain('Brand tab');
+  });
+
+  it('tells the phone and the TV where to turn on the spoken countdown', () => {
+    const phone = helpSections('phone').find((section) => section.id === 'help-sound');
+    const tv = helpSections('appletv').find((section) => section.id === 'help-sound');
+    expect(phone?.body).toContain('Brand tab');
+    expect(phone?.body).toContain('Voice countdown');
+    expect(phone?.body).toContain('stays off');
+    expect(tv?.body).toContain('Settings tab');
+    expect(tv?.body).toContain('Sound');
+    expect(tv?.body).toContain('Apple Watch');
+    expect(helpSections('androidtv').find((section) => section.id === 'help-sound')?.body).toBe(tv?.body);
   });
 
   it('describes save, load, update, rename, and delete', () => {

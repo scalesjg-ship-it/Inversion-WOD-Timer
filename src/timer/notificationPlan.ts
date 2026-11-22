@@ -1,5 +1,5 @@
 import { cueTimeline, elapsedMs, soundsForCues } from './engine';
-import type { Cue, EngineState, SoundName, TimerConfig } from './types';
+import type { Cue, CueScheduleOptions, EngineState, SoundName, TimerConfig } from './types';
 
 export interface NotificationPlanItem {
   atElapsedMs: number;
@@ -18,9 +18,9 @@ interface CueGroup {
   cues: Cue[];
 }
 
-function groupCues(state: EngineState): CueGroup[] {
+function groupCues(state: EngineState, options?: CueScheduleOptions): CueGroup[] {
   const groups: CueGroup[] = [];
-  for (const timed of cueTimeline(state)) {
+  for (const timed of cueTimeline(state, options)) {
     const last = groups[groups.length - 1];
     if (last && last.atElapsedMs === timed.atElapsedMs) {
       last.cues.push(timed.cue);
@@ -35,6 +35,9 @@ function primarySound(sounds: SoundName[]): SoundName {
   if (sounds.includes('bell')) return 'bell';
   if (sounds.includes('start')) return 'start';
   if (sounds.includes('warning')) return 'warning';
+  if (sounds.includes('three')) return 'three';
+  if (sounds.includes('two')) return 'two';
+  if (sounds.includes('one')) return 'one';
   return 'tick';
 }
 
@@ -51,6 +54,12 @@ function titleFor(sound: SoundName, cues: Cue[], config: TimerConfig): string {
       return 'Go';
     case 'bell':
       return 'Round over';
+    case 'three':
+      return 'Three';
+    case 'two':
+      return 'Two';
+    case 'one':
+      return 'One';
     default: {
       const exhaustive: never = sound;
       return exhaustive;
@@ -58,9 +67,13 @@ function titleFor(sound: SoundName, cues: Cue[], config: TimerConfig): string {
   }
 }
 
-export function notificationPlan(state: EngineState, gymName: string): NotificationPlanItem[] {
+export function notificationPlan(
+  state: EngineState,
+  gymName: string,
+  options?: CueScheduleOptions,
+): NotificationPlanItem[] {
   const items: NotificationPlanItem[] = [];
-  for (const group of groupCues(state)) {
+  for (const group of groupCues(state, options)) {
     const sounds = soundsForCues(group.cues);
     if (sounds.length === 0) continue;
     const sound = primarySound(sounds);

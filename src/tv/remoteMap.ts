@@ -18,7 +18,7 @@ export interface RemoteContext {
   controlsVisible: boolean;
   confirmOpen: boolean;
   /**
-   * Television keeps Pause and Stop mounted. Down must not unmount them.
+   * Television keeps Pause and Finish mounted. Down must not unmount them.
    * A phone or a browser preview still hides the row.
    */
   stableControls: boolean;
@@ -46,8 +46,11 @@ export function mapRemoteEvent(eventType: string, context: RemoteContext): Remot
 
   switch (eventType) {
     case 'select':
+      // A visible row handles Select on the focused button. Mapping it to
+      // Pause swallowed Reset and Finish, so those needed a second press.
+      if (context.controlsVisible) return { type: 'ignore' };
       if (context.running) return { type: 'pause', focusResume: true };
-      return context.controlsVisible ? { type: 'ignore' } : { type: 'toggle' };
+      return { type: 'toggle' };
     case 'playPause':
     case 'play':
     case 'pause':

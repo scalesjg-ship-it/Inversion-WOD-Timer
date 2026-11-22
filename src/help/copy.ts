@@ -66,13 +66,13 @@ function remoteBlock(platform: HelpPlatform): HelpBlock {
       return {
         id: 'help-remote',
         title: 'Remote',
-        body: 'Select pauses or resumes. Back on a running timer pauses it and stays. Back again leaves. If Select already paused the timer, the first Back stays and the next Back leaves. Play/Pause also toggles the clock.',
+        body: 'Select pauses or resumes. Back on a running timer pauses it and stays. Back again leaves. If Select already paused the timer, the first Back stays and the next Back leaves. Play/Pause also toggles the clock. Finish ends a For Time workout. Reset asks "Are you sure?" before it returns to the start, and Back closes that question.',
       };
     case 'phone':
       return {
         id: 'help-remote',
         title: 'Timer controls',
-        body: 'Tap the clock to pause or resume. Stop ends a For Time workout. Reset returns to the start. Back leaves the timer.',
+        body: 'Tap the clock to pause or resume. Finish ends a For Time workout. Reset asks "Are you sure?" before it returns to the start. Back leaves the timer.',
       };
     default: {
       const unexpected: never = platform;
@@ -103,6 +103,15 @@ function logoBlock(platform: HelpPlatform): HelpBlock {
   }
 }
 
+function soundBlock(platform: HelpPlatform): HelpBlock {
+  const where = platform === 'phone' ? 'On the Brand tab, Voice countdown' : 'On the Settings tab, open Sound. Voice countdown';
+  return {
+    id: 'help-sound',
+    title: 'Voice countdown',
+    body: `${where} says three, two, and one before a round, a rest, or get ready ends. It stays off until you turn it on. The beep at zero still plays. A phone that is locked keeps the beeps for those three seconds. The Apple Watch still taps and does not speak.`,
+  };
+}
+
 function presetBlock(): HelpBlock {
   return {
     id: 'help-presets',
@@ -117,7 +126,7 @@ export function helpSections(platform: HelpPlatform): HelpBlock[] {
     title: modeTitle(mode),
     body: HELP_MODE_LINES[mode],
   }));
-  return [watchBlock(platform), remoteBlock(platform), logoBlock(platform), presetBlock(), ...modes];
+  return [watchBlock(platform), remoteBlock(platform), logoBlock(platform), presetBlock(), soundBlock(platform), ...modes];
 }
 
 export function helpVersionLine(version: string | null | undefined, build: string | null | undefined): string {

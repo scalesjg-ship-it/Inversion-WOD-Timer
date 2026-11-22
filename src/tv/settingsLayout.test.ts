@@ -46,6 +46,7 @@ describe('TV settings layout', () => {
       'Display',
       'Colors',
       'Logo',
+      'Sound',
     ]);
     expect(settingsDetailTestId('brand')).toBe('settings-detail-brand');
     expect(settingsDetailTestId('logo')).toBe('settings-detail-logo');
@@ -65,8 +66,8 @@ describe('TV settings layout', () => {
     expect(settingsNeighbor(place, 'down', categories)).toEqual({ zone: 'self' });
 
     const entered = settingsNeighbor(place, 'right', categories);
-    expect(entered).toEqual({ zone: 'detail', id: 'logo-entry' });
-    expect(settingsAction(place, 'select', categories)).toEqual({ zone: 'detail', id: 'logo-entry' });
+    expect(entered).toEqual({ zone: 'detail', id: 'voice-countdown' });
+    expect(settingsAction(place, 'select', categories)).toEqual({ zone: 'detail', id: 'voice-countdown' });
     if (entered.zone !== 'detail') return;
     const option: SettingsPlace = { zone: 'detail', index: place.index, id: entered.id };
     expect(settingsNeighbor(option, 'left', categories)).toEqual({ zone: 'sidebar', index: place.index });
@@ -124,6 +125,31 @@ describe('TV settings layout', () => {
     expect(settingsNeighbor({ zone: 'detail', index: colors, id: 'color-work-toggle' }, 'down', categories)).toEqual({
       zone: 'detail',
       id: 'color-rest-toggle',
+    });
+
+    const sound = TV_SETTINGS_CATEGORIES.findIndex((category) => category.id === 'sound');
+    const logo = TV_SETTINGS_CATEGORIES.findIndex((category) => category.id === 'logo');
+    expect(settingsNeighbor({ zone: 'sidebar', index: logo }, 'right', categories)).toEqual({
+      zone: 'detail',
+      id: 'logo-entry',
+    });
+    expect(settingsNeighbor({ zone: 'sidebar', index: sound }, 'down', categories)).toEqual({ zone: 'self' });
+    expect(settingsNeighbor({ zone: 'detail', index: sound, id: 'voice-countdown' }, 'left', categories)).toEqual({
+      zone: 'sidebar',
+      index: sound,
+    });
+    expect(settingsNeighbor({ zone: 'detail', index: sound, id: 'voice-countdown' }, 'right', categories)).toEqual({
+      zone: 'self',
+    });
+    expect(settingsNeighbor({ zone: 'detail', index: sound, id: 'voice-countdown' }, 'up', categories)).toEqual({
+      zone: 'self',
+    });
+    expect(settingsNeighbor({ zone: 'detail', index: sound, id: 'voice-countdown' }, 'down', categories)).toEqual({
+      zone: 'self',
+    });
+    expect(settingsAction({ zone: 'detail', index: sound, id: 'voice-countdown' }, 'back', categories)).toEqual({
+      zone: 'sidebar',
+      index: sound,
     });
   });
 
