@@ -15,7 +15,7 @@ describe('help copy', () => {
     expect(helpPlatform({ os: 'android', tv: false })).toBe('phone');
   });
 
-  it('tells Apple TV and iPhone that Watch needs an Apple TV 4K, and not this Fire TV', () => {
+  it('tells Apple TV and iPhone that HD pairs with a code, and not this Fire TV', () => {
     const apple = helpSections('appletv').find((section) => section.id === 'help-watch');
     const phone = helpSections('phone').find((section) => section.id === 'help-watch');
     const android = helpSections('androidtv').find((section) => section.id === 'help-watch');
@@ -25,11 +25,18 @@ describe('help copy', () => {
     expect(apple?.body).toContain('same Wi-Fi');
     expect(apple?.body).toContain('iCloud');
     expect(apple?.body).toContain('press Watch');
+    expect(apple?.body).toContain('6-digit code');
+    expect(apple?.body).toContain('internet');
+    expect(apple?.body).toContain('Unpair watch');
+    expect(apple?.body).not.toContain('cannot pair');
+    expect(apple?.body).not.toContain('needs an Apple TV 4K');
     expect(apple?.body).toContain('start, pause, resume, and reset');
     expect(apple?.body).toContain('taps your wrist');
     expect(phone?.body).toContain('Apple TV 4K');
     expect(phone?.body).toContain('Apple TV HD');
+    expect(phone?.body).toContain('internet');
     expect(android?.body).toContain('Apple TV 4K');
+    expect(android?.body).toContain('Apple TV HD');
     expect(android?.body).not.toContain('press Watch');
   });
 

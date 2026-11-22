@@ -38,19 +38,19 @@ function watchBlock(platform: HelpPlatform): HelpBlock {
       return {
         id: 'help-watch',
         title: 'Apple Watch',
-        body: 'Needs an Apple TV 4K, not an Apple TV HD, on tvOS 16 or later. The watch and this Apple TV use the same Wi-Fi and the same iCloud account, or a Family Sharing account. Open the Americana watch app first, then press Watch on the timer and pick your watch. The watch can start, pause, resume, and reset. It taps your wrist when the round or phase changes, and when the timer finishes.',
+        body: 'On an Apple TV 4K with tvOS 16 or later, the watch and this Apple TV use the same Wi-Fi and the same iCloud account, or a Family Sharing account. Open the Americana watch app, then press Watch and pick your watch. Apple TV HD, and a 4K that cannot use that direct link, pairs with a 6-digit code instead. The TV shows the code, you enter it once on the watch, and both need internet. After that they reconnect on their own. The watch can start, pause, resume, and reset. It taps your wrist when the round or phase changes, and when the timer finishes. Unpair watch on the TV, or Forget TV on the watch, ends that pairing. The messages are not stored on a server.',
       };
     case 'phone':
       return {
         id: 'help-watch',
         title: 'Apple Watch',
-        body: 'The watch controls the Apple TV app, and only an Apple TV 4K on tvOS 16 or later. Apple TV HD cannot pair. Use the same Wi-Fi and the same iCloud account, or Family Sharing. Open the Americana watch app, then on the Apple TV timer press Watch and pick your watch. The watch can start, pause, resume, and reset, and it taps your wrist when the round or phase changes.',
+        body: 'The watch controls the Apple TV app. An Apple TV 4K on tvOS 16 or later can pair on the same Wi-Fi with the same iCloud account, or Family Sharing. Apple TV HD pairs with a 6-digit code: the TV shows it, you enter it on the watch, and both need internet. Open the Americana watch app, then on the Apple TV timer press Watch. The watch can start, pause, resume, and reset, and it taps your wrist when the round or phase changes. Forget TV on the watch, or Unpair watch on the TV, ends a code pairing. Those messages are not stored on a server.',
       };
     case 'androidtv':
       return {
         id: 'help-watch',
         title: 'Apple Watch',
-        body: 'Apple Watch control works with the Apple TV 4K app only, not with this TV.',
+        body: 'Apple Watch control works with the Apple TV app (Apple TV 4K or Apple TV HD), not with this TV.',
       };
     default: {
       const unexpected: never = platform;

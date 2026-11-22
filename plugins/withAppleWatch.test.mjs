@@ -45,6 +45,21 @@ describe('withAppleWatch', () => {
     // The fixture is created by the test runner when prebuild has not run.
     // linkWatchTarget is exercised against a parsed project in the prebuild check.
     expect(plugin.WATCH_BUNDLE_ID).toBe('com.garrettscales.americana.watchkitapp');
+    expect(plugin.WATCH_SOURCES).toContain('WatchRelay.swift');
+    expect(plugin.WATCH_SOURCES).toContain('PairingPad.swift');
     expect(typeof project.parseSync).toBe('function');
+  });
+
+  it('reads the Supabase env names and does not keep a quoted key', () => {
+    expect(plugin.relayInfoPlistValues({})).toEqual({ SUPABASE_URL: '', SUPABASE_ANON_KEY: '' });
+    expect(
+      plugin.relayInfoPlistValues({
+        SUPABASE_URL: ' https://example.supabase.co ',
+        SUPABASE_ANON_KEY: 'anon"key-value-123456',
+      }),
+    ).toEqual({
+      SUPABASE_URL: 'https://example.supabase.co',
+      SUPABASE_ANON_KEY: 'anonkey-value-123456',
+    });
   });
 });

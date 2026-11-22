@@ -96,6 +96,19 @@ On the running timer:
 
 D-pad and select cover every action. Home and the microphone button stay with the TV. On Brand, scan the QR code with a phone on the same Wi-Fi to send a logo. Remove logo stays on the remote. A guest network that isolates devices will not connect.
 
+### Apple Watch
+
+On an Apple TV 4K with tvOS 16 or later, press Watch and pick the watch. That link stays on the local network. DeviceDiscoveryUI does not run on Apple TV HD. There, and as a fallback on 4K after you leave the picker, the TV shows a 6-digit code. Enter it once on the watch. Both devices need internet. After that they reconnect on their own until you press Unpair watch on the TV or Forget TV on the watch.
+
+The code only names the first channel (`americana-pair-<code>`). The saved pairing uses a long random channel (`americana-session-<id>`) and one HMAC-SHA256 secret. Messages are Supabase Realtime broadcast frames. Nothing is written to a database.
+
+Set these in the build environment for both the iOS build (the watch ships inside the iPhone app) and the tvOS build. Do not commit the values. Use the anon key, never the service role key.
+
+- `SUPABASE_URL` — `https://<project-ref>.supabase.co`
+- `SUPABASE_ANON_KEY` — the project anon key
+
+`app.config.js` copies them to `extra.supabaseUrl` and `extra.supabaseAnonKey`. `plugins/withAppleWatch.js` copies them into the app Info.plist and the watch target’s build settings. Empty strings are the placeholders until you set the variables. See the pull request notes for the Supabase project toggles. Realtime must allow public channels, and broadcast replay stays off.
+
 ### Local logo transfer
 
 The TV listens with [`react-native-tcp-socket`](https://github.com/Rapsssito/react-native-tcp-socket). Its podspec includes tvOS (`:tvos => "10.0"`) and the iOS implementation is CocoaAsyncSocket, which also ships a tvOS target. Android uses `java.net.ServerSocket`, which Fire TV can run. `expo-network` `getIpAddressAsync` is supported on tvOS and supplies the address in the QR code. The code itself is drawn from the pure JavaScript `uqr` matrix with views, so the screen does not add another native graphics library.
@@ -195,7 +208,7 @@ Play Console is set to use the same release track and artifacts as the mobile ap
 
 ## Not in this version
 
-- No accounts, cloud sync, or shared gym profiles. Branding is per device, including each TV. A phone can hand a logo to a TV on the same Wi-Fi. That transfer stays on the local network.
+- No accounts, cloud sync, or shared gym profiles. Branding is per device, including each TV. A phone can hand a logo to a TV on the same Wi-Fi. That transfer stays on the local network. Apple Watch code pairing sends timer commands through Supabase Realtime only long enough to deliver them. They are not stored.
 - No store submission is performed from this repo.
 - On a phone, the logo comes from the photo library or Files. On a TV, it comes from the QR page.
 - Locked-screen sound on phones depends on notification permission. TVs keep the screen on.

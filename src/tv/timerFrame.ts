@@ -70,6 +70,8 @@ export function tvAppleTimerFrame(input: {
   safeHorizontal: number;
   buttonCount: number;
   linkStatus: boolean;
+  /** Lines reserved under the clock for the watch status. Defaults to 2. */
+  linkRows?: number;
   warning: boolean;
   paused: boolean;
 }): TvAppleTimerFrame {
@@ -104,7 +106,8 @@ export function tvAppleTimerFrame(input: {
   const linkFont = scaledLine(28, scale);
   const linkLine = scaledLine(36, scale);
   const linkGap = scaledLine(8, scale);
-  const linkBlock = input.linkStatus ? linkLine * 2 + linkGap : 0;
+  const linkRows = input.linkStatus ? Math.max(1, input.linkRows ?? 2) : 0;
+  const linkBlock = linkRows > 0 ? linkLine * linkRows + linkGap : 0;
   const columnHeight = linkBlock + minHeight;
   const separation = Math.max(12, scaledLine(12, scale));
   const controlsLift = Math.max(0, input.safeBottom) + 8;

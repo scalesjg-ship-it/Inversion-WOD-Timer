@@ -11,7 +11,9 @@ import { clockEdgeHeight, clockFontFamily } from '@/src/branding/palettes';
 import type { Branding } from '@/src/branding/types';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
 import { TvFocusPressable } from '@/src/components/TvFocus';
+import type { TvFocusTag } from '@/src/components/TvTabFocus';
 import { BigButton } from '@/src/components/ui';
+import { WatchPairBar } from '@/src/components/WatchPairBar';
 import { usePreferences } from '@/src/preferences/PreferencesProvider';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
@@ -91,6 +93,7 @@ export default function TimerScreen() {
   const [stopTag, onStopHost] = useTvFocusTag();
   const [resetTag, onResetHost] = useTvFocusTag();
   const [watchTag, onWatchHost] = useTvFocusTag();
+  const [pairTag, setPairTag] = useState<TvFocusTag | null>(null);
   const appleTv = watchLinkEnabled({ os: Platform.OS, tv });
   const [confirmResetTag, onConfirmResetHost] = useTvFocusTag();
   const [confirmCancelTag, onConfirmCancelHost] = useTvFocusTag();
@@ -321,9 +324,14 @@ export default function TimerScreen() {
   // Select. leaveArmed stays clear, so hardware Back still follows backStep.
   const {
     presentPicker,
+    pairWithCode,
+    unpair,
     message: watchMessage,
     phase: watchPhase,
     watchControlVisible,
+    pairingCode,
+    offerPairCode,
+    offerUnpair,
   } = useWatchLink({
     enabled: appleTv,
     snapshot: timer.snapshot,
@@ -371,7 +379,8 @@ export default function TimerScreen() {
         safeBottom: safe.bottom,
         safeHorizontal: Math.max(safe.left, safe.right),
         buttonCount: transport.length + (showWatch ? 1 : 0),
-        linkStatus: Boolean(watchMessage),
+        linkStatus: Boolean(watchMessage) || Boolean(pairingCode) || offerPairCode || offerUnpair,
+        linkRows: pairingCode ? 3 : 2,
         warning: timer.snapshot.warningActive,
         paused: timer.snapshot.paused,
       })
@@ -486,7 +495,7 @@ export default function TimerScreen() {
               ? watchTag
               : tagFor(transportNeighbor(transportRoles, button.role, 1))
           }
-          focusUp={null}
+          focusUp={pairTag}
         />
       ))}
       {showWatch ? (
@@ -501,7 +510,7 @@ export default function TimerScreen() {
           focusable={confirmKind === null}
           focusLeft={tagFor(transportRoles[transportRoles.length - 1])}
           focusRight={watchTag}
-          focusUp={null}
+          focusUp={pairTag}
         />
       ) : null}
     </>
@@ -628,23 +637,22 @@ export default function TimerScreen() {
               },
             ]}
           >
-            {watchMessage ? (
-              <Text
-                pointerEvents="none"
-                testID="timer-watch-status"
-                numberOfLines={2}
-                style={{
-                  color: watchLinkTone(watchPhase) === 'alert' ? attention : palette.text,
-                  textAlign: 'center',
-                  fontFamily: 'Oswald',
-                  fontSize: appleFrame.linkFont,
-                  lineHeight: appleFrame.linkLine,
-                  marginBottom: appleFrame.linkGap,
-                  alignSelf: 'stretch',
-                }}
-              >
-                {watchMessage}
-              </Text>
+            {watchMessage || pairingCode || offerPairCode || offerUnpair ? (
+              <WatchPairBar
+                message={watchMessage}
+                code={pairingCode}
+                offerPair={offerPairCode}
+                offerUnpair={offerUnpair}
+                color={watchLinkTone(watchPhase) === 'alert' ? attention : palette.text}
+                fontSize={appleFrame.linkFont}
+                lineHeight={appleFrame.linkLine}
+                gap={appleFrame.linkGap}
+                onPair={pairWithCode}
+                onUnpair={unpair}
+                onRefresh={pairWithCode}
+                focusDown={primaryTag}
+                onTag={setPairTag}
+              />
             ) : null}
             <View
               style={{

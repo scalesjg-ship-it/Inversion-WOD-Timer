@@ -75,8 +75,10 @@ final class WatchTvLink: @unchecked Sendable {
     }
   }
 
-  /// UI tests pass `-AmericanaWatchStatus unsupported` to show the HD message
-  /// without presenting DeviceDiscoveryUI. TestFlight launches do not.
+  /// UI tests pass `-AmericanaWatchStatus unsupported` to open the HD code
+  /// screen without presenting DeviceDiscoveryUI. TestFlight launches do not.
+  /// `unsupported` means this TV cannot browse for a watch, so the JS relay
+  /// shows a pairing code instead of blocking the button.
   func noteLaunchStatus() {
     guard let name = Self.launchStatus() else { return }
     log("launch status \(name)")

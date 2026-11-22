@@ -5,8 +5,21 @@ struct WatchRoot: View {
   @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
-    TimerFace(model: session.model) { command in
-      session.sendCommand(command)
+    Group {
+      if session.screen == .pad {
+        PairingPad(
+          digits: session.codeDigits,
+          status: session.pairStatus,
+          onDigit: { session.typeDigit($0) },
+          onDelete: { session.deleteDigit() },
+          onSubmit: { session.submitCode() },
+          onCancel: { session.cancelPairing() }
+        )
+      } else {
+        TimerFace(model: session.model, onCommand: { command in
+          session.sendCommand(command)
+        }, onPair: { session.beginPairing() }, onForget: { session.forgetTV() })
+      }
     }
     .onAppear { session.start() }
     .onChange(of: scenePhase) { phase in
@@ -20,6 +33,8 @@ struct WatchRoot: View {
 struct TimerFace: View {
   let model: WatchFaceModel
   let onCommand: (String) -> Void
+  var onPair: () -> Void = {}
+  var onForget: () -> Void = {}
 
   var body: some View {
     VStack(spacing: 4) {
@@ -58,6 +73,17 @@ struct TimerFace: View {
         .multilineTextAlignment(.center)
         .lineLimit(2)
         .minimumScaleFactor(0.8)
+      if model.showsPair {
+        Button("Pair with code", action: onPair)
+          .buttonStyle(.bordered)
+          .font(.system(size: 14, weight: .semibold))
+      }
+      if model.showsForget {
+        Button("Forget TV", action: onForget)
+          .buttonStyle(.plain)
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(Color(red: 0.576, green: 0.627, blue: 0.690))
+      }
     }
     .padding(.horizontal, 6)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -103,7 +129,9 @@ enum WatchPreviewFace: String {
         primaryCommand: "pause",
         canReset: true,
         status: "Apple TV",
-        connected: true
+        connected: true,
+        showsPair: false,
+        showsForget: false
       )
     case .work:
       return WatchFaceModel(
@@ -115,7 +143,9 @@ enum WatchPreviewFace: String {
         primaryCommand: "pause",
         canReset: true,
         status: "Apple TV",
-        connected: true
+        connected: true,
+        showsPair: false,
+        showsForget: false
       )
     case .rest:
       return WatchFaceModel(
@@ -127,7 +157,9 @@ enum WatchPreviewFace: String {
         primaryCommand: "pause",
         canReset: true,
         status: "Apple TV",
-        connected: true
+        connected: true,
+        showsPair: false,
+        showsForget: false
       )
     case .finished:
       return WatchFaceModel(
@@ -139,7 +171,9 @@ enum WatchPreviewFace: String {
         primaryCommand: "start",
         canReset: true,
         status: "Apple TV",
-        connected: true
+        connected: true,
+        showsPair: false,
+        showsForget: false
       )
     }
   }
