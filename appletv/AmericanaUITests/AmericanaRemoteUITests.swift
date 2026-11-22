@@ -266,26 +266,18 @@ final class AmericanaRemoteUITests: XCTestCase {
   }
 
   private func rightIntoVoiceCountdown() -> String {
+    XCTAssertTrue(focused("settings-category-sound"), "Right was not taken from Sound. \(snapshot())")
     press(.right, settle: 0.75)
-    let enteredByRight = focused("voice-countdown")
-    if !enteredByRight {
-      // Select is the sidebar row's enter action when Right does not move.
-      if !focused("settings-category-sound") {
-        _ = nudge("settings-category-sound", directions: [.left, .down, .up], limit: 4)
-      }
-      press(.select, settle: 0.75)
-    }
     XCTAssertTrue(
       focused("voice-countdown") || waitFocus("voice-countdown", timeout: 2),
-      "Voice countdown did not take focus. \(snapshot())"
+      "Right from Sound did not focus Voice countdown. \(snapshot())"
     )
-    XCTAssertFalse(focused("settings-category-sound"), "Focus stayed on the Sound row. \(snapshot())")
     XCTAssertTrue(any("settings-detail-sound").exists, "Right left the Sound pane. \(snapshot())")
     let label = any("voice-countdown").label
     XCTAssertTrue(label.contains("Voice countdown"), "Voice countdown label was \(label). \(snapshot())")
     XCTAssertFalse(voiceCountdownOn(), "Voice countdown did not start off. \(voiceCountdownDetail())")
     XCTAssertEqual(app.state, .runningForeground, "Right left the app")
-    return "\(enteredByRight ? "right" : "select") \(voiceCountdownDetail())"
+    return voiceCountdownDetail()
   }
 
   private func setVoiceCountdown(_ on: Bool) -> String {
@@ -467,26 +459,13 @@ final class AmericanaRemoteUITests: XCTestCase {
     let digits = code.label.filter(\.isNumber)
     XCTAssertEqual(digits.count, 6, "Code label was \(code.label). \(snapshot())")
     XCTAssertTrue(any("timer-watch").exists, "Watch was missing on the HD code screen. \(snapshot())")
-    if !focused("watch-pair-code") {
-      press(.up, settle: 0.7)
-    }
-    // The code is centered above the row. Up from a side button can miss it.
-    if !focused("watch-pair-code") {
-      for id in ["timer-finish", "timer-reset", "timer-watch"] {
-        if focused("watch-pair-code") { break }
-        if !focused(id) {
-          _ = nudge(id, directions: [.right], limit: 3)
-        }
-        press(.up, settle: 0.55)
-      }
-    }
-    if !focused("watch-pair-code") {
-      XCTAssertTrue(
-        nudge("watch-pair-code", directions: [.up, .right], limit: 6),
-        "Remote could not focus the pairing code. \(snapshot())"
-      )
-    }
-    XCTAssertTrue(focused("watch-pair-code"), "Pairing code did not take focus. \(snapshot())")
+    let resume = any("timer-pause")
+    XCTAssertTrue(focused("timer-pause") && resume.label.contains("Resume"), "Up was not taken from Resume. \(snapshot())")
+    press(.up, settle: 0.7)
+    XCTAssertTrue(
+      focused("watch-pair-code") || waitFocus("watch-pair-code", timeout: 2),
+      "Up from Resume did not focus the pairing code. \(snapshot())"
+    )
     press(.down, settle: 0.6)
     if !focused("timer-pause") {
       XCTAssertTrue(nudge("timer-pause", directions: [.down, .left], limit: 6), "Down from the code did not return to the clock. \(snapshot())")
