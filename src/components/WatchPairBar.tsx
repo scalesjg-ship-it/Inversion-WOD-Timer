@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, TVFocusGuideView, View } from 'react-native';
 
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import type { TvFocusTag } from '@/src/components/TvTabFocus';
@@ -53,9 +53,17 @@ export function WatchPairBar({
     fontSize,
     lineHeight,
   };
+  const Guide = TVFocusGuideView ?? View;
+  // The code is a short centered control. Up from Resume misses it unless this
+  // full-width bar collects that move and sends it to the code.
+  const guideDestinations = action && tag != null ? [tag] : null;
 
   return (
-    <View pointerEvents="box-none" style={[styles.bar, { marginBottom: gap }]}>
+    <Guide
+      pointerEvents="box-none"
+      style={[styles.bar, { marginBottom: gap }]}
+      {...(guideDestinations ? { destinations: guideDestinations } : null)}
+    >
       {code ? (
         <TvFocusPressable
           testID="watch-pair-code"
@@ -115,7 +123,7 @@ export function WatchPairBar({
           {message}
         </Text>
       ) : null}
-    </View>
+    </Guide>
   );
 }
 
