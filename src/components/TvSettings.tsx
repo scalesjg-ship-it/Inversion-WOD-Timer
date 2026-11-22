@@ -119,11 +119,15 @@ export function TvSettings({
   accent,
   update,
   reset,
+  voiceCountdown,
+  onVoiceCountdown,
 }: {
   branding: Branding;
   accent: string;
   update: (patch: Partial<Branding>) => Promise<void> | void;
   reset: () => Promise<void> | void;
+  voiceCountdown: boolean;
+  onVoiceCountdown: (value: boolean) => void;
 }) {
   const { width, height } = useWindowDimensions();
   const metrics = tvSettingsMetrics(width, height);
@@ -445,6 +449,8 @@ export function TvSettings({
               setName={setName}
               update={update}
               reset={reset}
+              voiceCountdown={voiceCountdown}
+              onVoiceCountdown={onVoiceCountdown}
               metricsHeader={metrics.header}
               metricsBody={metrics.body}
               gap={metrics.gap}
@@ -475,6 +481,8 @@ function DetailBody({
   setName,
   update,
   reset,
+  voiceCountdown,
+  onVoiceCountdown,
   metricsHeader,
   metricsBody,
   gap,
@@ -494,6 +502,8 @@ function DetailBody({
   setName: (value: string) => void;
   update: (patch: Partial<Branding>) => Promise<void> | void;
   reset: () => Promise<void> | void;
+  voiceCountdown: boolean;
+  onVoiceCountdown: (value: boolean) => void;
   metricsHeader: number;
   metricsBody: number;
   gap: number;
@@ -641,6 +651,31 @@ function DetailBody({
           })}
         </View>
       );
+    case 'sound': {
+      const links = optionLinks('voice-countdown');
+      return (
+        <View
+          style={{ gap }}
+          onLayout={(event) => {
+            const next = event.nativeEvent.layout;
+            rememberPlace('voice-countdown', next.y, next.height);
+          }}
+        >
+          {heading('Countdown')}
+          <TvToggle
+            label="Voice countdown"
+            help="Three, two, one before every round and rest ends. The beep at zero stays."
+            value={voiceCountdown}
+            onValueChange={onVoiceCountdown}
+            testID="voice-countdown"
+            accent={accent}
+            onHost={(node) => bind('voice-countdown', node)}
+            onFocus={() => onDetail('voice-countdown')}
+            {...links}
+          />
+        </View>
+      );
+    }
     case 'logo': {
       const entry = optionLinks('logo-entry');
       const field = optionLinks('logo-url');

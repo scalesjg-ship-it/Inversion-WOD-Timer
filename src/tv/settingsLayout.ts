@@ -12,7 +12,8 @@ export const SETTINGS_CLOCK_COLUMNS = 2;
 
 /**
  * Categories already on the TV settings screen: gym name, templates and
- * placement, background and clock, palettes and colors, then the logo link.
+ * placement, background and clock, palettes and colors, the logo link,
+ * then the voice countdown.
  */
 export const TV_SETTINGS_CATEGORIES = [
   { id: 'brand', label: 'Brand', testID: 'settings-category-brand' },
@@ -20,6 +21,7 @@ export const TV_SETTINGS_CATEGORIES = [
   { id: 'display', label: 'Display', testID: 'settings-category-display' },
   { id: 'colors', label: 'Colors', testID: 'settings-category-colors' },
   { id: 'logo', label: 'Logo', testID: 'settings-category-logo' },
+  { id: 'sound', label: 'Sound', testID: 'settings-category-sound' },
 ] as const;
 
 export type SettingsCategoryId = (typeof TV_SETTINGS_CATEGORIES)[number]['id'];
@@ -156,6 +158,8 @@ export function settingsDetailRows(
         { columns: 1, ids: ['logo-blur'] },
         { columns: 1, ids: ['reset-brand'] },
       ];
+    case 'sound':
+      return [{ columns: 1, ids: ['voice-countdown'] }];
     default: {
       const unexpected: never = category;
       return unexpected;

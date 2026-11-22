@@ -17,8 +17,9 @@ export type FocusDirection = 'up' | 'down' | 'left' | 'right';
 
 /**
  * Buttons on the TV clock. Pause/Resume is first so focus can start there.
- * For Time keeps Stop while the work interval is paused, so the row does not
- * unmount under the focused control.
+ * For Time keeps Finish while the work interval is paused, so the row does not
+ * unmount under the focused control. Finish ends the workout. It is not a
+ * second pause.
  */
 export function tvTransportButtons(input: {
   phase: Phase;
@@ -38,12 +39,66 @@ export function tvTransportButtons(input: {
   }
 
   if (input.mode === 'forTime' && input.phase === 'work' && (input.running || input.paused)) {
-    buttons.push({ role: 'stop', label: 'Stop', testID: 'timer-stop', variant: 'ghost' });
+    buttons.push({ role: 'stop', label: 'Finish', testID: 'timer-finish', variant: 'ghost' });
   }
   if (input.phase !== 'idle') {
     buttons.push({ role: 'reset', label: 'Reset', testID: 'timer-reset', variant: 'ghost' });
   }
   return buttons;
+}
+
+export type TransportPress = 'pause' | 'resume' | 'start' | 'finish' | 'ask-reset';
+
+/**
+ * One press on a transport button.
+ * Pause is only the primary control. Reset always asks first, including while
+ * the clock is running, so it does not take a second press. Finish records
+ * the For Time result immediately.
+ */
+export function transportPress(role: TransportRole, input: { running: boolean; phase: Phase }): TransportPress {
+  switch (role) {
+    case 'primary':
+      if (input.running) return 'pause';
+      if (input.phase === 'idle' || input.phase === 'finished') return 'start';
+      return 'resume';
+    case 'stop':
+      return 'finish';
+    case 'reset':
+      return 'ask-reset';
+    default: {
+      const unexpected: never = role;
+      return unexpected;
+    }
+  }
+}
+
+/** The reset question. No is the safe answer and the control the remote lands on. */
+export const RESET_CONFIRM = {
+  title: 'Are you sure?',
+  yes: 'Yes',
+  no: 'No',
+  initialFocus: 'no',
+} as const;
+
+export type ResetConfirmFocus = typeof RESET_CONFIRM.initialFocus | 'yes';
+
+/** No leaves the clock untouched. Yes is the only answer that resets. */
+export function resetConfirmResult(answer: ResetConfirmFocus): 'keep' | 'reset' {
+  switch (answer) {
+    case 'no':
+      return 'keep';
+    case 'yes':
+      return 'reset';
+    default: {
+      const unexpected: never = answer;
+      return unexpected;
+    }
+  }
+}
+
+/** After the question closes, focus returns to Reset. */
+export function focusAfterResetPrompt(): TransportRole {
+  return 'reset';
 }
 
 /** The control the remote should land on when the clock appears. Never Back. */

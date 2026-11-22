@@ -12,6 +12,7 @@ import type { Branding } from '@/src/branding/types';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { BigButton } from '@/src/components/ui';
+import { usePreferences } from '@/src/preferences/PreferencesProvider';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
 import { formatSnapshot, phaseLabel, roundLabel } from '@/src/timer/labels';
@@ -23,11 +24,14 @@ import { tvAppleTimerFrame } from '@/src/tv/timerFrame';
 import { DUPLICATE_PRESS_MS, claimPress, type PressClaim } from '@/src/tv/pressClaim';
 import type { RemoteCommand } from '@/src/tv/remoteMap';
 import {
+  RESET_CONFIRM,
   backStep,
+  focusAfterResetPrompt,
   onScreenBackFocusable,
   onScreenBackPress,
   showsOnScreenBack,
   transportNeighbor,
+  transportPress,
   tvTransportButtons,
   type TransportRole,
 } from '@/src/tv/timerTransport';
@@ -43,9 +47,14 @@ const FocusGuide = TVFocusGuideView ?? View;
 export default function TimerScreen() {
   const { session } = useTimerSession();
   const { branding } = useBranding();
+  const { preferences } = usePreferences();
   const [config] = useState(session.config);
   const [label] = useState(session.label);
-  const timer = useTimer(config, { autoStart: true, gymName: branding.gymName });
+  const timer = useTimer(config, {
+    autoStart: true,
+    gymName: branding.gymName,
+    voiceCountdown: preferences.voiceCountdown,
+  });
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [frame, setFrame] = useState({ width: 0, height: 0 });
@@ -74,6 +83,7 @@ export default function TimerScreen() {
   const controlsVisible = tv ? true : tenFoot ? controlsHeld : true;
   const [confirmKind, setConfirmKind] = useState<null | 'reset'>(null);
   const [preferPrimary, setPreferPrimary] = useState(true);
+  const [preferReset, setPreferReset] = useState(false);
   const [preferDialog, setPreferDialog] = useState(false);
   const [backTag, onBackHost] = useTvFocusTag();
   const [primaryTag, onPrimaryHost] = useTvFocusTag();
@@ -118,21 +128,49 @@ export default function TimerScreen() {
   }, [preferPrimary]);
 
   useEffect(() => {
+    if (!preferReset) return undefined;
+    const id = setTimeout(() => setPreferReset(false), 600);
+    return () => clearTimeout(id);
+  }, [preferReset]);
+
+  useEffect(() => {
     if (!preferDialog) return undefined;
     const id = requestAnimationFrame(() => setPreferDialog(false));
     return () => cancelAnimationFrame(id);
   }, [preferDialog]);
 
   const onClock = () => {
-    if (tv) return;
+    if (tv || confirmKindRef.current) return;
     if (timer.snapshot.running || timer.snapshot.paused) timer.toggle();
   };
 
-  const closeConfirm = () => {
+  const clearConfirm = () => {
     confirmKindRef.current = null;
     setConfirmKind(null);
     setPreferDialog(false);
+  };
+
+  /** No and Back. The clock was not paused by the question, so it stays as it was. */
+  const declineReset = () => {
+    clearConfirm();
+    setPreferPrimary(false);
+    setPreferReset(focusAfterResetPrompt() === 'reset');
+  };
+
+  const acceptReset = () => {
+    timer.resetTimer();
+    clearConfirm();
+    setPreferReset(false);
     setPreferPrimary(true);
+  };
+
+  const askReset = () => {
+    setPreferPrimary(false);
+    setPreferReset(false);
+    setPreferDialog(true);
+    confirmKindRef.current = 'reset';
+    setConfirmKind('reset');
+    setControlsHeld(true);
   };
 
   const claim = (kind: 'select' | 'menu') => {
@@ -171,7 +209,7 @@ export default function TimerScreen() {
       });
       switch (step) {
         case 'dismiss':
-          closeConfirm();
+          declineReset();
           return;
         case 'pause':
           pauseOnResume();
@@ -226,14 +264,10 @@ export default function TimerScreen() {
         timer.toggle();
         break;
       case 'confirmReset':
-        setPreferPrimary(false);
-        setPreferDialog(true);
-        confirmKindRef.current = 'reset';
-        setConfirmKind('reset');
-        setControlsHeld(true);
+        askReset();
         break;
       case 'dismissConfirm':
-        closeConfirm();
+        declineReset();
         break;
       case 'seek':
         timer.seekTimer(command.seconds);
@@ -246,7 +280,7 @@ export default function TimerScreen() {
         break;
       case 'hideControls':
         setControlsHeld(false);
-        closeConfirm();
+        clearConfirm();
         break;
       case 'pause': {
         if (!claim('select')) break;
@@ -297,7 +331,12 @@ export default function TimerScreen() {
     onAction: (action) => {
       if (action === 'ignore') return;
       leaveArmed.current = false;
-      if (confirmKindRef.current) closeConfirm();
+      if (action === 'reset') {
+        // The watch has no Yes or No. It resets the TV clock directly.
+        acceptReset();
+        return;
+      }
+      if (confirmKindRef.current) clearConfirm();
       switch (action) {
         case 'start':
           timer.startTimer();
@@ -308,9 +347,6 @@ export default function TimerScreen() {
         case 'resume':
           timer.toggle();
           setPreferPrimary(true);
-          return;
-        case 'reset':
-          timer.resetTimer();
           return;
         default: {
           const unexpected: never = action;
@@ -389,26 +425,28 @@ export default function TimerScreen() {
   const pressTransport = (role: TransportRole) => {
     if (!claim('select')) return;
     const snap = timer.readSnapshot();
-    if (snap.running) {
-      pauseOnResume();
-      leaveArmed.current = false;
-      return;
-    }
     leaveArmed.current = false;
-    switch (role) {
-      case 'primary':
-        if (snap.phase === 'idle' || snap.phase === 'finished') timer.startTimer();
-        else timer.toggle();
+    const action = transportPress(role, { running: snap.running, phase: snap.phase });
+    switch (action) {
+      case 'pause':
+        pauseOnResume();
         return;
-      case 'stop':
+      case 'resume':
+        timer.toggle();
+        setPreferPrimary(true);
+        return;
+      case 'start':
+        timer.startTimer();
+        return;
+      case 'finish':
         timer.completeTimer();
+        setPreferPrimary(true);
         return;
-      case 'reset':
-        timer.resetTimer();
-        closeConfirm();
+      case 'ask-reset':
+        askReset();
         return;
       default: {
-        const unexpected: never = role;
+        const unexpected: never = action;
         return unexpected;
       }
     }
@@ -431,8 +469,17 @@ export default function TimerScreen() {
             setPrimaryNode((current) => (current === node ? current : node));
           }}
           focusable={confirmKind === null}
-          hasTVPreferredFocus={preferPrimary && confirmKind === null && button.role === 'primary'}
-          onFocus={button.role === 'primary' ? () => setPreferPrimary(false) : undefined}
+          hasTVPreferredFocus={
+            confirmKind === null &&
+            (button.role === 'primary' ? preferPrimary : button.role === 'reset' ? preferReset : false)
+          }
+          onFocus={
+            button.role === 'primary'
+              ? () => setPreferPrimary(false)
+              : button.role === 'reset'
+                ? () => setPreferReset(false)
+                : undefined
+          }
           focusLeft={tagFor(transportNeighbor(transportRoles, button.role, -1))}
           focusRight={
             showWatch && button.role === transportRoles[transportRoles.length - 1]
@@ -724,31 +771,28 @@ export default function TimerScreen() {
         </View>
         {confirmKind === 'reset' ? (
           <View style={[styles.confirm, tv ? styles.confirmTv : null]} testID="reset-confirm">
-            <Text style={styles.confirmTitle}>Reset this timer?</Text>
+            <Text style={styles.confirmTitle}>{RESET_CONFIRM.title}</Text>
             <BigButton
-              label="Reset"
+              label={RESET_CONFIRM.no}
               color={digits}
-              onPress={() => {
-                timer.resetTimer();
-                closeConfirm();
-              }}
-              testID="confirm-reset"
-              onHost={tv ? onConfirmResetHost : undefined}
-              focusDown={tv ? confirmCancelTag : null}
-              focusUp={tv ? confirmResetTag : null}
+              variant="ghost"
+              onPress={declineReset}
+              testID="confirm-reset-no"
+              hasTVPreferredFocus={tv ? preferDialog && RESET_CONFIRM.initialFocus === 'no' : undefined}
+              onFocus={tv ? () => setPreferDialog(false) : undefined}
+              onHost={tv ? onConfirmCancelHost : undefined}
+              focusDown={tv ? confirmResetTag : null}
+              focusUp={tv ? confirmCancelTag : null}
               focusable={tv ? true : undefined}
             />
             <BigButton
-              label="Cancel"
+              label={RESET_CONFIRM.yes}
               color={digits}
-              variant="ghost"
-              onPress={closeConfirm}
-              testID="confirm-cancel"
-              hasTVPreferredFocus={tv ? preferDialog : undefined}
-              onFocus={tv ? () => setPreferDialog(false) : undefined}
-              onHost={tv ? onConfirmCancelHost : undefined}
-              focusUp={tv ? confirmResetTag : null}
-              focusDown={tv ? confirmCancelTag : null}
+              onPress={acceptReset}
+              testID="confirm-reset-yes"
+              onHost={tv ? onConfirmResetHost : undefined}
+              focusUp={tv ? confirmCancelTag : null}
+              focusDown={tv ? confirmResetTag : null}
               focusable={tv ? true : undefined}
             />
           </View>
@@ -765,20 +809,21 @@ export default function TimerScreen() {
             },
           ]}
         >
-          {timer.snapshot.phase === 'idle' || timer.snapshot.phase === 'finished' ? (
-            <BigButton
-              label={timer.snapshot.phase === 'finished' ? 'Go again' : 'Start'}
-              color={digits}
-              onPress={timer.startTimer}
-              testID="timer-start"
-            />
-          ) : null}
-          {timer.snapshot.running && config.mode === 'forTime' && timer.snapshot.phase === 'work' ? (
-            <BigButton label="Stop" color={digits} variant="ghost" onPress={timer.completeTimer} testID="timer-stop" />
-          ) : null}
-          {timer.snapshot.phase !== 'idle' ? (
-            <BigButton label="Reset" color={digits} variant="ghost" onPress={timer.resetTimer} testID="timer-reset" />
-          ) : null}
+          {transport.map((button) => {
+            if (button.role === 'primary' && timer.snapshot.phase !== 'idle' && timer.snapshot.phase !== 'finished') {
+              return null;
+            }
+            return (
+              <BigButton
+                key={button.role}
+                label={button.label}
+                color={digits}
+                variant={button.variant}
+                onPress={() => pressTransport(button.role)}
+                testID={button.testID}
+              />
+            );
+          })}
         </View>
         ) : null}
       </Overlay>

@@ -1,15 +1,17 @@
-import { COUNTDOWN_MAX_SECONDS, sanitizeWarningMarks } from './countdown';
+import { COUNTDOWN_MAX_SECONDS, FINAL_BEEP_SECONDS, sanitizeWarningMarks } from './countdown';
 import type {
   Cue,
+  CueScheduleOptions,
   EngineState,
   Segment,
   SoundName,
   TimedCue,
   TimerConfig,
   TimerSnapshot,
+  VoiceCount,
 } from './types';
 
-export type { Cue, EngineState, Segment, SoundName, TimedCue, TimerConfig, TimerSnapshot };
+export type { Cue, CueScheduleOptions, EngineState, Segment, SoundName, TimedCue, TimerConfig, TimerSnapshot };
 export type { Phase, TimerMode } from './types';
 
 const MAX_ROUNDS = 99;
@@ -145,8 +147,29 @@ export function elapsedMs(state: EngineState, nowMs: number): number {
   return state.elapsedBeforeRunMs + Math.max(0, nowMs - started);
 }
 
-export function cueTimeline(state: EngineState): TimedCue[] {
+function isFinalCount(remainingMs: number): boolean {
+  return FINAL_BEEP_SECONDS.some((seconds) => seconds * 1000 === remainingMs);
+}
+
+/**
+ * Speak a count only when the segment is longer than that many seconds.
+ * The opening instant belongs to the horn that started the segment, so a
+ * 3 second rest says "two" and "one" and a 2 second rest says "one".
+ */
+function appendVoiceCounts(cues: TimedCue[], cursor: number, durationMs: number): void {
+  if (!Number.isFinite(durationMs)) return;
+  for (const seconds of FINAL_BEEP_SECONDS) {
+    const remainingMs = seconds * 1000;
+    if (remainingMs >= durationMs) continue;
+    const atElapsedMs = cursor + durationMs - remainingMs;
+    if (atElapsedMs <= cursor) continue;
+    cues.push({ atElapsedMs, cue: { type: 'voice', count: seconds } });
+  }
+}
+
+export function cueTimeline(state: EngineState, options?: CueScheduleOptions): TimedCue[] {
   const cues: TimedCue[] = [];
+  const voice = options?.voiceCountdown === true;
   let cursor = 0;
 
   for (const segment of state.segments) {
@@ -155,7 +178,7 @@ export function cueTimeline(state: EngineState): TimedCue[] {
       cue: { type: 'phase', phase: segment.phase, round: segment.round },
     });
 
-    if (segment.phase === 'leadIn') {
+    if (segment.phase === 'leadIn' && !voice) {
       for (const remainingMs of [3000, 2000, 1000]) {
         if (remainingMs >= segment.durationMs) continue;
         const atElapsedMs = cursor + segment.durationMs - remainingMs;
@@ -165,6 +188,8 @@ export function cueTimeline(state: EngineState): TimedCue[] {
       }
     }
 
+    if (voice) appendVoiceCounts(cues, cursor, segment.durationMs);
+
     if (segment.warningOffsetMs != null && Number.isFinite(segment.durationMs)) {
       cues.push({
         atElapsedMs: cursor + segment.warningOffsetMs,
@@ -173,6 +198,7 @@ export function cueTimeline(state: EngineState): TimedCue[] {
     }
 
     for (const extra of segment.extraCues ?? []) {
+      if (voice && extra.kind === 'tick' && isFinalCount(extra.remainingMs)) continue;
       const atElapsedMs = cursor + extra.offsetMs;
       if (extra.kind === 'tick') {
         cues.push({ atElapsedMs, cue: { type: 'tick', remainingMs: extra.remainingMs } });
@@ -201,10 +227,15 @@ export function cueTimeline(state: EngineState): TimedCue[] {
 }
 
 /** Cues with timestamps in (fromExclusiveMs, toInclusiveMs]. */
-export function cuesBetween(state: EngineState, fromExclusiveMs: number, toInclusiveMs: number): Cue[] {
+export function cuesBetween(
+  state: EngineState,
+  fromExclusiveMs: number,
+  toInclusiveMs: number,
+  options?: CueScheduleOptions,
+): Cue[] {
   if (!(toInclusiveMs > fromExclusiveMs)) return [];
   const cues: Cue[] = [];
-  for (const timed of cueTimeline(state)) {
+  for (const timed of cueTimeline(state, options)) {
     if (timed.atElapsedMs > fromExclusiveMs && timed.atElapsedMs <= toInclusiveMs) {
       cues.push(timed.cue);
     }
@@ -442,6 +473,21 @@ export function reconcile(state: EngineState, nowMs: number): EngineState {
  * A round ending into rest is one bell. Back-to-back work (EMOM) is one start beep.
  * The final horn replaces the last round-end bell.
  */
+function soundForVoice(count: VoiceCount): SoundName {
+  switch (count) {
+    case 3:
+      return 'three';
+    case 2:
+      return 'two';
+    case 1:
+      return 'one';
+    default: {
+      const unexpected: never = count;
+      return unexpected;
+    }
+  }
+}
+
 export function soundsForCues(cues: Cue[]): SoundName[] {
   if (cues.length === 0) return [];
   const hasFinished = cues.some((cue) => cue.type === 'finished');
@@ -451,9 +497,16 @@ export function soundsForCues(cues: Cue[]): SoundName[] {
   const hasWork = cues.some((cue) => cue.type === 'phase' && cue.phase === 'work');
   const hasRest = cues.some((cue) => cue.type === 'phase' && cue.phase === 'rest');
   const hasRoundEnd = cues.some((cue) => cue.type === 'roundEnd');
+  const voiceCounts = new Set<VoiceCount>();
+  for (const cue of cues) {
+    if (cue.type === 'voice') voiceCounts.add(cue.count);
+  }
 
   const sounds: SoundName[] = [];
   if (hasLead || hasTick) sounds.push('tick');
+  for (const count of FINAL_BEEP_SECONDS) {
+    if (voiceCounts.has(count)) sounds.push(soundForVoice(count));
+  }
   if (hasWarning) sounds.push('warning');
   if (hasFinished) {
     sounds.push('bell');

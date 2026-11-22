@@ -73,7 +73,8 @@ describe('remote key mapping', () => {
     expect(mapRemoteEvent('up', shown)).toEqual({ type: 'ignore' });
     expect(mapRemoteEvent('back', tv)).toEqual({ type: 'menu' });
     expect(mapRemoteEvent('menu', tv)).toEqual({ type: 'menu' });
-    expect(mapRemoteEvent('select', tv)).toEqual({ type: 'pause', focusResume: true });
+    expect(mapRemoteEvent('select', tv)).toEqual({ type: 'ignore' });
+    expect(mapRemoteEvent('select', { ...hidden, running: true })).toEqual({ type: 'pause', focusResume: true });
     expect(mapRemoteEvent('playPause', tv)).toEqual({ type: 'toggle' });
     expect(mapRemoteEvent('back', tvStopped)).toEqual({ type: 'menu' });
     expect(mapRemoteEvent('menu', tvStopped)).toEqual({ type: 'menu' });

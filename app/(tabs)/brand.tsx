@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
+import { usePreferences } from '@/src/preferences/PreferencesProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { TvSettings } from '@/src/components/TvSettings';
 import { prepareLogo } from '@/src/branding/logo';
@@ -41,6 +42,7 @@ const PLACEMENTS: { id: LogoPlacement; label: string }[] = [
 
 export default function BrandScreen() {
   const { branding, update, reset } = useBranding();
+  const { preferences, update: updatePreferences } = usePreferences();
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
   const digits = readableDigitColor(branding.digitColor, branding.backgroundColor);
   const [frame, setFrame] = useState({ width: 0, height: 0 });
@@ -106,7 +108,16 @@ export default function BrandScreen() {
   };
 
   if (tv) {
-    return <TvSettings branding={branding} accent={accent} update={update} reset={reset} />;
+    return (
+      <TvSettings
+        branding={branding}
+        accent={accent}
+        update={update}
+        reset={reset}
+        voiceCountdown={preferences.voiceCountdown}
+        onVoiceCountdown={(voiceCountdown) => void updatePreferences({ voiceCountdown })}
+      />
+    );
   }
 
   return (
@@ -122,6 +133,24 @@ export default function BrandScreen() {
         <Text style={[styles.lede, tv && styles.ledeTv]}>
           Your gym name, colors, and logo stay on this device. The timer reads them on every screen.
         </Text>
+
+        <Text style={labelStyle}>Sound</Text>
+        <View style={styles.switchRow}>
+          <View style={styles.switchCopy}>
+            <Text style={styles.voiceLabel}>Voice countdown</Text>
+            <Text style={styles.help}>
+              Says three, two, one before a round, a rest, or get ready ends. Off leaves the beeps.
+            </Text>
+          </View>
+          <Switch
+            testID="voice-countdown"
+            accessibilityLabel="Voice countdown"
+            value={preferences.voiceCountdown}
+            onValueChange={(voiceCountdown) => void updatePreferences({ voiceCountdown })}
+            trackColor={{ false: '#2A3140', true: accent }}
+            thumbColor={chrome.text}
+          />
+        </View>
 
         <View
           testID="brand-preview"
@@ -503,9 +532,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
+  switchCopy: {
+    flex: 1,
+    gap: 4,
+  },
   switchLabel: {
     color: chrome.text,
     flex: 1,
+  },
+  voiceLabel: {
+    color: chrome.text,
+    fontFamily: 'OswaldMedium',
+    fontSize: 16,
   },
   reset: {
     marginTop: 8,

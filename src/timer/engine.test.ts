@@ -18,7 +18,7 @@ import {
   totalDurationMs,
 } from './engine';
 import { notificationPlan, selectUpcoming } from './notificationPlan';
-import type { Cue, TimerConfig } from './types';
+import type { Cue, CueScheduleOptions, TimerConfig } from './types';
 
 function roundsConfig(overrides: Partial<TimerConfig> = {}): TimerConfig {
   return normalizeConfig({
@@ -32,18 +32,24 @@ function roundsConfig(overrides: Partial<TimerConfig> = {}): TimerConfig {
   });
 }
 
-function cuesWhileRunning(config: TimerConfig, stepMs = 100): Cue[] {
+function cuesWhileRunning(config: TimerConfig, stepMs = 100, options?: CueScheduleOptions): Cue[] {
   const state = start(createInitial(config), 0);
   const total = totalDurationMs(state.segments);
   const seen: Cue[] = [];
   let last = -1;
   const end = Number.isFinite(total) ? total : 5 * 60 * 1000;
   for (let elapsed = 0; elapsed <= end; elapsed += stepMs) {
-    seen.push(...cuesBetween(state, last, elapsed));
+    seen.push(...cuesBetween(state, last, elapsed, options));
     last = elapsed;
   }
-  if (last < end) seen.push(...cuesBetween(state, last, end));
+  if (last < end) seen.push(...cuesBetween(state, last, end, options));
   return seen;
+}
+
+const voiceOn: CueScheduleOptions = { voiceCountdown: true };
+
+function voiceCounts(cues: Cue[]): number[] {
+  return cues.flatMap((cue) => (cue.type === 'voice' ? [cue.count] : []));
 }
 
 describe('normalizeConfig', () => {
@@ -432,5 +438,129 @@ describe('countdown duration edits', () => {
     expect(addCountdownSeconds(10, 5 * 60)).toBe(310);
     expect(addCountdownSeconds(2, -30)).toBe(1);
     expect(splitDuration(joinDuration(1, 2, 3))).toEqual({ hours: 1, minutes: 2, seconds: 3 });
+  });
+});
+
+describe('voice countdown', () => {
+  it('keeps the tick beeps when voice is off', () => {
+    const countdown = {
+      mode: 'countdown' as const,
+      leadInSeconds: 10,
+      workSeconds: 30,
+      restSeconds: 0,
+      rounds: 1,
+      warningSeconds: 0,
+      warningMarksSeconds: [10, 3, 2, 1],
+    };
+    const seen = cuesWhileRunning(countdown);
+    expect(seen.some((cue) => cue.type === 'voice')).toBe(false);
+    expect(seen.filter((cue) => cue.type === 'tick')).toEqual([
+      { type: 'tick', remainingMs: 3000 },
+      { type: 'tick', remainingMs: 2000 },
+      { type: 'tick', remainingMs: 1000 },
+      { type: 'tick', remainingMs: 3000 },
+      { type: 'tick', remainingMs: 2000 },
+      { type: 'tick', remainingMs: 1000 },
+    ]);
+  });
+
+  it('speaks through get ready and still starts on the horn', () => {
+    const state = createInitial(roundsConfig({ leadInSeconds: 10, workSeconds: 30, restSeconds: 0, rounds: 1, warningSeconds: 0 }));
+    expect(soundsForCues(cuesBetween(state, -1, 0, voiceOn))).toEqual(['tick']);
+    expect(voiceCounts(cuesBetween(state, 0, 10_000, voiceOn))).toEqual([3, 2, 1]);
+    expect(cuesBetween(state, 0, 10_000, voiceOn).some((cue) => cue.type === 'tick')).toBe(false);
+    expect(soundsForCues(cuesBetween(state, 6_000, 7_000, voiceOn))).toEqual(['three']);
+    expect(soundsForCues(cuesBetween(state, 9_000, 10_000, voiceOn))).toEqual(['start']);
+  });
+
+  it('speaks at the end of work and the end of rest', () => {
+    const state = createInitial(roundsConfig({ leadInSeconds: 0, workSeconds: 20, restSeconds: 10, rounds: 2, warningSeconds: 0 }));
+    expect(voiceCounts(cuesBetween(state, 0, 20_000, voiceOn))).toEqual([3, 2, 1]);
+    expect(soundsForCues(cuesBetween(state, 19_000, 20_000, voiceOn))).toEqual(['bell']);
+    expect(voiceCounts(cuesBetween(state, 20_000, 30_000, voiceOn))).toEqual([3, 2, 1]);
+    expect(soundsForCues(cuesBetween(state, 29_000, 30_000, voiceOn))).toEqual(['start']);
+    expect(cuesBetween(state, 0, 30_000, voiceOn).some((cue) => cue.type === 'tick')).toBe(false);
+  });
+
+  it('speaks before an EMOM boundary and keeps the single start beep', () => {
+    const state = createInitial({
+      mode: 'emom',
+      leadInSeconds: 0,
+      workSeconds: 60,
+      restSeconds: 0,
+      rounds: 2,
+      warningSeconds: 0,
+    });
+    expect(voiceCounts(cuesBetween(state, 50_000, 60_000, voiceOn))).toEqual([3, 2, 1]);
+    expect(soundsForCues(cuesBetween(state, 59_000, 60_000, voiceOn))).toEqual(['start']);
+    expect(voiceCounts(cuesBetween(state, 110_000, 120_000, voiceOn))).toEqual([3, 2, 1]);
+    expect(soundsForCues(cuesBetween(state, 119_000, 120_000, voiceOn))).toEqual(['bell']);
+  });
+
+  it('replaces the last three countdown ticks and keeps the earlier warning horns', () => {
+    const countdown = {
+      mode: 'countdown' as const,
+      leadInSeconds: 0,
+      workSeconds: 90,
+      restSeconds: 0,
+      rounds: 1,
+      warningSeconds: 0,
+      warningMarksSeconds: [60, 30, 10, 3, 2, 1],
+    };
+    const seen = cuesWhileRunning(countdown, 100, voiceOn);
+    expect(seen.filter((cue) => cue.type === 'warning')).toHaveLength(3);
+    expect(seen.filter((cue) => cue.type === 'tick')).toEqual([]);
+    expect(voiceCounts(seen)).toEqual([3, 2, 1]);
+    const state = createInitial(countdown);
+    expect(soundsForCues(cuesBetween(state, 79_999, 80_000, voiceOn))).toEqual(['warning']);
+    expect(soundsForCues(cuesBetween(state, 89_000, 90_000, voiceOn))).toEqual(['bell']);
+    const plan = notificationPlan(state, 'Gym', voiceOn);
+    expect(plan.find((item) => item.sound === 'three')).toMatchObject({ title: 'Three' });
+    expect(plan.some((item) => item.sound === 'warning')).toBe(true);
+    expect(plan.at(-1)?.sound).toBe('bell');
+  });
+
+  it('skips a count the segment is too short to hold', () => {
+    const state = createInitial(roundsConfig({
+      leadInSeconds: 2,
+      workSeconds: 3,
+      restSeconds: 2,
+      rounds: 2,
+      warningSeconds: 0,
+    }));
+    expect(voiceCounts(cuesBetween(state, 0, 2_000, voiceOn))).toEqual([1]);
+    expect(voiceCounts(cuesBetween(state, 2_000, 5_000, voiceOn))).toEqual([2, 1]);
+    expect(voiceCounts(cuesBetween(state, 5_000, 7_000, voiceOn))).toEqual([1]);
+    const longer = createInitial(roundsConfig({ leadInSeconds: 0, workSeconds: 4, restSeconds: 0, rounds: 1, warningSeconds: 0 }));
+    expect(voiceCounts(cuesBetween(longer, 0, 4_000, voiceOn))).toEqual([3, 2, 1]);
+  });
+
+  it('says nothing while paused and speaks the counts still ahead after resume or skip', () => {
+    let state = start(createInitial(roundsConfig({
+      leadInSeconds: 0,
+      workSeconds: 20,
+      restSeconds: 0,
+      rounds: 1,
+      warningSeconds: 0,
+    })), 0);
+    state = pause(state, 16_000);
+    expect(cuesBetween(state, 16_000, 16_000, voiceOn)).toEqual([]);
+    state = start(state, 90_000);
+    expect(voiceCounts(cuesBetween(state, 16_000, 17_000, voiceOn))).toEqual([3]);
+    expect(voiceCounts(cuesBetween(state, 18_200, 20_000, voiceOn))).toEqual([1]);
+    expect(soundsForCues(cuesBetween(state, 19_000, 20_000, voiceOn))).toEqual(['bell']);
+  });
+
+  it('does not speak at the end of an uncapped For Time', () => {
+    const state = createInitial({
+      mode: 'forTime',
+      leadInSeconds: 5,
+      workSeconds: 0,
+      restSeconds: 0,
+      rounds: 1,
+      warningSeconds: 0,
+    });
+    expect(voiceCounts(cuesBetween(state, 0, 5_000, voiceOn))).toEqual([3, 2, 1]);
+    expect(cuesBetween(state, 5_000, 60_000, voiceOn).some((cue) => cue.type === 'voice')).toBe(false);
   });
 });
