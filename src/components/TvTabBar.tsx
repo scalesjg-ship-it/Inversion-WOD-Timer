@@ -8,13 +8,13 @@ import { TvFocusPressable } from '@/src/components/TvFocus';
 import { useTvTabFocus } from '@/src/components/TvTabFocus';
 import { chrome } from '@/src/theme/chrome';
 import { tabBarControlSize } from '@/src/tv/controls';
-import { tvDirectionalProps, tvTabIndex, tvTabLink } from '@/src/tv/tabFocus';
+import { TV_TAB_ROUTES, tvDirectionalProps, tvTabIndex, tvTabLink } from '@/src/tv/tabFocus';
 
-const TABS: { href: Href; title: string; testID: string }[] = [
-  { href: '/', title: 'WOD', testID: 'tab-wod' },
-  { href: '/rounds', title: 'Rounds', testID: 'tab-rounds' },
-  { href: '/brand', title: 'Brand', testID: 'tab-brand' },
-];
+const TABS: { href: Href; title: string; testID: string }[] = TV_TAB_ROUTES.map((tab) => ({
+  href: tab.path as Href,
+  title: tab.title,
+  testID: tab.testID,
+}));
 
 /** react-native-web has no focus guide. Television builds export the real one. */
 const TabGuide = TVFocusGuideView ?? View;

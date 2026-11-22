@@ -62,19 +62,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="rounds"
-        options={{
-          title: 'Rounds',
-          tabBarButtonTestID: 'tab-rounds',
-          tabBarIcon: ({ color }) => <TabMark color={color} label="R" />,
-        }}
-      />
-      <Tabs.Screen
         name="brand"
         options={{
           title: 'Brand',
           tabBarButtonTestID: 'tab-brand',
           tabBarIcon: ({ color }) => <TabMark color={color} label="B" />,
+        }}
+      />
+      <Tabs.Screen
+        name="help"
+        options={{
+          title: 'Help',
+          tabBarButtonTestID: 'tab-help',
+          tabBarIcon: ({ color }) => <TabMark color={color} label="H" />,
         }}
       />
     </Tabs>

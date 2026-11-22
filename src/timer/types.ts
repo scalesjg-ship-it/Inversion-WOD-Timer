@@ -1,4 +1,4 @@
-export type TimerMode = 'forTime' | 'amrap' | 'emom' | 'tabata' | 'intervals' | 'rounds' | 'countdown';
+export type TimerMode = 'forTime' | 'amrap' | 'emom' | 'intervals' | 'countdown';
 
 export type Phase = 'idle' | 'leadIn' | 'work' | 'rest' | 'finished';
 

@@ -18,7 +18,14 @@ describe('withAppleWatch', () => {
     expect(plugin.isTvBuild({})).toBe(false);
     const services = plugin.tvApplicationServices();
     expect(services.Browses[0].NSApplicationServiceIdentifier).toBe('Americana-Timer');
+    expect(services.Browses[0].NSApplicationServiceUsageDescription.length).toBeGreaterThan(20);
     expect(services.Browses[0].NSApplicationServicePlatformSupport).toEqual(['watchOS']);
+    expect(Object.keys(services)).toEqual(['Browses']);
+    expect(Object.keys(services.Browses[0]).sort()).toEqual([
+      'NSApplicationServiceIdentifier',
+      'NSApplicationServicePlatformSupport',
+      'NSApplicationServiceUsageDescription',
+    ]);
     expect(JSON.stringify(services)).not.toContain('NSBonjourServices');
     expect(JSON.stringify(services)).not.toMatch(/heart|HealthKit/i);
   });

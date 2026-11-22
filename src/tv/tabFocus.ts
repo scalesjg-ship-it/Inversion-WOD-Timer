@@ -66,12 +66,17 @@ export function tvTabLink(index: number, count: number): TvTabLink {
   };
 }
 
-/** WOD, Rounds, Brand. Any other path is the WOD tab. */
+/** WOD, Brand, Help. Any other path is the WOD tab. */
+export const TV_TAB_ROUTES = [
+  { path: '/', title: 'WOD', testID: 'tab-wod' },
+  { path: '/brand', title: 'Settings', testID: 'tab-settings' },
+  { path: '/help', title: 'Help', testID: 'tab-help' },
+] as const;
+
 export function tvTabIndex(pathname: string): number {
   const path = pathname.split('?')[0].replace(/\/+$/, '') || '/';
-  if (path === '/rounds' || path.endsWith('/rounds')) return 1;
-  if (path === '/brand' || path.endsWith('/brand')) return 2;
-  return 0;
+  const index = TV_TAB_ROUTES.findIndex((tab) => tab.path !== '/' && (path === tab.path || path.endsWith(tab.path)));
+  return index < 0 ? 0 : index;
 }
 
 /**

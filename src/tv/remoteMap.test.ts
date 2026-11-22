@@ -10,7 +10,7 @@ const hidden: RemoteContext = {
   running: false,
 };
 const rounds: RemoteContext = {
-  mode: 'rounds',
+  mode: 'intervals',
   controlsVisible: false,
   confirmOpen: false,
   stableControls: false,
@@ -60,9 +60,9 @@ describe('remote key mapping', () => {
     expect(mapRemoteEvent('swipeRight', { ...hidden, mode: 'forTime' })).toEqual({ type: 'seek', seconds: 10 });
   });
 
-  it('steps rounds for rounds, intervals, and tabata', () => {
+  it('steps rounds on an intervals clock and seeks on EMOM', () => {
     expect(mapRemoteEvent('left', rounds)).toEqual({ type: 'stepRound', direction: -1 });
-    expect(mapRemoteEvent('fastForward', { ...rounds, mode: 'tabata' })).toEqual({ type: 'stepRound', direction: 1 });
+    expect(mapRemoteEvent('fastForward', rounds)).toEqual({ type: 'stepRound', direction: 1 });
     expect(mapRemoteEvent('rewind', { ...rounds, mode: 'intervals' })).toEqual({ type: 'stepRound', direction: -1 });
     expect(mapRemoteEvent('right', { ...rounds, mode: 'emom' })).toEqual({ type: 'seek', seconds: 10 });
   });

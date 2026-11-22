@@ -7,8 +7,6 @@ function tabName(): string {
 
 export function usePathname(): string {
   const tab = tabName();
-  // rounds-confirm is the same Rounds route as rounds. The preview only adds the delete confirm.
-  if (tab === 'rounds' || tab === 'rounds-confirm') return '/rounds';
   if (tab === 'brand') return '/brand';
   return '/';
 }

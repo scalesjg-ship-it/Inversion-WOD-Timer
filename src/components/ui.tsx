@@ -9,6 +9,7 @@ import { useTvFocusTag } from '@/src/tv/useTvFocusTag';
 import { chrome } from '@/src/theme/chrome';
 import { stepperControlSize, tvSetupScale } from '@/src/tv/controls';
 import { fitTvStyle, scaleTvStyle, tvScale } from '@/src/tv/layout';
+import type { TvTransportButtonMetrics } from '@/src/tv/timerFrame';
 import { showsOnScreenBack } from '@/src/tv/timerTransport';
 import { stepperFocus, tvSetupMetrics, type StepperLinks } from '@/src/tv/setupLayout';
 
@@ -28,6 +29,7 @@ export function BigButton({
   focusable,
   roomy = false,
   fill = false,
+  tvMetrics,
 }: {
   label: string;
   onPress: () => void;
@@ -47,6 +49,8 @@ export function BigButton({
   roomy?: boolean;
   /** TV only. Stretch across the row so Down from the left edge can land here. */
   fill?: boolean;
+  /** Apple TV timer row. Already scaled. Keeps the row on screen when Watch is included. */
+  tvMetrics?: TvTransportButtonMetrics;
 }) {
   const solid = variant === 'solid';
   const tv = Platform.isTV === true;
@@ -54,17 +58,29 @@ export function BigButton({
   const scale = tv ? tvScale(width, height) : 1;
   const ink = solid ? inkOn(color) : color;
   const grown = tvSetupScale(height);
-  const tvButton = roomy
+  const tvButton = tvMetrics
     ? {
-        minHeight: Math.round(72 * grown),
-        borderRadius: Math.round(18 * grown),
-        paddingHorizontal: Math.round(36 * grown),
-        minWidth: Math.round(240 * grown),
+        minHeight: tvMetrics.minHeight,
+        borderRadius: tvMetrics.radius,
+        paddingHorizontal: tvMetrics.padX,
+        minWidth: tvMetrics.minWidth,
+        width: tvMetrics.minWidth,
+        flexGrow: 0,
+        flexShrink: 0,
       }
-    : { minHeight: 72, borderRadius: 18, paddingHorizontal: 36, minWidth: 240 };
-  const tvLabel = roomy
-    ? { fontSize: Math.round(32 * grown), letterSpacing: 1.4 }
-    : { fontSize: 32, letterSpacing: 1.2 };
+    : roomy
+      ? {
+          minHeight: Math.round(72 * grown),
+          borderRadius: Math.round(18 * grown),
+          paddingHorizontal: Math.round(36 * grown),
+          minWidth: Math.round(240 * grown),
+        }
+      : { minHeight: 72, borderRadius: 18, paddingHorizontal: 36, minWidth: 240 };
+  const tvLabel = tvMetrics
+    ? { fontSize: tvMetrics.fontSize, letterSpacing: tvMetrics.letterSpacing }
+    : roomy
+      ? { fontSize: Math.round(32 * grown), letterSpacing: 1.4 }
+      : { fontSize: 32, letterSpacing: 1.2 };
   return (
     <TvFocusPressable
       accent={ink}
@@ -82,7 +98,7 @@ export function BigButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.big,
-        tv && scaleTvStyle(tvButton, scale),
+        tv && scaleTvStyle(tvButton, tvMetrics ? 1 : scale),
         tv && (fill ? { alignSelf: 'stretch', width: '100%' } : { alignSelf: 'center', maxWidth: '100%' }),
         solid
           ? { backgroundColor: color }
@@ -91,10 +107,13 @@ export function BigButton({
       ]}
     >
       <Text
+        numberOfLines={tvMetrics ? 1 : undefined}
+        adjustsFontSizeToFit={tvMetrics ? true : undefined}
+        minimumFontScale={tvMetrics ? 0.6 : undefined}
         style={[
           styles.bigLabel,
           { backgroundColor: 'transparent' },
-          tv && scaleTvStyle(tvLabel, scale),
+          tv && scaleTvStyle(tvLabel, tvMetrics ? 1 : scale),
           { color: ink },
         ]}
       >

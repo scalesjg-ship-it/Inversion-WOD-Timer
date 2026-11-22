@@ -2,65 +2,70 @@ import { FINAL_BEEP_SECONDS, WARNING_MARK_CHOICES } from './countdown';
 import { normalizeConfig } from './engine';
 import type { TimerConfig, TimerMode } from './types';
 
-export interface RoundPreset {
+/** One-tap setups on the Intervals clock. Tabata and the martial-arts rounds live here. */
+export interface IntervalPreset {
   id: string;
   name: string;
-  roundSeconds: number;
+  workSeconds: number;
   restSeconds: number;
   rounds: number;
   warningSeconds: number;
   leadInSeconds: number;
-  builtIn: boolean;
 }
 
-export const BUILTIN_PRESETS: RoundPreset[] = [
+export const INTERVAL_PRESETS: IntervalPreset[] = [
+  {
+    id: 'tabata',
+    name: 'Tabata',
+    workSeconds: 20,
+    restSeconds: 10,
+    rounds: 8,
+    warningSeconds: 0,
+    leadInSeconds: 10,
+  },
   {
     id: 'bjj',
     name: 'BJJ roll',
-    roundSeconds: 5 * 60,
+    workSeconds: 5 * 60,
     restSeconds: 60,
     rounds: 5,
     warningSeconds: 30,
     leadInSeconds: 10,
-    builtIn: true,
   },
   {
     id: 'boxing',
     name: 'Boxing',
-    roundSeconds: 3 * 60,
+    workSeconds: 3 * 60,
     restSeconds: 60,
     rounds: 3,
     warningSeconds: 10,
     leadInSeconds: 10,
-    builtIn: true,
   },
   {
     id: 'mma',
     name: 'MMA',
-    roundSeconds: 5 * 60,
+    workSeconds: 5 * 60,
     restSeconds: 60,
     rounds: 3,
     warningSeconds: 10,
     leadInSeconds: 10,
-    builtIn: true,
   },
   {
     id: 'muay-thai',
     name: 'Muay Thai',
-    roundSeconds: 3 * 60,
+    workSeconds: 3 * 60,
     restSeconds: 60,
     rounds: 5,
     warningSeconds: 10,
     leadInSeconds: 10,
-    builtIn: true,
   },
 ];
 
-export function configFromPreset(preset: RoundPreset): TimerConfig {
+export function configFromIntervalPreset(preset: IntervalPreset): TimerConfig {
   return normalizeConfig({
-    mode: 'rounds',
+    mode: 'intervals',
     leadInSeconds: preset.leadInSeconds,
-    workSeconds: preset.roundSeconds,
+    workSeconds: preset.workSeconds,
     restSeconds: preset.restSeconds,
     rounds: preset.rounds,
     warningSeconds: preset.warningSeconds,
@@ -96,15 +101,6 @@ export function defaultConfig(mode: TimerMode): TimerConfig {
         rounds: 10,
         warningSeconds: 0,
       });
-    case 'tabata':
-      return normalizeConfig({
-        mode,
-        leadInSeconds: 10,
-        workSeconds: 20,
-        restSeconds: 10,
-        rounds: 8,
-        warningSeconds: 0,
-      });
     case 'intervals':
       return normalizeConfig({
         mode,
@@ -114,8 +110,6 @@ export function defaultConfig(mode: TimerMode): TimerConfig {
         rounds: 8,
         warningSeconds: 0,
       });
-    case 'rounds':
-      return configFromPreset(BUILTIN_PRESETS[0]);
     case 'countdown':
       return normalizeConfig({
         mode,

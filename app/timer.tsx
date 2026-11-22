@@ -19,6 +19,7 @@ import { useTimer } from '@/src/timer/useTimer';
 import type { Phase } from '@/src/timer/types';
 import { clockStatusHint } from '@/src/tv/copy';
 import { fitClock, isTenFootLayout, scaleTvStyle, tvClockChrome, tvSafeBox, tvSafeInset, tvScale } from '@/src/tv/layout';
+import { tvAppleTimerFrame } from '@/src/tv/timerFrame';
 import { DUPLICATE_PRESS_MS, claimPress, type PressClaim } from '@/src/tv/pressClaim';
 import type { RemoteCommand } from '@/src/tv/remoteMap';
 import {
@@ -32,8 +33,9 @@ import {
 } from '@/src/tv/timerTransport';
 import { useRemoteCommands } from '@/src/tv/useRemoteCommands';
 import { useTvFocusTag } from '@/src/tv/useTvFocusTag';
-import { useWatchLink } from '@/src/watch/useWatchLink';
 import { watchLinkEnabled } from '@/src/watch/gate';
+import { watchLinkTone } from '@/src/watch/linkStatus';
+import { useWatchLink } from '@/src/watch/useWatchLink';
 
 const KEEP_AWAKE = 'americana-timer';
 const FocusGuide = TVFocusGuideView ?? View;
@@ -96,20 +98,6 @@ export default function TimerScreen() {
   const brandHeight = tv ? clockChrome.logo + (clockChrome.logo > 0 ? 8 : 0) + clockChrome.name + 16 : 0;
   const headerBlock = tv ? safe.top + brandHeight : 0;
   const faceReady = tv && faceBox.height > 0 && faceBox.width > 0;
-  const clock = fitClock({
-    text: clockText,
-    screenWidth: faceReady ? faceBox.width : width,
-    screenHeight: faceReady ? faceBox.height : height,
-    tenFoot,
-    fillFrame: tv,
-    horizontalInset: side * 2,
-    verticalInset: tv
-      ? faceReady
-        ? clockChrome.phase + 16 + 150
-        : headerBlock + safe.bottom + clockChrome.phase + 170
-      : safe.top + safe.bottom + 58 + 36 + 96 + (landscape ? 16 : 80),
-  });
-  const labelGap = tv ? 8 : 10 - Math.round(clock.fontSize * 0.22);
 
   useEffect(() => {
     if (!timer.snapshot.running) return undefined;
@@ -297,7 +285,12 @@ export default function TimerScreen() {
 
   // Wrist commands call the same start, pause, resume, and reset functions as
   // Select. leaveArmed stays clear, so hardware Back still follows backStep.
-  const { presentPicker } = useWatchLink({
+  const {
+    presentPicker,
+    message: watchMessage,
+    phase: watchPhase,
+    watchControlVisible,
+  } = useWatchLink({
     enabled: appleTv,
     snapshot: timer.snapshot,
     config,
@@ -334,6 +327,34 @@ export default function TimerScreen() {
     mode: config.mode,
   });
   const transportRoles = transport.map((button) => button.role);
+  const showWatch = appleTv && watchControlVisible;
+  const appleFrame = appleTv
+    ? tvAppleTimerFrame({
+        screenWidth: width,
+        screenHeight: height,
+        safeBottom: safe.bottom,
+        safeHorizontal: Math.max(safe.left, safe.right),
+        buttonCount: transport.length + (showWatch ? 1 : 0),
+        linkStatus: Boolean(watchMessage),
+        warning: timer.snapshot.warningActive,
+        paused: timer.snapshot.paused,
+      })
+    : null;
+  const metaReserve = appleFrame ? appleFrame.metaBlock : 150;
+  const clock = fitClock({
+    text: clockText,
+    screenWidth: faceReady ? faceBox.width : width,
+    screenHeight: faceReady ? faceBox.height : height,
+    tenFoot,
+    fillFrame: tv,
+    horizontalInset: side * 2,
+    verticalInset: tv
+      ? faceReady
+        ? clockChrome.phase + 16 + metaReserve
+        : headerBlock + (appleFrame ? appleFrame.faceBottom : safe.bottom) + clockChrome.phase + (appleFrame ? metaReserve + 20 : 170)
+      : safe.top + safe.bottom + 58 + 36 + 96 + (landscape ? 16 : 80),
+  });
+  const labelGap = tv ? 8 : 10 - Math.round(clock.fontSize * 0.22);
 
   const tagFor = (role: TransportRole) => {
     switch (role) {
@@ -393,6 +414,51 @@ export default function TimerScreen() {
     }
   };
 
+  const transportButtons = (
+    <>
+      {transport.map((button) => (
+        <BigButton
+          key={button.role}
+          label={button.label}
+          color={digits}
+          variant={button.variant}
+          testID={button.testID}
+          tvMetrics={appleFrame?.button}
+          onPress={() => pressTransport(button.role)}
+          onHost={(node) => {
+            hostFor(button.role)(node);
+            if (button.role !== 'primary') return;
+            setPrimaryNode((current) => (current === node ? current : node));
+          }}
+          focusable={confirmKind === null}
+          hasTVPreferredFocus={preferPrimary && confirmKind === null && button.role === 'primary'}
+          onFocus={button.role === 'primary' ? () => setPreferPrimary(false) : undefined}
+          focusLeft={tagFor(transportNeighbor(transportRoles, button.role, -1))}
+          focusRight={
+            showWatch && button.role === transportRoles[transportRoles.length - 1]
+              ? watchTag
+              : tagFor(transportNeighbor(transportRoles, button.role, 1))
+          }
+          focusUp={null}
+        />
+      ))}
+      {showWatch ? (
+        <BigButton
+          label="Watch"
+          color={digits}
+          variant="ghost"
+          testID="timer-watch"
+          tvMetrics={appleFrame?.button}
+          onPress={presentPicker}
+          onHost={onWatchHost}
+          focusable={confirmKind === null}
+          focusLeft={tagFor(transportRoles[transportRoles.length - 1])}
+          focusRight={watchTag}
+          focusUp={null}
+        />
+      ) : null}
+    </>
+  );
   const Overlay = tv ? FocusGuide : View;
   const phaseText = phaseLabelInk(phaseColor, branding.digitColor, branding.backgroundColor);
   const attention = readableDigitColor(chrome.gold, branding.backgroundColor);
@@ -430,7 +496,7 @@ export default function TimerScreen() {
               }
             : undefined
         }
-        style={[styles.face, tv && { top: headerBlock, bottom: safe.bottom }]}
+        style={[styles.face, tv && { top: headerBlock, bottom: appleFrame ? appleFrame.faceBottom : safe.bottom }]}
       >
         <View style={styles.clockBlock}>
           <Text
@@ -498,7 +564,54 @@ export default function TimerScreen() {
         style={[styles.overlay, { paddingTop: safe.top }]}
         {...(tv ? { autoFocus: true, destinations: primaryNode ? [primaryNode] : [] } : {})}
       >
-        {tv ? (
+        {tv && appleFrame ? (
+          <View
+            collapsable={false}
+            pointerEvents={confirmKind === null ? 'box-none' : 'none'}
+            style={[
+              styles.controlsTv,
+              {
+                flexDirection: 'column',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                gap: 0,
+                bottom: safe.bottom + 8,
+                left: appleFrame.inset,
+                right: appleFrame.inset,
+              },
+            ]}
+          >
+            {watchMessage ? (
+              <Text
+                pointerEvents="none"
+                testID="timer-watch-status"
+                numberOfLines={2}
+                style={{
+                  color: watchLinkTone(watchPhase) === 'alert' ? attention : palette.text,
+                  textAlign: 'center',
+                  fontFamily: 'Oswald',
+                  fontSize: appleFrame.linkFont,
+                  lineHeight: appleFrame.linkLine,
+                  marginBottom: appleFrame.linkGap,
+                  alignSelf: 'stretch',
+                }}
+              >
+                {watchMessage}
+              </Text>
+            ) : null}
+            <View
+              style={{
+                alignSelf: 'stretch',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: appleFrame.button.gap,
+              }}
+            >
+              {transportButtons}
+            </View>
+          </View>
+        ) : tv ? (
           <View
             collapsable={false}
             pointerEvents={confirmKind === null ? 'box-none' : 'none'}
@@ -511,45 +624,7 @@ export default function TimerScreen() {
               },
             ]}
           >
-            {transport.map((button) => (
-              <BigButton
-                key={button.role}
-                label={button.label}
-                color={digits}
-                variant={button.variant}
-                testID={button.testID}
-                onPress={() => pressTransport(button.role)}
-                onHost={(node) => {
-                  hostFor(button.role)(node);
-                  if (button.role !== 'primary') return;
-                  setPrimaryNode((current) => (current === node ? current : node));
-                }}
-                focusable={confirmKind === null}
-                hasTVPreferredFocus={preferPrimary && confirmKind === null && button.role === 'primary'}
-                onFocus={button.role === 'primary' ? () => setPreferPrimary(false) : undefined}
-                focusLeft={tagFor(transportNeighbor(transportRoles, button.role, -1))}
-                focusRight={
-                  appleTv && button.role === transportRoles[transportRoles.length - 1]
-                    ? watchTag
-                    : tagFor(transportNeighbor(transportRoles, button.role, 1))
-                }
-                focusUp={null}
-              />
-            ))}
-            {appleTv ? (
-              <BigButton
-                label="Watch"
-                color={digits}
-                variant="ghost"
-                testID="timer-watch"
-                onPress={presentPicker}
-                onHost={onWatchHost}
-                focusable={confirmKind === null}
-                focusLeft={tagFor(transportRoles[transportRoles.length - 1])}
-                focusRight={watchTag}
-                focusUp={null}
-              />
-            ) : null}
+            {transportButtons}
           </View>
         ) : null}
         <View style={[styles.top, tv ? { height: brandHeight } : null]} pointerEvents="box-none">

@@ -42,6 +42,20 @@ def profile(**overrides):
     return base
 
 
+def watch_browse():
+    return {
+        "NSApplicationServices": {
+            "Browses": [
+                {
+                    "NSApplicationServiceIdentifier": "Americana-Timer",
+                    "NSApplicationServiceUsageDescription": "Finds the Apple Watch on this Wi-Fi.",
+                    "NSApplicationServicePlatformSupport": ["watchOS"],
+                }
+            ]
+        }
+    }
+
+
 def expect_fail(testcase, message_part, function):
     with testcase.assertRaises(SystemExit) as caught:
         function()
@@ -265,7 +279,7 @@ class PrebuildTests(unittest.TestCase):
             app.mkdir()
             with (app / "Info.plist").open("wb") as handle:
                 plistlib.dump(
-                    {"CFBundleVersion": "24", "CFBundleShortVersionString": "1.0.0"},
+                    {"CFBundleVersion": "24", "CFBundleShortVersionString": "1.0.0", **watch_browse()},
                     handle,
                 )
             env_file = ios / "prebuild.env"
@@ -369,7 +383,13 @@ def write_tvos_tree(
     short = "$(MARKETING_VERSION)" if variable_short_version else short_version
     with (app / "Info.plist").open("wb") as handle:
         plistlib.dump(
-            {"CFBundleVersion": build_number, "CFBundleShortVersionString": short, "CFBundleName": "Americana"},
+            {
+                "CFBundleVersion": build_number,
+                "CFBundleShortVersionString": short,
+                "CFBundleName": "Americana",
+                "CFBundleIdentifier": "$(PRODUCT_BUNDLE_IDENTIFIER)",
+                **watch_browse(),
+            },
             handle,
         )
     other = ios / "Other"
@@ -387,6 +407,52 @@ def write_tvos_tree(
             handle,
         )
     return project / "project.pbxproj"
+
+
+class WatchBrowseTests(unittest.TestCase):
+    def test_requires_the_watchos_browse_entry(self):
+        signing.assert_watch_browse(watch_browse())
+        expect_fail(self, "NSApplicationServices", lambda: signing.assert_watch_browse({}))
+        expect_fail(
+            self,
+            "Americana-Timer",
+            lambda: signing.assert_watch_browse(
+                {
+                    "NSApplicationServices": {
+                        "Browses": [
+                            {
+                                "NSApplicationServiceIdentifier": "Other",
+                                "NSApplicationServiceUsageDescription": "Nope",
+                                "NSApplicationServicePlatformSupport": ["watchOS"],
+                            }
+                        ]
+                    }
+                }
+            ),
+        )
+        expect_fail(
+            self,
+            "watchOS",
+            lambda: signing.assert_watch_browse(
+                {
+                    "NSApplicationServices": {
+                        "Browses": [
+                            {
+                                "NSApplicationServiceIdentifier": "Americana-Timer",
+                                "NSApplicationServiceUsageDescription": "Finds the watch.",
+                                "NSApplicationServicePlatformSupport": ["iOS"],
+                            }
+                        ]
+                    }
+                }
+            ),
+        )
+
+    def test_check_watch_browse_reads_the_generated_plist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ios = Path(tmp)
+            write_tvos_tree(ios)
+            signing.check_watch_browse(ios)
 
 
 class MarketingVersionTests(unittest.TestCase):

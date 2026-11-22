@@ -6,7 +6,6 @@ import SetupScreen from '../app/setup';
 import TimerScreen from '../app/timer';
 import BrandScreen from '../app/(tabs)/brand';
 import WodScreen from '../app/(tabs)/index';
-import RoundsScreen from '../app/(tabs)/rounds';
 import { BrandingProvider } from '../src/branding/BrandingProvider';
 import { TvTabBar } from '../src/components/TvTabBar';
 import { TvTabFocusProvider } from '../src/components/TvTabFocus';
@@ -30,7 +29,6 @@ try {
 
 function Screen() {
   const tab = (globalThis as { __TV_TAB__?: string }).__TV_TAB__ ?? 'wod';
-  if (tab === 'rounds' || tab === 'rounds-confirm') return <RoundsScreen />;
   if (tab === 'brand') return <BrandScreen />;
   if (tab === 'setup') return <SetupScreen />;
   if (tab === 'countdown') return <CountdownScreen />;

@@ -32,6 +32,8 @@ describe('watch privacy and platform gate', () => {
   it('advertises the same service name the protocol uses', () => {
     expect(swift).toContain(WATCH_SERVICE_NAME);
     expect(source('targets/watch/Info.plist')).toContain('Advertises');
+    expect(source('targets/watch/Info.plist')).toContain('<string>Americana-Timer</string>');
+    expect(source('targets/watch/Info.plist')).not.toContain('Browses');
     expect(source('plugins/withAppleWatch.js')).toContain('Browses');
     expect(source('plugins/withAppleWatch.js')).not.toContain('NSBonjourServices');
   });
@@ -51,6 +53,16 @@ describe('watch privacy and platform gate', () => {
     expect(face).toContain('WatchPreviewFace.getReady.model');
     expect(session).toContain('showsLaunchPreview');
     expect(session).toContain('Waiting for Apple TV');
+    expect(session).toContain('noteForeground');
+    expect(session).toContain('scheduleRestart');
+    expect(source('targets/watch/TimerFace.swift')).toContain('scenePhase');
+    const tv = source('modules/americana-watch-link/ios/AmericanaWatchLinkModule.swift');
+    expect(tv).toContain('candidateWindows');
+    expect(tv).toContain('isBeingDismissed');
+    expect(tv).toContain('delegate?.window');
+    expect(tv).toContain('isSupported=');
+    expect(tv).toContain('AmericanaWatchLink');
+    expect(tv).not.toMatch(/com\.apple\.developer\.networking/);
   });
 
   it('runs on Apple TV only', () => {

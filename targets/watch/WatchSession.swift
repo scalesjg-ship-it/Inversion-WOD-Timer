@@ -38,6 +38,9 @@ final class WatchSession: ObservableObject {
   private let framer = WatchFramer()
   /// Debug screenshot launches already show a preview face and must not open the listener.
   private let showsLaunchPreview: Bool
+  private var restartAttempts = 0
+  private var restartQueued = false
+  private let restartLimit = 4
 
   init() {
     #if DEBUG
@@ -49,6 +52,16 @@ final class WatchSession: ObservableObject {
     #else
     showsLaunchPreview = false
     #endif
+    if !showsLaunchPreview {
+      start()
+    }
+  }
+
+  /// Foreground launches the listener again after a failure or a cancel.
+  func noteForeground() {
+    guard !showsLaunchPreview else { return }
+    restartAttempts = 0
+    start()
   }
 
   func start() {
@@ -73,8 +86,11 @@ final class WatchSession: ObservableObject {
       }
       listener.start(queue: .main)
       self.listener = listener
+      log("listener started")
     } catch {
+      log("listener error \(error.localizedDescription)")
       model.status = "Could not listen"
+      scheduleRestart()
     }
   }
 
@@ -86,15 +102,57 @@ final class WatchSession: ObservableObject {
 
   private func noteListener(_ state: NWListener.State) {
     switch state {
-    case .failed(_):
+    case .ready:
+      restartAttempts = 0
+      log("listener ready")
+    case .failed(let error):
+      log("listener failed \(error.localizedDescription)")
       model.status = "Listener failed"
-    case .waiting(_):
-      break
-    case .ready, .setup, .cancelled:
-      break
+      guard listener != nil else { return }
+      dropListener()
+      scheduleRestart()
+    case .cancelled:
+      log("listener cancelled")
+      guard listener != nil else { return }
+      listener = nil
+      scheduleRestart()
+    case .waiting(let error):
+      log("listener waiting \(error.localizedDescription)")
+    case .setup:
+      log("listener setup")
     @unknown default:
-      break
+      log("listener unknown")
     }
+  }
+
+  private func dropListener() {
+    let dead = listener
+    listener = nil
+    dead?.stateUpdateHandler = nil
+    dead?.newConnectionHandler = nil
+    dead?.cancel()
+  }
+
+  private func scheduleRestart() {
+    guard !showsLaunchPreview else { return }
+    guard !restartQueued else { return }
+    guard restartAttempts < restartLimit else {
+      log("listener restart gave up")
+      return
+    }
+    restartQueued = true
+    restartAttempts += 1
+    let attempt = restartAttempts
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 500_000_000)
+      self.restartQueued = false
+      self.log("listener restart \(attempt)")
+      self.start()
+    }
+  }
+
+  private func log(_ message: String) {
+    print("AmericanaWatchLink \(message)")
   }
 
   private func accept(_ next: NWConnection) {

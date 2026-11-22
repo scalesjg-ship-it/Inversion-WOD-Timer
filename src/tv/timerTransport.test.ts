@@ -34,10 +34,10 @@ describe('TV transport buttons', () => {
 
   it('offers Resume for a paused round clock and Go again when the clock is finished', () => {
     expect(
-      tvTransportButtons({ phase: 'rest', running: false, paused: true, mode: 'tabata' }).map((button) => button.label),
+      tvTransportButtons({ phase: 'rest', running: false, paused: true, mode: 'intervals' }).map((button) => button.label),
     ).toEqual(['Resume', 'Reset']);
     expect(
-      tvTransportButtons({ phase: 'finished', running: false, paused: false, mode: 'rounds' }).map(
+      tvTransportButtons({ phase: 'finished', running: false, paused: false, mode: 'intervals' }).map(
         (button) => button.label,
       ),
     ).toEqual(['Go again', 'Reset']);
