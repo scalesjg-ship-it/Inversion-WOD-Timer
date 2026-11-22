@@ -136,6 +136,8 @@ export function TvSettings({
   const [paneWidth, setPaneWidth] = useState(0);
   const hosts = useRef<Record<string, unknown>>({});
   const placeRef = useRef<SettingsPlace>({ zone: 'sidebar', index: 0 });
+  /** Last option that had focus. A text field's Left press moves focus before this event arrives. */
+  const detailEdgeRef = useRef<SettingsPlace | null>(null);
   const lastBack = useRef(0);
   const pendingDown = useRef(new Set<string>());
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
@@ -255,14 +257,28 @@ export function TvSettings({
   );
 
   useTVEventHandler((event) => {
-    if (event.eventType !== 'menu' && event.eventType !== 'back') return;
+    const type = event.eventType;
+    if (type !== 'menu' && type !== 'back' && type !== 'left') return;
     const decision = acceptRemotePress(
-      event.eventType,
+      type,
       event.eventKeyAction as number | string | undefined,
       pendingDown.current,
     );
     pendingDown.current = decision.pendingDown;
     if (!decision.accept) return;
+    if (type === 'left') {
+      const edge = detailEdgeRef.current;
+      detailEdgeRef.current = null;
+      if (!edge || edge.zone !== 'detail') return;
+      const neighbor = settingsNeighbor(edge, 'left', settingsRows());
+      if (neighbor.zone !== 'sidebar') return;
+      const id = TV_SETTINGS_CATEGORIES[neighbor.index]?.testID;
+      if (!id) return;
+      requestTvFocus(hosts.current[id]);
+      placeRef.current = { zone: 'sidebar', index: neighbor.index };
+      setSelected(neighbor.index);
+      return;
+    }
     handleBack();
   });
 
@@ -280,7 +296,9 @@ export function TvSettings({
   };
 
   const onDetail = (id: string) => {
-    placeRef.current = { zone: 'detail', index: selected, id };
+    const place: SettingsPlace = { zone: 'detail', index: selected, id };
+    placeRef.current = place;
+    detailEdgeRef.current = place;
     reveal(id);
   };
 
