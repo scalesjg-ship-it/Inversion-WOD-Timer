@@ -151,6 +151,7 @@ export function settingsDetailRows(
       ].filter(filled);
     case 'logo':
       return [
+        { columns: 1, ids: ['logo-entry'] },
         { columns: 2, ids: ['logo-url', 'logo-url-load'] },
         { columns: 1, ids: ['logo-blur'] },
         { columns: 1, ids: ['reset-brand'] },

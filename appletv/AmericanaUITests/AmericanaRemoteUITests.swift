@@ -236,7 +236,7 @@ final class AmericanaRemoteUITests: XCTestCase {
 
   private func rightIntoLogoOptions() -> String {
     press(.right, settle: 0.75)
-    let option = focused("logo-url") || focused("logo-url-load") || focused("logo-blur") || focused("reset-brand")
+    let option = focused("logo-entry") || focused("logo-url") || focused("logo-url-load") || focused("logo-blur") || focused("reset-brand")
     XCTAssertTrue(option, "Right did not enter the logo options. \(snapshot())")
     XCTAssertFalse(focused("settings-category-logo"), "Right stayed on the sidebar. \(snapshot())")
     XCTAssertTrue(any("settings-detail-logo").exists, "Right left the logo pane. \(snapshot())")

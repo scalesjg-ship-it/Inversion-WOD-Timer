@@ -65,8 +65,8 @@ describe('TV settings layout', () => {
     expect(settingsNeighbor(place, 'down', categories)).toEqual({ zone: 'self' });
 
     const entered = settingsNeighbor(place, 'right', categories);
-    expect(entered).toEqual({ zone: 'detail', id: 'logo-url' });
-    expect(settingsAction(place, 'select', categories)).toEqual({ zone: 'detail', id: 'logo-url' });
+    expect(entered).toEqual({ zone: 'detail', id: 'logo-entry' });
+    expect(settingsAction(place, 'select', categories)).toEqual({ zone: 'detail', id: 'logo-entry' });
     if (entered.zone !== 'detail') return;
     const option: SettingsPlace = { zone: 'detail', index: place.index, id: entered.id };
     expect(settingsNeighbor(option, 'left', categories)).toEqual({ zone: 'sidebar', index: place.index });

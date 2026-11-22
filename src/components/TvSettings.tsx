@@ -271,11 +271,20 @@ export function TvSettings({
       if (!edge || edge.zone !== 'detail') return;
       const neighbor = settingsNeighbor(edge, 'left', settingsRows());
       if (neighbor.zone !== 'sidebar') return;
-      const id = TV_SETTINGS_CATEGORIES[neighbor.index]?.testID;
-      if (!id) return;
-      requestTvFocus(hosts.current[id]);
-      placeRef.current = { zone: 'sidebar', index: neighbor.index };
-      setSelected(neighbor.index);
+      // The text field's inner view ignores nextFocusLeft, so the focus
+      // engine lands on a neighboring category. Pull focus back after that.
+      const index = neighbor.index;
+      const pull = () => {
+        const current = detailEdgeRef.current;
+        if (!current || current.zone !== 'detail' || current.index !== index) return;
+        const id = TV_SETTINGS_CATEGORIES[index]?.testID;
+        if (!id) return;
+        requestTvFocus(hosts.current[id]);
+        placeRef.current = { zone: 'sidebar', index };
+        setSelected(index);
+      };
+      pull();
+      requestAnimationFrame(pull);
       return;
     }
     handleBack();
@@ -403,18 +412,7 @@ export function TvSettings({
             style={{ height: metrics.padV }}
             {...(plain || sidebarDestinations.length === 0 ? null : { destinations: sidebarDestinations })}
           />
-          <View style={styles.detailRow} collapsable={false}>
-            {/*
-              A text field keeps focus on an inner view, so nextFocusLeft never
-              runs. This band is the nearest thing to the left of every option
-              and sends Left back to the open category.
-            */}
-            <Guide
-              collapsable={false}
-              style={{ width: Math.max(48, metrics.gap) }}
-              {...(plain || sidebarDestinations.length === 0 ? null : { destinations: sidebarDestinations })}
-            />
-            <Guide
+          <Guide
             style={styles.detailBody}
             collapsable={false}
             testID={settingsDetailTestId(category.id)}
@@ -457,10 +455,12 @@ export function TvSettings({
               optionLinks={optionLinks}
               bind={bind}
               onDetail={onDetail}
+              focusOption={(id) => {
+                requestTvFocus(hosts.current[id]);
+              }}
             />
             </ScrollView>
-            </Guide>
-          </View>
+          </Guide>
         </View>
       </View>
     </View>
@@ -485,6 +485,7 @@ function DetailBody({
   optionLinks,
   bind,
   onDetail,
+  focusOption,
 }: {
   categoryId: SettingsCategoryId;
   branding: Branding;
@@ -508,6 +509,7 @@ function DetailBody({
   };
   bind: (id: string, node: unknown) => void;
   onDetail: (id: string) => void;
+  focusOption: (id: string) => void;
 }) {
   const heading = (label: string) => (
     <Text key={label} style={[styles.header, { fontSize: metricsHeader, lineHeight: metricsHeader + 4 }]}>
@@ -640,12 +642,26 @@ function DetailBody({
         </View>
       );
     case 'logo': {
+      const entry = optionLinks('logo-entry');
       const field = optionLinks('logo-url');
       const save = optionLinks('logo-url-load');
       const blur = optionLinks('logo-blur');
       const resetLinks = optionLinks('reset-brand');
       return (
         <View style={{ gap }}>
+          <SettingChoice
+            id="logo-entry"
+            label="Send a logo"
+            selected={false}
+            accent={accent}
+            width={undefined}
+            minHeight={Math.max(56, metricsBody + 28)}
+            fontSize={metricsBody}
+            onPress={() => focusOption('logo-url')}
+            onBind={bind}
+            onFocus={() => onDetail('logo-entry')}
+            {...entry}
+          />
           <TvLogoTransfer branding={branding} update={async (patch) => update(patch)} accent={accent}>
             <TvLogoUrl
               onStored={async (logoUri) => update({ logoUri })}
@@ -767,7 +783,6 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   detail: { flex: 1, minWidth: 0 },
-  detailRow: { flex: 1, flexDirection: 'row', minWidth: 0 },
   detailBody: { flex: 1, minWidth: 0 },
   detailScroll: { flex: 1 },
   title: { fontFamily: 'Oswald' },
