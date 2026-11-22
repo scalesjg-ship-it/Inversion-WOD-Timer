@@ -683,6 +683,12 @@ export function TvToggle({
   accent,
   disabled = false,
   preferred = false,
+  focusUp = null,
+  focusDown = null,
+  focusLeft = null,
+  focusRight = null,
+  onHost,
+  onFocus,
 }: {
   label: string;
   help?: string;
@@ -693,7 +699,14 @@ export function TvToggle({
   disabled?: boolean;
   /** TV only. Focus starts here when the toggle is the first control. */
   preferred?: boolean;
+  focusUp?: TvFocusTag | null;
+  focusDown?: TvFocusTag | null;
+  focusLeft?: TvFocusTag | null;
+  focusRight?: TvFocusTag | null;
+  onHost?: (node: ComponentRef<typeof Pressable> | null) => void;
+  onFocus?: () => void;
 }) {
+  const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
   const toggle = fitTvStyle(styles.tvToggle, width, height);
   const copy = fitTvStyle(styles.tvToggleCopy, width, height);
@@ -705,10 +718,19 @@ export function TvToggle({
       dim={!disabled}
       accessibilityRole="switch"
       accessibilityState={{ checked: value, disabled }}
-      disabled={disabled}
+      disabled={tv ? false : disabled}
       testID={testID}
       hasTVPreferredFocus={preferred ? true : undefined}
-      onPress={() => onValueChange(!value)}
+      focusUp={focusUp}
+      focusDown={focusDown}
+      focusLeft={focusLeft}
+      focusRight={focusRight}
+      onHost={onHost}
+      onFocus={onFocus}
+      onPress={() => {
+        if (disabled) return;
+        onValueChange(!value);
+      }}
       style={({ pressed }) => [
         toggle,
         {

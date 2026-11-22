@@ -74,6 +74,25 @@ final class AmericanaRemoteUITests: XCTestCase {
     step("Intervals presets") { showIntervalPresets() }
   }
 
+  /// Settings is a sidebar under the tab bar. Down from Settings lands on the
+  /// first category, each category changes the pane, Right enters an option,
+  /// and Left returns to that category. Up from the top of the sidebar reaches
+  /// Settings again. Menu from an option returns to the sidebar, and Menu from
+  /// the sidebar returns to the previous tab without leaving the app.
+  func testSettingsMasterDetail() {
+    step("open Settings") { openTab("tab-settings", screen: "screen-settings", direction: .right) }
+    step("Down into the sidebar") { downToCategory("settings-category-brand", detail: "settings-detail-brand") }
+    step("Down to Look") { downToCategory("settings-category-look", detail: "settings-detail-look") }
+    step("Down to Display") { downToCategory("settings-category-display", detail: "settings-detail-display") }
+    step("Down to Colors") { downToCategory("settings-category-colors", detail: "settings-detail-colors") }
+    step("Down to Logo") { downToCategory("settings-category-logo", detail: "settings-detail-logo") }
+    step("Right into options") { rightIntoLogoOptions() }
+    step("Left back to the sidebar") { leftToSidebar("settings-category-logo") }
+    step("Up to the Settings tab") { upSidebarToTab() }
+    step("Menu from an option returns to the sidebar") { menuFromOptionToSidebar() }
+    step("Menu from the sidebar leaves Settings") { menuFromSidebarLeavesSettings() }
+  }
+
   /// Down from the lead-in minutes minus must leave that button. Save preset
   /// sits above Start, so a second Down reaches Start. Up returns to the row.
   func testDownFromLeadInMinusReachesStart() {
@@ -197,6 +216,80 @@ final class AmericanaRemoteUITests: XCTestCase {
     XCTAssertTrue(ready, "For Time did not reach work. face=\(faceLabel()) \(snapshot())")
     XCTAssertTrue(any("timer-stop").waitForExistence(timeout: 5), "Stop was not on the For Time clock. \(snapshot())")
     return "face=\(faceLabel())"
+  }
+
+  private func downToCategory(_ category: String, detail: String) -> String {
+    press(.down, settle: 0.7)
+    if !focused(category) {
+      XCTAssertTrue(
+        nudge(category, directions: [.down, .up], limit: 8),
+        "Down did not focus \(category). \(snapshot())"
+      )
+    }
+    XCTAssertTrue(any(detail).waitForExistence(timeout: 4), "\(detail) did not appear. \(snapshot())")
+    for other in ["settings-detail-brand", "settings-detail-look", "settings-detail-display", "settings-detail-colors", "settings-detail-logo"] where other != detail {
+      XCTAssertFalse(any(other).exists, "\(other) was still showing with \(detail). \(snapshot())")
+    }
+    XCTAssertEqual(app.state, .runningForeground, "Down left the app")
+    return "focus=\(focusedIdentifier()) detail=\(detail)"
+  }
+
+  private func rightIntoLogoOptions() -> String {
+    press(.right, settle: 0.75)
+    let option = focused("logo-url") || focused("logo-url-load") || focused("logo-blur") || focused("reset-brand")
+    XCTAssertTrue(option, "Right did not enter the logo options. \(snapshot())")
+    XCTAssertFalse(focused("settings-category-logo"), "Right stayed on the sidebar. \(snapshot())")
+    XCTAssertTrue(any("settings-detail-logo").exists, "Right left the logo pane. \(snapshot())")
+    XCTAssertEqual(app.state, .runningForeground, "Right left the app")
+    return focusedIdentifier()
+  }
+
+  private func leftToSidebar(_ category: String) -> String {
+    for _ in 0..<4 where !focused(category) {
+      press(.left, settle: 0.65)
+    }
+    XCTAssertTrue(focused(category), "Left did not return to \(category). \(snapshot())")
+    XCTAssertTrue(any("settings-detail-logo").exists, "Left closed the logo pane. \(snapshot())")
+    XCTAssertEqual(app.state, .runningForeground, "Left left the app")
+    return focusedIdentifier()
+  }
+
+  private func upSidebarToTab() -> String {
+    for _ in 0..<8 where !focused("tab-settings") {
+      press(.up, settle: 0.5)
+    }
+    XCTAssertTrue(focused("tab-settings"), "Up did not reach Settings. \(snapshot())")
+    XCTAssertTrue(any("screen-settings").exists, "Up left Settings. \(snapshot())")
+    XCTAssertEqual(app.state, .runningForeground, "Up left the app")
+    return focusedIdentifier()
+  }
+
+  private func menuFromOptionToSidebar() -> String {
+    press(.down, settle: 0.6)
+    if !focused("settings-category-brand") {
+      _ = nudge("settings-category-brand", directions: [.up, .down], limit: 6)
+    }
+    press(.right, settle: 0.7)
+    XCTAssertFalse(focused("settings-category-brand"), "Right did not enter Brand options. \(snapshot())")
+    press(.menu, settle: 0.9)
+    XCTAssertTrue(focused("settings-category-brand"), "Menu did not return to Brand. \(snapshot())")
+    XCTAssertTrue(any("screen-settings").exists, "Menu left Settings. \(snapshot())")
+    XCTAssertEqual(app.state, .runningForeground, "Menu left the app")
+    return focusedIdentifier()
+  }
+
+  private func menuFromSidebarLeavesSettings() -> String {
+    if !focused("settings-category-brand") {
+      _ = nudge("settings-category-brand", directions: [.down, .up], limit: 6)
+    }
+    press(.menu, settle: 1.0)
+    let stayed = app.state == .runningForeground
+    let leftSettings = waitGone("screen-settings", timeout: 6)
+    let onWod = any("screen-wod").waitForExistence(timeout: 6) || any("mode-forTime").exists
+    XCTAssertTrue(stayed, "Menu backgrounded the app. state=\(app.state.rawValue)")
+    XCTAssertTrue(leftSettings, "Menu stayed on Settings. \(snapshot())")
+    XCTAssertTrue(onWod, "Menu did not return to WOD. \(snapshot())")
+    return "focus=\(focusedIdentifier()) wod=\(onWod)"
   }
 
   private func walkHelp() -> String {
