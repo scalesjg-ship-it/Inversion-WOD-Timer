@@ -53,6 +53,23 @@ describe('Apple TV transport frame', () => {
     expect(tvTransportLeft(700, safe.horizontal, row.rowWidth)).toBeGreaterThanOrEqual(safe.horizontal);
   });
 
+  it('gives a pairing code a taller status block than a one-line message', () => {
+    const message = frame(1920, 1080, 4, true);
+    const code = tvAppleTimerFrame({
+      screenWidth: 1920,
+      screenHeight: 1080,
+      safeBottom: tvSafeBox(true, 1920, 1080).vertical,
+      safeHorizontal: tvSafeBox(true, 1920, 1080).horizontal,
+      buttonCount: 4,
+      linkStatus: true,
+      linkRows: 3,
+      warning: false,
+      paused: true,
+    });
+    expect(code.columnHeight).toBeGreaterThan(message.columnHeight);
+    expect(code.faceBottom).toBeGreaterThan(message.faceBottom);
+  });
+
   it('lifts the status block above a link message as well as the buttons', () => {
     const plain = frame(1920, 1080, 4, false);
     const withStatus = frame(1920, 1080, 4, true);

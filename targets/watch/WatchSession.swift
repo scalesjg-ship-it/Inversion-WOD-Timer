@@ -13,6 +13,8 @@ struct WatchFaceModel: Equatable {
   var canReset: Bool
   var status: String
   var connected: Bool
+  var showsPair: Bool
+  var showsForget: Bool
 
   static let waiting = WatchFaceModel(
     phase: "idle",
@@ -23,8 +25,15 @@ struct WatchFaceModel: Equatable {
     primaryCommand: "start",
     canReset: false,
     status: "Waiting for Apple TV",
-    connected: false
+    connected: false,
+    showsPair: true,
+    showsForget: false
   )
+}
+
+enum WatchScreen: Equatable {
+  case face
+  case pad
 }
 
 /// Listens for the Apple TV. The TV presents DeviceDiscoveryUI and connects here.
@@ -32,10 +41,15 @@ struct WatchFaceModel: Equatable {
 @MainActor
 final class WatchSession: ObservableObject {
   @Published private(set) var model = WatchFaceModel.waiting
+  @Published private(set) var screen: WatchScreen = .face
+  @Published private(set) var codeDigits = ""
+  @Published private(set) var pairStatus = "Enter the 6-digit code"
 
   private var listener: NWListener?
   private var connection: NWConnection?
   private let framer = WatchFramer()
+  private let relay = WatchRelayClient()
+  private var directReady = false
   /// Debug screenshot launches already show a preview face and must not open the listener.
   private let showsLaunchPreview: Bool
   private var restartAttempts = 0
@@ -53,8 +67,46 @@ final class WatchSession: ObservableObject {
     showsLaunchPreview = false
     #endif
     if !showsLaunchPreview {
+      relay.onLine = { [weak self] line in
+        self?.apply(line)
+      }
+      relay.onStatus = { [weak self] text, connected in
+        self?.noteRelay(text, connected: connected)
+      }
       start()
+      relay.resumeStored()
     }
+  }
+
+  func beginPairing() {
+    codeDigits = ""
+    pairStatus = "Enter the 6-digit code"
+    screen = .pad
+  }
+
+  func cancelPairing() {
+    screen = .face
+  }
+
+  func typeDigit(_ digit: String) {
+    guard codeDigits.count < 6, digit.count == 1, digit.first?.isNumber == true else { return }
+    codeDigits.append(digit)
+  }
+
+  func deleteDigit() {
+    if !codeDigits.isEmpty { codeDigits.removeLast() }
+  }
+
+  func submitCode() {
+    guard codeDigits.count == 6 else { return }
+    pairStatus = "Connecting…"
+    relay.pair(code: codeDigits)
+  }
+
+  func forgetTV() {
+    relay.forget()
+    screen = .face
+    refreshLink(status: directReady ? "Apple TV" : "Waiting for Apple TV")
   }
 
   /// Foreground launches the listener again after a failure or a cancel.
@@ -62,6 +114,7 @@ final class WatchSession: ObservableObject {
     guard !showsLaunchPreview else { return }
     restartAttempts = 0
     start()
+    relay.resumeIfNeeded()
   }
 
   func start() {
@@ -96,8 +149,12 @@ final class WatchSession: ObservableObject {
 
   func sendCommand(_ name: String) {
     guard model.connected, let line = WatchWire.commandLine(id: UUID().uuidString, name: name) else { return }
-    guard let data = line.data(using: .utf8) else { return }
-    connection?.send(content: data, completion: .contentProcessed { _ in })
+    if directReady {
+      guard let data = line.data(using: .utf8) else { return }
+      connection?.send(content: data, completion: .contentProcessed { _ in })
+      return
+    }
+    relay.sendLine(line)
   }
 
   private func noteListener(_ state: NWListener.State) {
@@ -171,16 +228,17 @@ final class WatchSession: ObservableObject {
   private func noteConnection(_ state: NWConnection.State) {
     switch state {
     case .ready:
-      model.connected = true
-      model.status = "Apple TV"
+      directReady = true
+      screen = .face
+      refreshLink(status: "Apple TV")
     case .failed(_):
-      model.connected = false
-      model.status = "Waiting for Apple TV"
+      directReady = false
       connection = nil
+      refreshLink(status: relayReady ? "Apple TV" : "Waiting for Apple TV")
     case .cancelled:
-      model.connected = false
-      model.status = "Waiting for Apple TV"
+      directReady = false
       connection = nil
+      refreshLink(status: relayReady ? "Apple TV" : "Waiting for Apple TV")
     case .setup, .preparing:
       break
     case .waiting(_):
@@ -188,6 +246,28 @@ final class WatchSession: ObservableObject {
     @unknown default:
       break
     }
+  }
+
+  private var relayReady: Bool { relay.isConnected }
+
+  private func noteRelay(_ text: String, connected: Bool) {
+    if connected {
+      screen = .face
+      refreshLink(status: "Apple TV")
+      return
+    }
+    if screen == .pad {
+      pairStatus = text
+    }
+    refreshLink(status: directReady ? "Apple TV" : text)
+  }
+
+  private func refreshLink(status: String) {
+    model.connected = directReady || relay.isConnected
+    model.showsPair = !model.connected
+    model.showsForget = relay.hasPairing
+    if model.status == "Not now" { return }
+    model.status = status
   }
 
   private func receive(on connection: NWConnection) {
@@ -201,8 +281,8 @@ final class WatchSession: ObservableObject {
           }
         }
         if isComplete || error != nil {
-          self.model.connected = false
-          self.model.status = "Waiting for Apple TV"
+          self.directReady = false
+          self.refreshLink(status: self.relay.isConnected ? "Apple TV" : "Waiting for Apple TV")
           return
         }
         self.receive(on: connection)
@@ -243,7 +323,8 @@ final class WatchSession: ObservableObject {
     model.primaryTitle = title(for: primary)
     model.canReset = canReset
     model.connected = true
-    if model.status == "Not now" || model.status == "Waiting for Apple TV" {
+    model.showsPair = false
+    if model.status == "Not now" || model.status == "Waiting for Apple TV" || model.status == "Reconnecting…" {
       model.status = "Apple TV"
     }
   }

@@ -5,15 +5,19 @@ import type { TimerConfig, TimerSnapshot } from '@/src/timer/types';
 import { watchControl, type WatchClockAction } from './commands';
 import { buildWatchState, watchEvents } from './face';
 import {
+  displayedWatchPhase,
   logWatchLink,
   watchButtonVisible,
   watchLinkAfterPickerResult,
   watchLinkMessage,
   watchLinkPhaseFromEvent,
+  watchPairOfferVisible,
+  watchUnpairVisible,
   type WatchLinkPhase,
 } from './linkStatus';
 import { eventJson, watchNative } from './native';
 import { decodeMessage, encodeMessage } from './protocol';
+import { useRelayLink } from './useRelayLink';
 
 interface UseWatchLinkInput {
   enabled: boolean;
@@ -27,7 +31,12 @@ export function useWatchLink(input: UseWatchLinkInput): {
   phase: WatchLinkPhase;
   message: string | null;
   watchControlVisible: boolean;
+  pairingCode: string | null;
+  offerPairCode: boolean;
+  offerUnpair: boolean;
   presentPicker: () => void;
+  pairWithCode: () => void;
+  unpair: () => void;
 } {
   const snapshotRef = useRef(input.snapshot);
   const configRef = useRef(input.config);
@@ -35,8 +44,34 @@ export function useWatchLink(input: UseWatchLinkInput): {
   const previousRef = useRef<TimerSnapshot | null>(null);
   const seqRef = useRef(0);
   const publishRef = useRef<() => void>(() => {});
-  const [connected, setConnected] = useState(false);
-  const [phase, setPhase] = useState<WatchLinkPhase>('idle');
+  const relaySendRef = useRef<(line: string) => void>(() => {});
+  const startPairingRef = useRef<(force?: boolean) => void>(() => {});
+  const directReadyRef = useRef(false);
+  const [directConnected, setDirectConnected] = useState(false);
+  const [directPhase, setDirectPhase] = useState<WatchLinkPhase>('idle');
+
+  const handleCommand = useCallback((line: string, via: 'direct' | 'relay') => {
+    const message = decodeMessage(line);
+    if (!message || message.type !== 'command') return;
+    const effect = watchControl(message.name, snapshotRef.current);
+    onActionRef.current(effect.action);
+    const ack = encodeMessage({
+      v: 1,
+      type: 'ack',
+      id: message.id,
+      ok: effect.action !== 'ignore',
+      action: effect.action,
+    });
+    if (via === 'direct') watchNative()?.send(ack);
+    else relaySendRef.current(ack);
+  }, []);
+
+  const relay = useRelayLink(input.enabled, (line) => handleCommand(line, 'relay'));
+
+  useEffect(() => {
+    relaySendRef.current = relay.send;
+    startPairingRef.current = relay.startPairing;
+  }, [relay.send, relay.startPairing]);
 
   useEffect(() => {
     snapshotRef.current = input.snapshot;
@@ -53,31 +88,22 @@ export function useWatchLink(input: UseWatchLinkInput): {
   useEffect(() => {
     if (!input.enabled) return undefined;
     const native = watchNative();
-    if (!native) return undefined;
-    native.start();
+    native?.start();
 
-    const commandSub = native.addListener('command', (payload) => {
-      const message = decodeMessage(eventJson(payload));
-      if (!message || message.type !== 'command') return;
-      const effect = watchControl(message.name, snapshotRef.current);
-      onActionRef.current(effect.action);
-      native.send(
-        encodeMessage({
-          v: 1,
-          type: 'ack',
-          id: message.id,
-          ok: effect.action !== 'ignore',
-          action: effect.action,
-        }),
-      );
+    const commandSub = native?.addListener('command', (payload) => {
+      handleCommand(eventJson(payload), 'direct');
     });
-    const linkSub = native.addListener('link', (payload) => {
+    const linkSub = native?.addListener('link', (payload) => {
       const raw = eventJson(payload);
       const next = watchLinkPhaseFromEvent(raw);
       logWatchLink(next ?? 'idle', `event ${raw || 'empty'}`);
       if (!next) return;
-      setPhase(next);
-      setConnected(next === 'connected');
+      if (next === 'pairing') {
+        startPairingRef.current(false);
+      }
+      directReadyRef.current = next === 'connected';
+      setDirectPhase(next);
+      setDirectConnected(next === 'connected');
     });
 
     const nextSeq = () => {
@@ -87,9 +113,13 @@ export function useWatchLink(input: UseWatchLinkInput): {
     const publish = () => {
       const snap = snapshotRef.current;
       const state = buildWatchState(snap, configRef.current, nextSeq());
-      native.send(encodeMessage(state));
+      const stateLine = encodeMessage(state);
+      native?.send(stateLine);
+      if (!directReadyRef.current) relaySendRef.current(stateLine);
       for (const event of watchEvents(previousRef.current, snap, nextSeq())) {
-        native.send(encodeMessage(event));
+        const line = encodeMessage(event);
+        native?.send(line);
+        if (!directReadyRef.current) relaySendRef.current(line);
       }
       previousRef.current = snap;
     };
@@ -99,49 +129,72 @@ export function useWatchLink(input: UseWatchLinkInput): {
     return () => {
       clearInterval(id);
       publishRef.current = () => {};
-      commandSub.remove();
-      linkSub.remove();
-      native.stop();
+      commandSub?.remove();
+      linkSub?.remove();
+      native?.stop();
       previousRef.current = null;
-      setConnected(false);
-      setPhase('idle');
+      directReadyRef.current = false;
+      setDirectConnected(false);
+      setDirectPhase('idle');
     };
-  }, [input.enabled]);
+  }, [handleCommand, input.enabled]);
 
   useEffect(() => {
     if (!input.enabled) return;
     publishRef.current();
   }, [input.enabled, input.snapshot.phase, input.snapshot.round, input.snapshot.running, input.snapshot.paused]);
 
+  useEffect(() => {
+    if (!input.enabled || relay.snapshot.phase !== 'connected') return;
+    publishRef.current();
+  }, [input.enabled, relay.snapshot.phase]);
+
   const presentPicker = useCallback(() => {
     if (!input.enabled) return;
+    if (directPhase === 'pairing' || relay.snapshot.code) {
+      relay.startPairing(true);
+      return;
+    }
     const native = watchNative();
     if (!native) {
       logWatchLink('unavailable', 'module missing');
-      setPhase('unavailable');
-      setConnected(false);
+      directReadyRef.current = false;
+      setDirectPhase('unavailable');
+      setDirectConnected(false);
       return;
     }
     logWatchLink('looking', 'presentPicker');
-    setPhase('looking');
-    void native.presentPicker()
+    setDirectPhase('looking');
+    void native
+      .presentPicker()
       .then((opened) => {
-        logWatchLink(opened ? 'looking' : 'unsupported', `presentPicker returned ${opened}`);
-        setPhase((current) => watchLinkAfterPickerResult(current, opened));
-        if (!opened) setConnected(false);
+        const next = watchLinkAfterPickerResult('looking', opened);
+        logWatchLink(next, `presentPicker returned ${opened}`);
+        if (!opened) startPairingRef.current(false);
+        setDirectPhase((current) => (current === 'connected' ? current : next));
+        if (!opened) setDirectConnected(false);
       })
       .catch(() => {
         logWatchLink('unavailable', 'presentPicker rejected');
-        setPhase((current) => (current === 'looking' || current === 'idle' ? 'unavailable' : current));
-        setConnected(false);
+        directReadyRef.current = false;
+        setDirectPhase((current) => (current === 'looking' || current === 'idle' ? 'unavailable' : current));
+        setDirectConnected(false);
       });
-  }, [input.enabled]);
+  }, [directPhase, input.enabled, relay]);
+
+  const phase = displayedWatchPhase(directPhase, relay.snapshot);
+  const joining = relay.snapshot.phase === 'joining';
 
   return {
-    connected,
+    connected: directConnected || relay.snapshot.phase === 'connected',
     phase,
-    message: watchLinkMessage(phase),
+    message: joining ? 'Connecting to Apple Watch…' : watchLinkMessage(phase, relay.configured),
     watchControlVisible: watchButtonVisible(phase),
+    pairingCode: relay.snapshot.code,
+    offerPairCode: watchPairOfferVisible(phase, relay.snapshot.paired),
+    offerUnpair: watchUnpairVisible(relay.snapshot.paired),
     presentPicker,
+    pairWithCode: () => relay.startPairing(true),
+    unpair: () => relay.forget(),
   };
 }

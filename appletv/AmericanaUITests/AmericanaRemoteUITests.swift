@@ -3,7 +3,7 @@ import XCTest
 /// Drives the Apple TV simulator with the Siri Remote.
 ///
 /// Tabs open when they gain focus. Select on the focused tab leaves that
-/// screen open. For Time keeps Pause, Stop, and Reset mounted. Select and
+/// screen open. For Time keeps Pause, Finish, and Reset mounted. Select and
 /// Menu pause a running clock and stay on the timer. The next Menu leaves.
 final class AmericanaRemoteUITests: XCTestCase {
   private let app = XCUIApplication()
@@ -48,7 +48,7 @@ final class AmericanaRemoteUITests: XCTestCase {
     step("paused For Time shows Watch") { pausedForTimeShowsWatch() }
     step("Resume continues") { resumeContinues() }
     step("Play/Pause toggles") { playPauseToggles() }
-    step("Stop (For Time)") { stopForTime() }
+    step("Finish (For Time)") { stopForTime() }
     step("Reset") { resetForTime() }
     step("Menu pauses rather than leaving") {
       startAgainIfNeeded()
@@ -57,17 +57,17 @@ final class AmericanaRemoteUITests: XCTestCase {
     step("second Menu leaves the timer") { secondMenuLeaves() }
   }
 
-  /// Relaunches with `-AmericanaWatchStatus unsupported`, the same message an
-  /// Apple TV HD gets when DeviceDiscoveryUI `isSupported` is false.
-  func testWatchUnsupportedMessage() {
+  /// Relaunches with `-AmericanaWatchStatus unsupported`. Apple TV HD cannot
+  /// open DeviceDiscoveryUI, so the timer shows a 6-digit pairing code.
+  func testWatchHdCodePairing() {
     app.terminate()
     app.launchArguments += ["-AmericanaWatchStatus", "unsupported"]
     app.launch()
     XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "App did not stay in the foreground")
-    step("unsupported opens For Time") { startForTime() }
-    step("unsupported reaches work") { waitForWorkPhase() }
-    step("unsupported pauses") { selectPausesOntoResume() }
-    step("unsupported Apple TV HD message") { unsupportedWatchMessage() }
+    step("HD opens For Time") { startForTime() }
+    step("HD reaches work") { waitForWorkPhase() }
+    step("HD pauses") { selectPausesOntoResume() }
+    step("HD pairing code") { hdPairingCode() }
   }
 
   func testIntervalPresets() {
@@ -214,7 +214,7 @@ final class AmericanaRemoteUITests: XCTestCase {
   private func waitForWorkPhase() -> String {
     let ready = waitFace(prefix: "For time", timeout: 25)
     XCTAssertTrue(ready, "For Time did not reach work. face=\(faceLabel()) \(snapshot())")
-    XCTAssertTrue(any("timer-stop").waitForExistence(timeout: 5), "Stop was not on the For Time clock. \(snapshot())")
+    XCTAssertTrue(any("timer-finish").waitForExistence(timeout: 5), "Stop was not on the For Time clock. \(snapshot())")
     return "face=\(faceLabel())"
   }
 
@@ -319,14 +319,14 @@ final class AmericanaRemoteUITests: XCTestCase {
     let watch = any("timer-watch")
     XCTAssertTrue(watch.waitForExistence(timeout: 5), "Watch was not on the paused clock. \(snapshot())")
     let screen = app.frame
-    for id in ["timer-pause", "timer-stop", "timer-reset", "timer-watch"] {
+    for id in ["timer-pause", "timer-finish", "timer-reset", "timer-watch"] {
       let button = any(id)
       XCTAssertTrue(button.exists, "\(id) missing on the paused clock. \(snapshot())")
       XCTAssertGreaterThanOrEqual(button.frame.minX, -1, "\(id) is off the left edge \(button.frame)")
       XCTAssertLessThanOrEqual(button.frame.maxX, screen.maxX + 1, "\(id) is off the right edge \(button.frame)")
     }
     var union = CGRect.null
-    for id in ["timer-pause", "timer-stop", "timer-reset", "timer-watch"] {
+    for id in ["timer-pause", "timer-finish", "timer-reset", "timer-watch"] {
       union = union.union(any(id).frame)
     }
     XCTAssertLessThan(abs(union.midX - screen.midX), 80, "Transport row is not centered. union=\(union) screen=\(screen)")
@@ -337,16 +337,36 @@ final class AmericanaRemoteUITests: XCTestCase {
     return "watch=\(watch.frame) union=\(union)"
   }
 
-  private func unsupportedWatchMessage() -> String {
+  private func hdPairingCode() -> String {
     let status = any("timer-watch-status")
     XCTAssertTrue(status.waitForExistence(timeout: 8), "Watch status did not appear. \(snapshot())")
-    XCTAssertTrue(status.label.contains("Apple TV 4K"), "Status was \(status.label). \(snapshot())")
-    XCTAssertFalse(any("timer-watch").exists, "Watch stayed on screen after unsupported. \(snapshot())")
-    let face = any("timer-face")
-    if face.exists && status.exists {
-      XCTAssertLessThanOrEqual(face.frame.maxY, status.frame.minY + 2, "Clock face overlaps the watch status. face=\(face.frame) status=\(status.frame)")
+    XCTAssertFalse(status.label.contains("Apple TV 4K"), "HD still asked for a 4K. Status was \(status.label). \(snapshot())")
+    XCTAssertFalse(status.label.contains("needs an Apple TV"), "HD still blocked pairing. Status was \(status.label). \(snapshot())")
+    XCTAssertTrue(status.label.localizedCaseInsensitiveContains("internet"), "Status was \(status.label). \(snapshot())")
+    let code = any("watch-pair-code")
+    XCTAssertTrue(code.waitForExistence(timeout: 5), "Pairing code did not appear. \(snapshot())")
+    let digits = code.label.filter(\.isNumber)
+    XCTAssertEqual(digits.count, 6, "Code label was \(code.label). \(snapshot())")
+    XCTAssertTrue(any("timer-watch").exists, "Watch was missing on the HD code screen. \(snapshot())")
+    if !focused("watch-pair-code") {
+      press(.up, settle: 0.7)
     }
-    return status.label
+    if !focused("watch-pair-code") {
+      XCTAssertTrue(
+        nudge("watch-pair-code", directions: [.up, .right, .left], limit: 8),
+        "Remote could not focus the pairing code. \(snapshot())"
+      )
+    }
+    XCTAssertTrue(focused("watch-pair-code"), "Pairing code did not take focus. \(snapshot())")
+    press(.down, settle: 0.6)
+    if !focused("timer-pause") {
+      XCTAssertTrue(nudge("timer-pause", directions: [.down, .left], limit: 6), "Down from the code did not return to the clock. \(snapshot())")
+    }
+    let face = any("timer-face")
+    if face.exists && code.exists {
+      XCTAssertLessThanOrEqual(face.frame.maxY, code.frame.minY + 8, "Clock face overlaps the pairing code. face=\(face.frame) code=\(code.frame)")
+    }
+    return "\(digits) \(status.label)"
   }
 
   private func selectPausesOntoResume() -> String {
@@ -409,10 +429,10 @@ final class AmericanaRemoteUITests: XCTestCase {
       press(.select, settle: 0.7)
       XCTAssertTrue(waitFace(containing: "Paused", timeout: 6), "Could not pause before Stop. \(snapshot())")
     }
-    XCTAssertTrue(nudge("timer-stop", directions: [.right, .left], limit: 4), "Could not focus Stop. \(snapshot())")
+    XCTAssertTrue(nudge("timer-finish", directions: [.right, .left], limit: 4), "Could not focus Stop. \(snapshot())")
     press(.select, settle: 0.8)
     let stopped = waitFace(prefix: "Time,", timeout: 6)
-    let gone = waitGone("timer-stop", timeout: 5)
+    let gone = waitGone("timer-finish", timeout: 5)
     let again = any("timer-start").waitForExistence(timeout: 5) && any("timer-start").label.contains("Go again")
     XCTAssertTrue(any("timer-face").exists, "Stop left the timer. \(snapshot())")
     XCTAssertTrue(stopped, "Stop did not finish the clock. face=\(faceLabel()) \(snapshot())")
@@ -424,6 +444,14 @@ final class AmericanaRemoteUITests: XCTestCase {
   private func resetForTime() -> String {
     XCTAssertTrue(nudge("timer-reset", directions: [.right, .left], limit: 4), "Could not focus Reset. \(snapshot())")
     press(.select, settle: 0.8)
+    XCTAssertTrue(any("reset-confirm").waitForExistence(timeout: 5), "Reset did not ask to confirm. \(snapshot())")
+    if !focused("confirm-reset-yes") {
+      XCTAssertTrue(
+        nudge("confirm-reset-yes", directions: [.down, .up], limit: 4),
+        "Could not focus Yes. \(snapshot())"
+      )
+    }
+    press(.select, settle: 0.8)
     let idle = waitFace(prefix: "For Time", timeout: 6)
     let startShown = any("timer-start").waitForExistence(timeout: 5)
     let startLabel = any("timer-start").label
@@ -432,7 +460,7 @@ final class AmericanaRemoteUITests: XCTestCase {
     XCTAssertTrue(idle, "Reset did not return to For Time. face=\(faceLabel()) \(snapshot())")
     XCTAssertTrue(startShown && startLabel.contains("Start"), "Start was not shown after Reset (\(startLabel)). \(snapshot())")
     XCTAssertEqual(clock, Optional(0), "Reset clock was \(faceLabel())")
-    XCTAssertFalse(any("timer-stop").exists, "Stop remained after Reset. \(snapshot())")
+    XCTAssertFalse(any("timer-finish").exists, "Stop remained after Reset. \(snapshot())")
     return "face=\(faceLabel()) start=\(startLabel)"
   }
 
