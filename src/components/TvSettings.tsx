@@ -311,25 +311,27 @@ export function TvSettings({
   const firstOption = settingsNeighbor({ zone: 'sidebar', index: selected }, 'right', categoryRows);
   const detailTag = firstOption.zone === 'detail' ? (tags[firstOption.id] ?? null) : null;
   const detailDestinations = detailTag != null ? [detailTag] : [];
-  const guideProps = Guide === View;
+  const plain = Guide === View;
+  const sidebarDestinations = selectedTag != null ? [selectedTag] : [];
+  const tabDestinations = settingsTabTag != null ? [settingsTabTag] : [];
 
   return (
     <View style={styles.screen} testID="screen-settings" collapsable={false}>
       <View style={[styles.split, { paddingHorizontal: metrics.padH, paddingBottom: metrics.padV, gap: metrics.gap }]}>
         <View style={[styles.sidebar, { width: metrics.sidebarWidth }]} collapsable={false}>
           {/*
-            The category list is on the left, under the WOD tab. tvOS only draws a
-            1px guide for nextFocusUp, and the WOD tab wins that search. This
-            guide fills the gap under the tab bar so Up from Brand reaches Settings.
+            Brand sits under the WOD tab. This band is the whole gap under the
+            tab bar, and it sends Up to Settings. The 1px nextFocusUp guide loses
+            to the WOD tab.
           */}
           <Guide
             collapsable={false}
             style={{ minHeight: metrics.padV, justifyContent: 'flex-end', paddingBottom: metrics.gap }}
-            {...(guideProps || settingsTabTag == null ? null : { destinations: [settingsTabTag] })}
+            {...(plain || tabDestinations.length === 0 ? null : { destinations: tabDestinations })}
           >
             <Text style={[styles.title, { fontSize: metrics.title, lineHeight: metrics.title + 6, color: accent }]}>Settings</Text>
           </Guide>
-          <Guide style={{ gap: metrics.gap }} collapsable={false} {...(guideProps ? null : { trapFocusLeft: true })}>
+          <Guide style={{ gap: metrics.gap }} collapsable={false} {...(plain ? null : { trapFocusLeft: true })}>
           {TV_SETTINGS_CATEGORIES.map((item, index) => {
             const selfId = item.testID;
             const place: SettingsPlace = { zone: 'sidebar', index };
@@ -375,11 +377,21 @@ export function TvSettings({
           })}
           </Guide>
         </View>
-        <Guide
-          style={[styles.detail, { paddingTop: metrics.padV }]}
+        <View style={styles.detail} collapsable={false}>
+          {/*
+            The Settings tab is centered over this pane. Down would otherwise
+            open the gym-name field. This band sends that Down into the sidebar.
+          */}
+          <Guide
+            collapsable={false}
+            style={{ height: metrics.padV }}
+            {...(plain || sidebarDestinations.length === 0 ? null : { destinations: sidebarDestinations })}
+          />
+          <Guide
+          style={styles.detailBody}
           collapsable={false}
           testID={settingsDetailTestId(category.id)}
-          {...(guideProps ? null : { destinations: detailDestinations, trapFocusUp: true, trapFocusDown: true, trapFocusRight: true })}
+          {...(plain ? null : { destinations: detailDestinations, trapFocusUp: true, trapFocusDown: true, trapFocusRight: true })}
           onLayout={(event) => {
             const next = Math.round(event.nativeEvent.layout.width);
             setPaneWidth((current) => (current === next ? current : next));
@@ -420,7 +432,8 @@ export function TvSettings({
               onDetail={onDetail}
             />
           </ScrollView>
-        </Guide>
+          </Guide>
+        </View>
       </View>
     </View>
   );
@@ -726,6 +739,7 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   detail: { flex: 1, minWidth: 0 },
+  detailBody: { flex: 1, minWidth: 0 },
   detailScroll: { flex: 1 },
   title: { fontFamily: 'Oswald' },
   detailTitle: { fontFamily: 'Oswald' },
