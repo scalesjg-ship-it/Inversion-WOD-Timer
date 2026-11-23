@@ -8,8 +8,10 @@ import {
   allowsDeviceHaptics,
   allowsSystemNotifications,
   focusChrome,
+  phoneTabBarFrame,
   stepperControlSize,
   tabBarControlSize,
+  tvTabBarHeight,
 } from './controls';
 
 describe('TV focus chrome', () => {
@@ -74,6 +76,34 @@ describe('TV control sizes', () => {
     const fire = tabBarControlSize(true, 540, 960);
     expect(fire.paddingHorizontal).toBeGreaterThanOrEqual(Math.round(960 * 0.05));
     expect(fire.barContentHeight).toBeLessThan(tab.barContentHeight);
+  });
+});
+
+describe('phone tab bar safe area', () => {
+  it('keeps a 64pt band when the bottom inset is 0', () => {
+    expect(phoneTabBarFrame(0)).toEqual({ height: 64, paddingTop: 6, paddingBottom: 0 });
+    expect(phoneTabBarFrame(-8)).toEqual({ height: 64, paddingTop: 6, paddingBottom: 0 });
+    expect(phoneTabBarFrame(Number.NaN).height).toBe(64);
+  });
+
+  it('lifts the band by the iPhone home-indicator inset and the Android navigation inset', () => {
+    const island = phoneTabBarFrame(34);
+    expect(island).toEqual({ height: 98, paddingTop: 6, paddingBottom: 34 });
+    expect(island.height - island.paddingBottom).toBe(tabBarControlSize(false).barContentHeight);
+
+    const gesture = phoneTabBarFrame(24);
+    expect(gesture).toEqual({ height: 88, paddingTop: 6, paddingBottom: 24 });
+
+    const threeButton = phoneTabBarFrame(48);
+    expect(threeButton).toEqual({ height: 112, paddingTop: 6, paddingBottom: 48 });
+  });
+
+  it('leaves the television tab bar on its own metrics', () => {
+    const tv = tabBarControlSize(true, 1080, 1920);
+    expect(tvTabBarHeight(1080, 0, 1920)).toBe(tv.paddingTop + tv.barContentHeight + tv.paddingBottom);
+    expect(tvTabBarHeight(1080, 34, 1920)).toBe(tv.paddingTop + tv.barContentHeight + 34);
+    expect(phoneTabBarFrame(34).height).not.toBe(tvTabBarHeight(1080, 34, 1920));
+    expect(tabBarControlSize(false).barContentHeight).toBe(64);
   });
 });
 
