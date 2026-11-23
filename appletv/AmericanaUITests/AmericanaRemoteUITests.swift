@@ -9,6 +9,8 @@ final class AmericanaRemoteUITests: XCTestCase {
   private let app = XCUIApplication()
   private let remote = XCUIRemote.shared
   private var lines: [String] = []
+  private var keptFace = ""
+  private var keptClock: Int?
 
   override func setUpWithError() throws {
     continueAfterFailure = true
@@ -49,7 +51,9 @@ final class AmericanaRemoteUITests: XCTestCase {
     step("Resume continues") { resumeContinues() }
     step("Play/Pause toggles") { playPauseToggles() }
     step("Finish (For Time)") { stopForTime() }
-    step("Reset") { resetForTime() }
+    step("Reset opens Are you sure") { openResetConfirm() }
+    step("No keeps the finished timer") { declineResetKeepsTimer() }
+    step("Yes resets") { confirmResetYes() }
     step("Menu pauses rather than leaving") {
       startAgainIfNeeded()
       return menuPausesAndStays()
@@ -91,6 +95,17 @@ final class AmericanaRemoteUITests: XCTestCase {
     step("Up to the Settings tab") { upSidebarToTab() }
     step("Menu from an option returns to the sidebar") { menuFromOptionToSidebar() }
     step("Menu from the sidebar leaves Settings") { menuFromSidebarLeavesSettings() }
+  }
+
+  /// Sound is the last sidebar row. Right enters the voice countdown switch.
+  /// Select turns it on, Select again turns it off, and Left returns to Sound.
+  func testSoundVoiceCountdown() {
+    step("open Settings") { openTab("tab-settings", screen: "screen-settings", direction: .right) }
+    step("Down to Sound") { downToSound() }
+    step("Right into Voice countdown") { rightIntoVoiceCountdown() }
+    step("Select turns voice countdown on") { setVoiceCountdown(true) }
+    step("Select turns voice countdown off") { setVoiceCountdown(false) }
+    step("Left returns to Sound") { leftToSound() }
   }
 
   /// Down from the lead-in minutes minus must leave that button. Save preset
@@ -214,7 +229,7 @@ final class AmericanaRemoteUITests: XCTestCase {
   private func waitForWorkPhase() -> String {
     let ready = waitFace(prefix: "For time", timeout: 25)
     XCTAssertTrue(ready, "For Time did not reach work. face=\(faceLabel()) \(snapshot())")
-    XCTAssertTrue(any("timer-finish").waitForExistence(timeout: 5), "Stop was not on the For Time clock. \(snapshot())")
+    XCTAssertTrue(any("timer-finish").waitForExistence(timeout: 5), "Finish was not on the For Time clock. \(snapshot())")
     return "face=\(faceLabel())"
   }
 
@@ -227,11 +242,99 @@ final class AmericanaRemoteUITests: XCTestCase {
       )
     }
     XCTAssertTrue(any(detail).waitForExistence(timeout: 4), "\(detail) did not appear. \(snapshot())")
-    for other in ["settings-detail-brand", "settings-detail-look", "settings-detail-display", "settings-detail-colors", "settings-detail-logo"] where other != detail {
+    for other in ["settings-detail-brand", "settings-detail-look", "settings-detail-display", "settings-detail-colors", "settings-detail-logo", "settings-detail-sound"] where other != detail {
       XCTAssertFalse(any(other).exists, "\(other) was still showing with \(detail). \(snapshot())")
     }
     XCTAssertEqual(app.state, .runningForeground, "Down left the app")
     return "focus=\(focusedIdentifier()) detail=\(detail)"
+  }
+
+  private func downToSound() -> String {
+    _ = ensureTabFocused()
+    press(.down, settle: 0.7)
+    XCTAssertTrue(
+      nudge("settings-category-sound", directions: [.down], limit: 8),
+      "Down did not reach Sound. \(snapshot())"
+    )
+    XCTAssertTrue(any("settings-detail-sound").waitForExistence(timeout: 4), "Sound pane did not appear. \(snapshot())")
+    XCTAssertTrue(any("voice-countdown").waitForExistence(timeout: 4), "Voice countdown was not in Sound. \(snapshot())")
+    for other in ["settings-detail-brand", "settings-detail-look", "settings-detail-display", "settings-detail-colors", "settings-detail-logo"] {
+      XCTAssertFalse(any(other).exists, "\(other) was still showing on Sound. \(snapshot())")
+    }
+    XCTAssertEqual(app.state, .runningForeground, "Down left the app")
+    return "focus=\(focusedIdentifier())"
+  }
+
+  private func rightIntoVoiceCountdown() -> String {
+    XCTAssertTrue(focused("settings-category-sound"), "Right was not taken from Sound. \(snapshot())")
+    press(.right, settle: 0.75)
+    XCTAssertTrue(
+      focused("voice-countdown") || waitFocus("voice-countdown", timeout: 2),
+      "Right from Sound did not focus Voice countdown. \(snapshot())"
+    )
+    XCTAssertTrue(any("settings-detail-sound").exists, "Right left the Sound pane. \(snapshot())")
+    let label = any("voice-countdown").label
+    XCTAssertTrue(label.contains("Voice countdown"), "Voice countdown label was \(label). \(snapshot())")
+    XCTAssertFalse(voiceCountdownOn(), "Voice countdown did not start off. \(voiceCountdownDetail())")
+    XCTAssertEqual(app.state, .runningForeground, "Right left the app")
+    return voiceCountdownDetail()
+  }
+
+  private func setVoiceCountdown(_ on: Bool) -> String {
+    if !focused("voice-countdown") {
+      XCTAssertTrue(
+        nudge("voice-countdown", directions: [.right, .left], limit: 4),
+        "Could not focus Voice countdown. \(snapshot())"
+      )
+    }
+    if voiceCountdownOn() != on {
+      press(.select, settle: 0.8)
+    }
+    let matched = waitVoiceCountdown(on, timeout: 4)
+    XCTAssertEqual(voiceCountdownOn(), on, "Voice countdown did not become \(on ? "On" : "Off"). \(voiceCountdownDetail())")
+    XCTAssertTrue(matched, "Voice countdown did not update. \(voiceCountdownDetail())")
+    XCTAssertTrue(focused("voice-countdown"), "Select left Voice countdown. \(snapshot())")
+    return voiceCountdownDetail()
+  }
+
+  private func leftToSound() -> String {
+    for _ in 0..<4 where !focused("settings-category-sound") {
+      press(.left, settle: 0.65)
+    }
+    XCTAssertTrue(focused("settings-category-sound"), "Left did not return to Sound. \(snapshot())")
+    XCTAssertTrue(any("settings-detail-sound").exists, "Left closed the Sound pane. \(snapshot())")
+    XCTAssertTrue(any("voice-countdown").exists, "Left removed Voice countdown. \(snapshot())")
+    XCTAssertFalse(voiceCountdownOn(), "Voice countdown was left on. \(voiceCountdownDetail())")
+    XCTAssertEqual(app.state, .runningForeground, "Left left the app")
+    return focusedIdentifier()
+  }
+
+  private func voiceCountdownOn() -> Bool {
+    let toggle = any("voice-countdown")
+    if let value = toggle.value as? String {
+      if value == "1" || value.caseInsensitiveCompare("On") == .orderedSame { return true }
+      if value == "0" || value.caseInsensitiveCompare("Off") == .orderedSame { return false }
+    }
+    if let number = toggle.value as? NSNumber {
+      return number.intValue != 0
+    }
+    let label = toggle.label
+    if label.contains("Off") { return false }
+    return label.contains("On")
+  }
+
+  private func voiceCountdownDetail() -> String {
+    let toggle = any("voice-countdown")
+    return "label=\(toggle.label) value=\(String(describing: toggle.value))"
+  }
+
+  private func waitVoiceCountdown(_ on: Bool, timeout: TimeInterval) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+      if voiceCountdownOn() == on { return true }
+      Thread.sleep(forTimeInterval: 0.2)
+    }
+    return voiceCountdownOn() == on
   }
 
   private func rightIntoLogoOptions() -> String {
@@ -299,7 +402,15 @@ final class AmericanaRemoteUITests: XCTestCase {
     if !focused("help-watch") {
       XCTAssertTrue(nudge("help-watch", directions: [.down, .up], limit: 6), "Down did not reach Apple Watch. \(snapshot())")
     }
+    let watchHelp = any("help-watch").label
+    XCTAssertTrue(watchHelp.contains("6-digit code"), "Apple Watch help was \(watchHelp). \(snapshot())")
+    XCTAssertTrue(watchHelp.contains("Apple TV HD"), "Apple Watch help omitted Apple TV HD. \(watchHelp)")
+    XCTAssertFalse(watchHelp.contains("not an Apple TV HD"), "Apple Watch help still excludes HD. \(watchHelp)")
+    XCTAssertFalse(watchHelp.localizedCaseInsensitiveContains("cannot pair"), "Apple Watch help still says HD cannot pair. \(watchHelp)")
     XCTAssertTrue(nudge("help-remote", directions: [.down], limit: 3), "Could not focus Remote. \(snapshot())")
+    let remoteHelp = any("help-remote").label
+    XCTAssertTrue(remoteHelp.contains("Finish"), "Remote help did not mention Finish. \(remoteHelp)")
+    XCTAssertTrue(remoteHelp.contains("Are you sure?"), "Remote help did not mention the reset question. \(remoteHelp)")
     XCTAssertTrue(nudge("help-version", directions: [.down], limit: 14), "Could not focus the version line. \(snapshot())")
     let version = any("help-version").label
     XCTAssertTrue(version.contains("Version"), "Version line was \(version). \(snapshot())")
@@ -348,16 +459,13 @@ final class AmericanaRemoteUITests: XCTestCase {
     let digits = code.label.filter(\.isNumber)
     XCTAssertEqual(digits.count, 6, "Code label was \(code.label). \(snapshot())")
     XCTAssertTrue(any("timer-watch").exists, "Watch was missing on the HD code screen. \(snapshot())")
-    if !focused("watch-pair-code") {
-      press(.up, settle: 0.7)
-    }
-    if !focused("watch-pair-code") {
-      XCTAssertTrue(
-        nudge("watch-pair-code", directions: [.up, .right, .left], limit: 8),
-        "Remote could not focus the pairing code. \(snapshot())"
-      )
-    }
-    XCTAssertTrue(focused("watch-pair-code"), "Pairing code did not take focus. \(snapshot())")
+    let resume = any("timer-pause")
+    XCTAssertTrue(focused("timer-pause") && resume.label.contains("Resume"), "Up was not taken from Resume. \(snapshot())")
+    press(.up, settle: 0.7)
+    XCTAssertTrue(
+      focused("watch-pair-code") || waitFocus("watch-pair-code", timeout: 2),
+      "Up from Resume did not focus the pairing code. \(snapshot())"
+    )
     press(.down, settle: 0.6)
     if !focused("timer-pause") {
       XCTAssertTrue(nudge("timer-pause", directions: [.down, .left], limit: 6), "Down from the code did not return to the clock. \(snapshot())")
@@ -429,22 +537,60 @@ final class AmericanaRemoteUITests: XCTestCase {
       press(.select, settle: 0.7)
       XCTAssertTrue(waitFace(containing: "Paused", timeout: 6), "Could not pause before Stop. \(snapshot())")
     }
-    XCTAssertTrue(nudge("timer-finish", directions: [.right, .left], limit: 4), "Could not focus Stop. \(snapshot())")
+    XCTAssertTrue(nudge("timer-finish", directions: [.right, .left], limit: 4), "Could not focus Finish. \(snapshot())")
     press(.select, settle: 0.8)
     let stopped = waitFace(prefix: "Time,", timeout: 6)
     let gone = waitGone("timer-finish", timeout: 5)
     let again = any("timer-start").waitForExistence(timeout: 5) && any("timer-start").label.contains("Go again")
-    XCTAssertTrue(any("timer-face").exists, "Stop left the timer. \(snapshot())")
-    XCTAssertTrue(stopped, "Stop did not finish the clock. face=\(faceLabel()) \(snapshot())")
-    XCTAssertTrue(gone, "Stop stayed on screen. \(snapshot())")
+    XCTAssertTrue(any("timer-face").exists, "Finish left the timer. \(snapshot())")
+    XCTAssertTrue(stopped, "Finish did not finish the clock. face=\(faceLabel()) \(snapshot())")
+    XCTAssertTrue(gone, "Finish stayed on screen. \(snapshot())")
     XCTAssertTrue(again, "Go again was not shown. label=\(any("timer-start").label) \(snapshot())")
     return "face=\(faceLabel()) goAgain=\(any("timer-start").label)"
   }
 
-  private func resetForTime() -> String {
+  private func openResetConfirm() -> String {
     XCTAssertTrue(nudge("timer-reset", directions: [.right, .left], limit: 4), "Could not focus Reset. \(snapshot())")
+    keptFace = faceLabel()
+    keptClock = clockSeconds()
     press(.select, settle: 0.8)
-    XCTAssertTrue(any("reset-confirm").waitForExistence(timeout: 5), "Reset did not ask to confirm. \(snapshot())")
+    XCTAssertTrue(any("reset-confirm").waitForExistence(timeout: 5), "One Reset press did not ask to confirm. \(snapshot())")
+    XCTAssertTrue(app.staticTexts["Are you sure?"].waitForExistence(timeout: 3), "Confirm title was missing. \(snapshot())")
+    XCTAssertTrue(any("confirm-reset-no").exists, "No was missing. \(snapshot())")
+    XCTAssertTrue(any("confirm-reset-yes").exists, "Yes was missing. \(snapshot())")
+    XCTAssertTrue(keptFace.hasPrefix("Time,"), "Reset was not asked from the finished clock. face=\(keptFace)")
+    XCTAssertFalse(faceLabel().hasPrefix("For Time"), "One Reset press reset without a Yes. \(snapshot())")
+    let landedOnNo = waitFocus("confirm-reset-no", timeout: 3)
+    XCTAssertTrue(landedOnNo, "Reset did not land on No. \(snapshot())")
+    return "face=\(faceLabel()) clock=\(keptClock ?? -1) no=\(landedOnNo)"
+  }
+
+  private func declineResetKeepsTimer() -> String {
+    if !focused("confirm-reset-no") {
+      XCTAssertTrue(
+        nudge("confirm-reset-no", directions: [.up, .down], limit: 4),
+        "Could not focus No. \(snapshot())"
+      )
+    }
+    press(.select, settle: 0.8)
+    XCTAssertTrue(waitGone("reset-confirm", timeout: 5), "No did not dismiss the question. \(snapshot())")
+    XCTAssertFalse(app.staticTexts["Are you sure?"].exists, "Are you sure stayed after No. \(snapshot())")
+    XCTAssertEqual(faceLabel(), keptFace, "No changed the clock face. \(snapshot())")
+    XCTAssertEqual(clockSeconds(), keptClock, "No changed the time. kept=\(keptClock ?? -1) \(snapshot())")
+    XCTAssertTrue(any("timer-start").label.contains("Go again"), "No left the finished timer. \(snapshot())")
+    XCTAssertFalse(any("timer-finish").exists, "Finish returned after No. \(snapshot())")
+    let backOnReset = waitFocus("timer-reset", timeout: 3) || nudge("timer-reset", directions: [.right, .left], limit: 4)
+    XCTAssertTrue(backOnReset, "Focus did not return to Reset. \(snapshot())")
+    return "face=\(faceLabel()) clock=\(clockSeconds() ?? -1)"
+  }
+
+  private func confirmResetYes() -> String {
+    if !any("reset-confirm").exists {
+      XCTAssertTrue(nudge("timer-reset", directions: [.right, .left], limit: 4), "Could not focus Reset. \(snapshot())")
+      press(.select, settle: 0.8)
+    }
+    XCTAssertTrue(any("reset-confirm").waitForExistence(timeout: 5), "Reset did not ask again. \(snapshot())")
+    XCTAssertTrue(faceLabel().hasPrefix("Time,"), "The timer changed before Yes. \(snapshot())")
     if !focused("confirm-reset-yes") {
       XCTAssertTrue(
         nudge("confirm-reset-yes", directions: [.down, .up], limit: 4),
@@ -456,11 +602,12 @@ final class AmericanaRemoteUITests: XCTestCase {
     let startShown = any("timer-start").waitForExistence(timeout: 5)
     let startLabel = any("timer-start").label
     let clock = clockSeconds()
-    XCTAssertTrue(any("timer-face").exists, "Reset left the timer. \(snapshot())")
-    XCTAssertTrue(idle, "Reset did not return to For Time. face=\(faceLabel()) \(snapshot())")
-    XCTAssertTrue(startShown && startLabel.contains("Start"), "Start was not shown after Reset (\(startLabel)). \(snapshot())")
-    XCTAssertEqual(clock, Optional(0), "Reset clock was \(faceLabel())")
-    XCTAssertFalse(any("timer-finish").exists, "Stop remained after Reset. \(snapshot())")
+    XCTAssertTrue(waitGone("reset-confirm", timeout: 4), "Yes left the question open. \(snapshot())")
+    XCTAssertTrue(any("timer-face").exists, "Yes left the timer. \(snapshot())")
+    XCTAssertTrue(idle, "Yes did not return to For Time. face=\(faceLabel()) \(snapshot())")
+    XCTAssertTrue(startShown && startLabel.contains("Start"), "Start was not shown after Yes (\(startLabel)). \(snapshot())")
+    XCTAssertEqual(clock, Optional(0), "Yes clock was \(faceLabel())")
+    XCTAssertFalse(any("timer-finish").exists, "Finish remained after Yes. \(snapshot())")
     return "face=\(faceLabel()) start=\(startLabel)"
   }
 

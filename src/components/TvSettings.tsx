@@ -428,7 +428,7 @@ export function TvSettings({
           >
             <ScrollView
             ref={scrollRef}
-            style={styles.detailScroll}
+            style={category.id === 'sound' ? undefined : styles.detailScroll}
             contentContainerStyle={{ gap: metrics.gap, paddingBottom: metrics.gap }}
             onLayout={(event) => {
               viewport.current = event.nativeEvent.layout.height;
@@ -466,6 +466,11 @@ export function TvSettings({
               }}
             />
             </ScrollView>
+            {category.id === 'sound' && tags['voice-countdown'] != null ? (
+              // The switch sits at the top. This guide is the empty area beside
+              // the Sound row, so Right from that row lands on the switch.
+              <Guide style={styles.soundGuide} destinations={[tags['voice-countdown']]} collapsable={false} />
+            ) : null}
           </Guide>
         </View>
       </View>
@@ -820,6 +825,7 @@ const styles = StyleSheet.create({
   detail: { flex: 1, minWidth: 0 },
   detailBody: { flex: 1, minWidth: 0 },
   detailScroll: { flex: 1 },
+  soundGuide: { flex: 1 },
   title: { fontFamily: 'Oswald' },
   detailTitle: { fontFamily: 'Oswald' },
   header: {

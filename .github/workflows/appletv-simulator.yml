@@ -11,6 +11,7 @@ on:
   push:
     branches:
       - cursor/appletv-sim-uitest-8dd8
+      - cursor/appletv-uitest-finish-sound-bfec
 
 concurrency:
   group: appletv-simulator-${{ github.ref }}
