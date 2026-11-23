@@ -200,6 +200,36 @@ export function tvTabBarHeight(screenHeight: number, bottomInset = 0, screenWidt
   return tab.paddingTop + tab.barContentHeight + Math.max(bottomInset, tab.paddingBottom);
 }
 
+export interface PhoneTabBarFrame {
+  /** Full bar height. Includes the bottom safe-area inset. */
+  height: number;
+  paddingTop: number;
+  /**
+   * Bottom padding equal to the safe-area inset.
+   * The letter and label sit in the band above this padding.
+   */
+  paddingBottom: number;
+}
+
+/**
+ * Phone tab bar frame for a custom numeric height.
+ *
+ * Expo Router uses that height as the entire bar and still pads the bottom by
+ * the safe-area inset. The inset has to be part of the height too, or the
+ * letter and label are squeezed into the home indicator (iPhone) or the
+ * navigation bar (Android gesture and 3-button). An inset of 0 — a Home-button
+ * iPhone — keeps the 64pt band. Television uses `tvTabBarHeight` instead.
+ */
+export function phoneTabBarFrame(bottomInset = 0): PhoneTabBarFrame {
+  const tab = tabBarControlSize(false);
+  const inset = Number.isFinite(bottomInset) && bottomInset > 0 ? bottomInset : 0;
+  return {
+    height: tab.barContentHeight + inset,
+    paddingTop: tab.paddingTop,
+    paddingBottom: inset,
+  };
+}
+
 /** Apple TV and Android TV have no Taptic Engine or vibration motor for this app. */
 export function allowsDeviceHaptics(tv: boolean): boolean {
   return !tv;

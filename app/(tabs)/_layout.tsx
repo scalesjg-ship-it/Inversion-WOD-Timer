@@ -7,8 +7,7 @@ import { readableDigitColor } from '@/src/branding/color';
 import { TvTabBar } from '@/src/components/TvTabBar';
 import { TvTabFocusProvider } from '@/src/components/TvTabFocus';
 import { chrome } from '@/src/theme/chrome';
-
-const TAB_BAR_CONTENT_HEIGHT = 64;
+import { phoneTabBarFrame } from '@/src/tv/controls';
 
 export default function TabLayout() {
   const { branding } = useBranding();
@@ -29,9 +28,13 @@ export default function TabLayout() {
     );
   }
 
-  // Android phone draws edge-to-edge. The fixed 64pt bar would sit under the
-  // navigation bar. iOS keeps the existing bar.
-  const androidPhone = Platform.OS === 'android';
+  // A numeric tab bar height replaces the navigator default, which is the
+  // only height that already includes the bottom inset. Add the inset on
+  // iPhone and Android so the letter and label stay in the 64pt band above
+  // the home indicator or system navigation bar. Inset 0 keeps that band.
+  // The tab scenes are laid out above the bar, so scroll content is not
+  // covered and does not need a second copy of this height.
+  const tabBar = phoneTabBarFrame(insets.bottom);
 
   return (
     <Tabs
@@ -42,13 +45,17 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: chrome.bg,
           borderTopColor: chrome.line,
-          height: androidPhone ? TAB_BAR_CONTENT_HEIGHT + insets.bottom : TAB_BAR_CONTENT_HEIGHT,
-          paddingTop: 6,
-          ...(androidPhone ? { paddingBottom: insets.bottom } : null),
+          height: tabBar.height,
+          paddingTop: tabBar.paddingTop,
+          paddingBottom: tabBar.paddingBottom,
+        },
+        tabBarItemStyle: {
+          justifyContent: 'center',
         },
         tabBarLabelStyle: {
           fontFamily: 'OswaldMedium',
           fontSize: 13,
+          lineHeight: 18,
           letterSpacing: 0.6,
         },
       }}
@@ -82,7 +89,7 @@ export default function TabLayout() {
 }
 
 function TabMark({ color, label }: { color: TextStyle['color']; label: string }) {
-  return <Text style={{ color, fontFamily: 'Oswald', fontSize: 16 }}>{label}</Text>;
+  return <Text style={{ color, fontFamily: 'Oswald', fontSize: 16, lineHeight: 20 }}>{label}</Text>;
 }
 
 const styles = StyleSheet.create({
