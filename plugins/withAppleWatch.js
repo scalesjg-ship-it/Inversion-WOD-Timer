@@ -87,6 +87,8 @@ function relayInfoPlistValues(env = process.env) {
 function watchBuildSettings(marketingVersion, buildNumber, env = process.env) {
   const relay = relayInfoPlistValues(env);
   return {
+    // targets/watch/Assets.xcassets/AppIcon.appiconset — one 1024 watchOS image.
+    // Must match CFBundleIconName in targets/watch/Info.plist.
     ASSETCATALOG_COMPILER_APPICON_NAME: 'AppIcon',
     CODE_SIGN_STYLE: 'Automatic',
     CURRENT_PROJECT_VERSION: `"${buildNumber}"`,

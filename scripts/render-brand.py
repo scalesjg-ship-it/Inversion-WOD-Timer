@@ -4,10 +4,14 @@
 Requires cairosvg, cairo, and Pillow. From the repo root:
 
     python3 scripts/render-brand.py
+
+`python3 scripts/render-brand.py --watch-icon` rewrites only the watch icon
+from assets/images/icon.png.
 """
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import cairosvg
@@ -23,6 +27,10 @@ STORE = ROOT / "assets" / "store"
 INK = (244, 241, 234, 255)
 RED = (255, 59, 36, 255)
 BG = (12, 13, 16, 255)
+WATCH_ICON = ROOT / "targets" / "watch" / "Assets.xcassets" / "AppIcon.appiconset" / "AppIcon.png"
+# watchOS clips the square to a circle. A few pixels of bleed puts the
+# anti-aliased rim outside that circle so the ring is not inset.
+WATCH_BLEED = 8
 
 
 def svg_text() -> str:
@@ -127,6 +135,56 @@ def banner(width: int, height: int, title_size: int, sub_size: int) -> Image.Ima
     return image
 
 
+def content_bounds(image: Image.Image, tolerance: int = 12) -> tuple[int, int, int, int]:
+    """Bounding box of pixels that are not the corner background."""
+    rgba = image.convert("RGBA")
+    pixels = rgba.load()
+    width, height = rgba.size
+    background = pixels[0, 0]
+    min_x, min_y, max_x, max_y = width, height, -1, -1
+    for y in range(height):
+        for x in range(width):
+            pixel = pixels[x, y]
+            if pixel[3] < 16:
+                continue
+            if all(abs(pixel[channel] - background[channel]) <= tolerance for channel in range(3)):
+                continue
+            min_x = min(min_x, x)
+            min_y = min(min_y, y)
+            max_x = max(max_x, x)
+            max_y = max(max_y, y)
+    if max_x < 0:
+        raise SystemExit("iPhone icon has no mark to derive the watch icon from")
+    return min_x, min_y, max_x, max_y
+
+
+def watch_app_icon(phone: Image.Image) -> Image.Image:
+    """Full-bleed opaque watch icon derived from the iPhone icon.
+
+    The iPhone mark keeps a margin. The same file looks small on Apple Watch
+    because the system masks the square to a circle. Scale the mark until it
+    crosses the canvas edge, then flatten to RGB. Corners stay square.
+    """
+    source = phone.convert("RGBA")
+    min_x, min_y, max_x, max_y = content_bounds(source)
+    span = max(max_x - min_x + 1, max_y - min_y + 1)
+    scale = (1024 + WATCH_BLEED * 2) / span
+    resized = source.resize(
+        (round(source.width * scale), round(source.height * scale)),
+        Image.Resampling.LANCZOS,
+    )
+    center_x = ((min_x + max_x) / 2) * scale
+    center_y = ((min_y + max_y) / 2) * scale
+    left = round(center_x - 512)
+    top = round(center_y - 512)
+    if left < 0 or top < 0 or left + 1024 > resized.width or top + 1024 > resized.height:
+        raise SystemExit(f"watch icon crop {left},{top} falls outside {resized.size}")
+    cropped = resized.crop((left, top, left + 1024, top + 1024))
+    flat = Image.new("RGB", (1024, 1024), BG[:3])
+    flat.paste(cropped, mask=cropped.getchannel("A"))
+    return flat
+
+
 def splash() -> Image.Image:
     image = Image.new("RGBA", (1024, 1024), BG)
     paste_mark(image, 720, (152, 48), "front")
@@ -137,8 +195,12 @@ def splash() -> Image.Image:
 
 
 def main() -> None:
+    if "--watch-icon" in sys.argv[1:]:
+        save(watch_app_icon(Image.open(IMAGES / "icon.png")), WATCH_ICON)
+        return
     icon = render_svg(mark_only("full"), 1024, 1024)
     save(icon, IMAGES / "icon.png")
+    save(watch_app_icon(icon), WATCH_ICON)
     save(icon.resize((48, 48), Image.Resampling.LANCZOS), IMAGES / "favicon.png")
 
     foreground = render_svg(mark_only("front"), 1024, 1024)
