@@ -298,6 +298,22 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("IOS_APP_PROFILE_BASE64", tvos)
         self.assertNotIn("WATCH_APP_PROFILE_BASE64", tvos)
 
+    def test_watch_target_compiles_the_app_icon(self):
+        signing.assert_watch_plist(ROOT / "targets" / "watch" / "Info.plist")
+        watch = """
+			ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+			PRODUCT_BUNDLE_IDENTIFIER = "com.garrettscales.americana.watchkitapp";
+"""
+        phone = """
+			ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+			PRODUCT_BUNDLE_IDENTIFIER = "com.garrettscales.americana";
+"""
+        signing.assert_watch_app_icon(
+            "buildSettings = {" + watch + "};\nbuildSettings = {" + watch + "};\nbuildSettings = {" + phone + "};"
+        )
+        missing = "buildSettings = {" + watch.replace("ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;", "") + "};"
+        expect_fail(self, "ASSETCATALOG_COMPILER_APPICON_NAME", lambda: signing.assert_watch_app_icon(missing + "\n" + missing))
+
     def test_shell_scripts_parse(self):
         for name in ("ci-ios-install-signing.sh", "ci-ios-cleanup-signing.sh"):
             subprocess.run(["bash", "-n", str(ROOT / "scripts" / name)], check=True)

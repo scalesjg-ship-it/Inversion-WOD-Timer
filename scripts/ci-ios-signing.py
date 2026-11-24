@@ -321,6 +321,22 @@ def assert_watch_plist(path: Path) -> None:
         fail("Watch companion bundle id must be the iPhone app")
     if plist.get("CFBundleIdentifier") not in {None, "$(PRODUCT_BUNDLE_IDENTIFIER)", WATCH_BUNDLE}:
         fail(f"Watch CFBundleIdentifier is {plist.get('CFBundleIdentifier')!r}")
+    if plist.get("CFBundleIconName") != "AppIcon":
+        fail("Watch Info.plist CFBundleIconName must be AppIcon")
+
+
+def assert_watch_app_icon(project_text: str) -> None:
+    """The watch target compiles AppIcon.appiconset, not a phone icon slot."""
+    blocks = [
+        block
+        for block in re.findall(r"buildSettings = \{([^}]*)\}", project_text)
+        if re.search(rf'PRODUCT_BUNDLE_IDENTIFIER = "?{re.escape(WATCH_BUNDLE)}"?\s*;', block)
+    ]
+    if len(blocks) < 2:
+        fail(f"Expected Debug and Release watch build settings, found {len(blocks)}")
+    for block in blocks:
+        if not re.search(r'ASSETCATALOG_COMPILER_APPICON_NAME = "?AppIcon"?\s*;', block):
+            fail("Watch target ASSETCATALOG_COMPILER_APPICON_NAME must be AppIcon so the 1024 icon ships")
 
 
 def verify_prebuild(root: Path, ios_dir: Path) -> dict[str, str]:
@@ -339,6 +355,7 @@ def verify_prebuild(root: Path, ios_dir: Path) -> dict[str, str]:
     if bundle_ids != expected:
         fail(f"Unexpected PRODUCT_BUNDLE_IDENTIFIER values: {sorted(bundle_ids)}")
     project_text, counts = apply_versions(project_text, build)
+    assert_watch_app_icon(project_text)
     pbx_files[0].write_text(project_text)
     phone_plist = _phone_plist(ios_dir)
     apply_phone_plist(phone_plist, build)
