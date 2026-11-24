@@ -187,8 +187,7 @@ body:not(.home) footer {
 .home h1,
 .home h2,
 .home h3,
-.stores a,
-.stores .soon {
+.stores a {
   font-family: Oswald, "Avenir Next", "Segoe UI", sans-serif;
   font-weight: 700;
 }
@@ -240,21 +239,6 @@ body:not(.home) footer {
   color: var(--bg);
 }
 
-.stores .soon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 0.45rem 1.05rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-  font-weight: 500;
-  font-size: 1.05rem;
-  letter-spacing: 0.02em;
-  cursor: default;
-}
-
 .features {
   padding-bottom: 3.25rem;
 }
@@ -304,13 +288,7 @@ body:not(.home) footer {
 
 .stage {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.85rem 0.75rem;
-  align-items: start;
-}
-
-.shot-tv {
-  grid-column: 1 / -1;
+  grid-template-columns: 1fr;
 }
 
 .shot {
@@ -336,15 +314,6 @@ body:not(.home) footer {
 
 .bezel.tv img {
   border-radius: 0.45rem;
-}
-
-.bezel.phone {
-  padding: 0.4rem;
-  border-radius: 1.35rem;
-}
-
-.bezel.phone img {
-  border-radius: 1rem;
 }
 
 figcaption {
@@ -394,27 +363,6 @@ figcaption {
 @media (min-width: 860px) {
   .hero {
     padding-top: 3.5rem;
-  }
-
-  .stage {
-    grid-template-columns: minmax(0, 0.49fr) minmax(0, 1.55fr) minmax(0, 0.49fr);
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .shot-tv {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .shot-phone:nth-child(2) {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .shot-phone:nth-child(3) {
-    grid-column: 3;
-    grid-row: 1;
   }
 }
 
