@@ -232,6 +232,51 @@ final class AmericanaRemoteUITests: XCTestCase {
     return "face=\(faceLabel())"
   }
 
+  /// Layout frames for the open category stay inside the detail pane.
+  /// A focused row may scale, but its box still has to start and end in that pane.
+  private func assertRowsInside(_ detail: String) {
+    let rows: [String]
+    switch detail {
+    case "settings-detail-brand":
+      rows = ["brand-name"]
+    case "settings-detail-look":
+      rows = ["template-inversion-classic", "template-dark-room", "placement-watermark", "placement-fullBleed", "placement-corner"]
+    case "settings-detail-display":
+      rows = ["background-solid", "background-vignette", "background-edge", "clock-bold", "clock-regular"]
+    case "settings-detail-colors":
+      rows = ["palette-classic", "palette-patriot", "color-work-toggle", "color-rest-toggle", "color-ui-toggle"]
+    case "settings-detail-logo":
+      rows = ["logo-entry", "logo-url", "logo-url-load", "logo-blur", "reset-brand"]
+    case "settings-detail-sound":
+      rows = ["voice-countdown"]
+    case "settings-detail-watch":
+      rows = ["watch-status", "watch-pair", "watch-pair-code", "watch-unpair"]
+    default:
+      rows = []
+    }
+    let pane = any(detail)
+    XCTAssertTrue(pane.waitForExistence(timeout: 4), "\(detail) missing. \(snapshot())")
+    let paneFrame = pane.frame
+    XCTAssertGreaterThan(paneFrame.width, 1, "\(detail) has no width")
+    var checked = 0
+    for id in rows {
+      let row = any(id)
+      guard row.exists, row.frame.width > 1, row.frame.height > 1 else { continue }
+      checked += 1
+      XCTAssertGreaterThanOrEqual(
+        row.frame.minX,
+        paneFrame.minX - 1,
+        "\(id) starts left of \(detail). row=\(row.frame) pane=\(paneFrame)"
+      )
+      XCTAssertLessThanOrEqual(
+        row.frame.maxX,
+        paneFrame.maxX + 1,
+        "\(id) ends right of \(detail). row=\(row.frame) pane=\(paneFrame)"
+      )
+    }
+    XCTAssertGreaterThan(checked, 0, "No \(detail) rows were on screen. \(snapshot())")
+  }
+
   private func downToCategory(_ category: String, detail: String) -> String {
     press(.down, settle: 0.7)
     if !focused(category) {
@@ -241,6 +286,7 @@ final class AmericanaRemoteUITests: XCTestCase {
       )
     }
     XCTAssertTrue(any(detail).waitForExistence(timeout: 4), "\(detail) did not appear. \(snapshot())")
+    assertRowsInside(detail)
     for other in ["settings-detail-brand", "settings-detail-look", "settings-detail-display", "settings-detail-colors", "settings-detail-logo", "settings-detail-sound", "settings-detail-watch"] where other != detail {
       XCTAssertFalse(any(other).exists, "\(other) was still showing with \(detail). \(snapshot())")
     }
@@ -257,6 +303,7 @@ final class AmericanaRemoteUITests: XCTestCase {
     )
     XCTAssertTrue(any("settings-detail-sound").waitForExistence(timeout: 4), "Sound pane did not appear. \(snapshot())")
     XCTAssertTrue(any("voice-countdown").waitForExistence(timeout: 4), "Voice countdown was not in Sound. \(snapshot())")
+    assertRowsInside("settings-detail-sound")
     for other in ["settings-detail-brand", "settings-detail-look", "settings-detail-display", "settings-detail-colors", "settings-detail-logo"] {
       XCTAssertFalse(any(other).exists, "\(other) was still showing on Sound. \(snapshot())")
     }
@@ -272,6 +319,7 @@ final class AmericanaRemoteUITests: XCTestCase {
       "Right from Sound did not focus Voice countdown. \(snapshot())"
     )
     XCTAssertTrue(any("settings-detail-sound").exists, "Right left the Sound pane. \(snapshot())")
+    assertRowsInside("settings-detail-sound")
     let label = any("voice-countdown").label
     XCTAssertTrue(label.contains("Voice countdown"), "Voice countdown label was \(label). \(snapshot())")
     XCTAssertFalse(voiceCountdownOn(), "Voice countdown did not start off. \(voiceCountdownDetail())")
@@ -460,6 +508,7 @@ final class AmericanaRemoteUITests: XCTestCase {
       "Down did not reach Watch. \(snapshot())"
     )
     XCTAssertTrue(any("settings-detail-watch").waitForExistence(timeout: 4), "Watch pane did not appear. \(snapshot())")
+    assertRowsInside("settings-detail-watch")
     let status = any("watch-status")
     XCTAssertTrue(status.waitForExistence(timeout: 8), "Watch status did not appear. \(snapshot())")
     XCTAssertFalse(status.label.contains("Apple TV 4K"), "HD still asked for a 4K. Status was \(status.label). \(snapshot())")

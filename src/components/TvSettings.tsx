@@ -24,13 +24,18 @@ import { TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
 import { formatPairingCode } from '@/src/watch/relay/pairing';
 import { scrollOffsetForFocus } from '@/src/tv/scroll';
+import { tvFocusGutter } from '@/src/tv/layout';
 import { acceptRemotePress } from '@/src/tv/keyAction';
 import {
   settingsAction,
   settingsBackTab,
   settingsCategoryRows,
   settingsColorToggleId,
+  settingsColumnGap,
+  settingsDetailContentWidth,
+  settingsDetailInset,
   settingsDetailTestId,
+  settingsItemWidth,
   settingsNeighbor,
   TV_SETTINGS_CATEGORIES,
   tvSettingsMetrics,
@@ -43,6 +48,8 @@ import {
 import { TV_TAB_ROUTES } from '@/src/tv/tabFocus';
 
 const Guide = TVFocusGuideView ?? View;
+/** react-native-web has no TV event hook. The preview still has to lay out the pane. */
+const useTvRemote = typeof useTVEventHandler === 'function' ? useTVEventHandler : () => {};
 
 const PLACEMENTS: { id: LogoPlacement; label: string }[] = [
   { id: 'watermark', label: 'Watermark' },
@@ -229,7 +236,9 @@ export function TvSettings({
   const reveal = (id: string) => {
     const place = places.current[id];
     if (!place) return;
-    const next = scrollOffsetForFocus(place.y, place.height, viewport.current, offset.current);
+    // The focused row grows from its center. Scroll the grown frame into view.
+    const bleed = tvFocusGutter(place.height);
+    const next = scrollOffsetForFocus(place.y - bleed, place.height + bleed * 2, viewport.current, offset.current);
     if (next === offset.current) return;
     offset.current = next;
     scrollRef.current?.scrollTo({ y: next, animated: true });
@@ -282,7 +291,7 @@ export function TvSettings({
     }, [handleBack]),
   );
 
-  useTVEventHandler((event) => {
+  useTvRemote((event) => {
     const type = event.eventType;
     if (type !== 'menu' && type !== 'back' && type !== 'left') return;
     const decision = acceptRemotePress(
@@ -339,9 +348,15 @@ export function TvSettings({
   };
 
   const optionLinks = (id: string) => linksFor({ zone: 'detail', index: selected, id }, id);
+  // A focused row scales from its center. This inset is the room that scale needs
+  // so the label and the yellow ring stay inside the detail column.
+  const detailInset = settingsDetailInset(paneWidth);
+  const contentWidth = settingsDetailContentWidth(paneWidth);
+  const lineGap = (count: number) => settingsColumnGap(contentWidth, count, metrics.gap);
   const lineWidth = (count: number) => {
-    if (count <= 1 || paneWidth <= 0) return undefined;
-    return Math.floor((paneWidth - metrics.gap * (count - 1)) / count);
+    if (count <= 1 || contentWidth <= 0) return undefined;
+    const width = settingsItemWidth(contentWidth, count, lineGap(count));
+    return width > 0 ? width : undefined;
   };
 
   const choice = (id: string, label: string, active: boolean, onPress: () => void, itemWidth: number | undefined) => (
@@ -450,8 +465,12 @@ export function TvSettings({
           >
             <ScrollView
             ref={scrollRef}
-            style={category.id === 'sound' ? undefined : styles.detailScroll}
-            contentContainerStyle={{ gap: metrics.gap, paddingBottom: metrics.gap }}
+            style={category.id === 'sound' ? styles.detailScrollShrink : styles.detailScroll}
+            contentContainerStyle={{
+              gap: metrics.gap,
+              paddingBottom: metrics.gap,
+              paddingHorizontal: detailInset,
+            }}
             onLayout={(event) => {
               viewport.current = event.nativeEvent.layout.height;
             }}
@@ -478,6 +497,7 @@ export function TvSettings({
               metricsBody={metrics.body}
               gap={metrics.gap}
               lineWidth={lineWidth}
+              lineGap={lineGap}
               groups={categoryRows[selected] ?? []}
               rememberPlace={rememberPlace}
               choice={choice}
@@ -516,6 +536,7 @@ function DetailBody({
   metricsBody,
   gap,
   lineWidth,
+  lineGap,
   groups,
   rememberPlace,
   choice,
@@ -538,6 +559,7 @@ function DetailBody({
   metricsBody: number;
   gap: number;
   lineWidth: (count: number) => number | undefined;
+  lineGap: (count: number) => number;
   groups: readonly SettingsRow[];
   rememberPlace: (id: string, y: number, height: number) => void;
   choice: (id: string, label: string, active: boolean, onPress: () => void, itemWidth: number | undefined) => ReactElement;
@@ -566,7 +588,7 @@ function DetailBody({
         {rows.map((line) => (
           <View
             key={line.key}
-            style={[styles.line, { gap }]}
+            style={[styles.line, { gap: lineGap(Math.max(1, group.columns)) }]}
             onLayout={(event) => {
               const next = event.nativeEvent.layout;
               for (const id of line.ids) rememberPlace(id, next.y, next.height);
@@ -922,7 +944,9 @@ const styles = StyleSheet.create({
   },
   detail: { flex: 1, minWidth: 0 },
   detailBody: { flex: 1, minWidth: 0 },
-  detailScroll: { flex: 1 },
+  detailScroll: { flex: 1, alignSelf: 'stretch', minWidth: 0 },
+  /** Sound sizes to its row so the focus guide below can fill the empty pane. */
+  detailScrollShrink: { flexGrow: 0, alignSelf: 'stretch', minWidth: 0 },
   soundGuide: { flex: 1 },
   title: { fontFamily: 'Oswald' },
   detailTitle: { fontFamily: 'Oswald' },

@@ -29,6 +29,9 @@ const rnWeb = {
     build.onResolve({ filter: /^expo-modules-core$/ }, () => ({
       path: path.join(root, 'scripts/stub-expo-modules-core.ts'),
     }));
+    build.onResolve({ filter: /^expo$/ }, () => ({
+      path: path.join(root, 'scripts/stub-expo-modules-core.ts'),
+    }));
     build.onResolve({ filter: /^expo-router$/ }, () => ({
       path: path.join(root, 'scripts/stub-expo-router.tsx'),
     }));
@@ -185,6 +188,7 @@ function pageFor(tab, width, height, seed, confirm, mode, frameCategory, frameWa
 <body>
 <div id="root"></div>
 <script>
+globalThis.global = globalThis;
 globalThis.process = globalThis.process || { env: { NODE_ENV: 'development' } };
 ${storage}
 ${preview}
