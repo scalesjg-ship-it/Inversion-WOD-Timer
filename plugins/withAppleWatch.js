@@ -19,6 +19,8 @@ const WATCH_SOURCES = [
   'WatchApp.swift',
   'WatchSession.swift',
   'TimerFace.swift',
+  'PairingPad.swift',
+  'WatchRelay.swift',
 ];
 
 function isTvBuild(env = process.env) {
@@ -50,7 +52,7 @@ function tvApplicationServices() {
       {
         NSApplicationServiceIdentifier: WATCH_SERVICE,
         NSApplicationServiceUsageDescription:
-          'Americana finds your Apple Watch on this Wi-Fi so you can start, pause, and reset the gym timer from your wrist. Timer state stays between the watch and this TV and is not sent to a server.',
+          'Americana finds your Apple Watch on this Wi-Fi so you can start, pause, and reset the gym timer from your wrist. This direct link stays on your Wi-Fi.',
         NSApplicationServicePlatformSupport: ['watchOS'],
       },
     ],
@@ -70,8 +72,23 @@ function targetNamed(project, name) {
   return null;
 }
 
-function watchBuildSettings(marketingVersion, buildNumber) {
+/**
+ * SUPABASE_URL and SUPABASE_ANON_KEY are read at prebuild.
+ * Empty strings are the placeholders. Do not commit a real key.
+ */
+function relayInfoPlistValues(env = process.env) {
+  const clean = (value) => (typeof value === 'string' ? value.trim().replace(/"/g, '') : '');
   return {
+    SUPABASE_URL: clean(env.SUPABASE_URL),
+    SUPABASE_ANON_KEY: clean(env.SUPABASE_ANON_KEY),
+  };
+}
+
+function watchBuildSettings(marketingVersion, buildNumber, env = process.env) {
+  const relay = relayInfoPlistValues(env);
+  return {
+    // targets/watch/Assets.xcassets/AppIcon.appiconset — one 1024 watchOS image.
+    // Must match CFBundleIconName in targets/watch/Info.plist.
     ASSETCATALOG_COMPILER_APPICON_NAME: 'AppIcon',
     CODE_SIGN_STYLE: 'Automatic',
     CURRENT_PROJECT_VERSION: `"${buildNumber}"`,
@@ -89,11 +106,13 @@ function watchBuildSettings(marketingVersion, buildNumber) {
     SWIFT_VERSION: '5.0',
     TARGETED_DEVICE_FAMILY: '4',
     WATCHOS_DEPLOYMENT_TARGET: '9.0',
+    SUPABASE_URL: `"${relay.SUPABASE_URL}"`,
+    SUPABASE_ANON_KEY: `"${relay.SUPABASE_ANON_KEY}"`,
   };
 }
 
-function applyWatchSettings(project, marketingVersion, buildNumber) {
-  const settings = watchBuildSettings(marketingVersion, buildNumber);
+function applyWatchSettings(project, marketingVersion, buildNumber, env = process.env) {
+  const settings = watchBuildSettings(marketingVersion, buildNumber, env);
   const configs = project.pbxXCBuildConfigurationSection();
   for (const key of Object.keys(configs)) {
     if (key.endsWith('_comment')) continue;
@@ -223,7 +242,10 @@ function withAppleWatch(config) {
   const marketingVersion = config.version || '1.0.0';
   const archiveBuild = resolveIosArchiveBuild();
   const buildNumber = archiveBuild || config.ios?.buildNumber || '1';
+  const relay = relayInfoPlistValues();
   config = withInfoPlist(config, (mod) => {
+    mod.modResults.SUPABASE_URL = relay.SUPABASE_URL;
+    mod.modResults.SUPABASE_ANON_KEY = relay.SUPABASE_ANON_KEY;
     if (isTvBuild()) {
       mod.modResults.NSApplicationServices = tvApplicationServices();
       return mod;
@@ -246,4 +268,6 @@ module.exports.tvApplicationServices = tvApplicationServices;
 module.exports.linkWatchTarget = linkWatchTarget;
 module.exports.WATCH_BUNDLE_ID = WATCH_BUNDLE_ID;
 module.exports.WATCH_SERVICE = WATCH_SERVICE;
+module.exports.WATCH_SOURCES = WATCH_SOURCES;
 module.exports.resolveIosArchiveBuild = resolveIosArchiveBuild;
+module.exports.relayInfoPlistValues = relayInfoPlistValues;

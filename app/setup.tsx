@@ -16,7 +16,7 @@ import { tvSetupFrame, tvSetupMetrics, tvSetupScaled } from '@/src/tv/setupLayou
 import { showsOnScreenBack } from '@/src/tv/timerTransport';
 import { normalizeConfig } from '@/src/timer/engine';
 import { modeTitle } from '@/src/timer/labels';
-import { defaultConfig } from '@/src/timer/presets';
+import { defaultConfig, INTERVAL_PRESETS, type IntervalPreset } from '@/src/timer/presets';
 import { listPresets, presetSummary, type SavedPreset } from '@/src/timer/presetStorage';
 import type { TimerConfig, TimerMode } from '@/src/timer/types';
 
@@ -30,9 +30,11 @@ function readMode(value: string | string[] | undefined): TimerMode | null {
     case 'forTime':
     case 'amrap':
     case 'emom':
-    case 'tabata':
-    case 'intervals':
       return raw;
+    case 'tabata':
+    case 'rounds':
+    case 'intervals':
+      return 'intervals';
     default:
       return null;
   }
@@ -90,7 +92,9 @@ function SetupForm({
   const [workSeconds, setWorkSeconds] = useState(mode === 'forTime' ? 12 * 60 : initial.workSeconds);
   const [restSeconds, setRestSeconds] = useState(initial.restSeconds);
   const [rounds, setRounds] = useState(initial.rounds);
+  const [warningSeconds, setWarningSeconds] = useState(initial.warningSeconds);
   const [capOn, setCapOn] = useState(false);
+  const [pickedPreset, setPickedPreset] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [runLabel, setRunLabel] = useState(modeTitle(mode));
 
@@ -98,6 +102,8 @@ function SetupForm({
     setLeadInSeconds(preset.config.leadInSeconds);
     setRestSeconds(preset.config.restSeconds);
     setRounds(preset.config.rounds);
+    setWarningSeconds(preset.config.warningSeconds);
+    setPickedPreset(null);
     if (preset.config.mode === 'forTime') {
       if (preset.config.workSeconds > 0) {
         setCapOn(true);
@@ -131,10 +137,48 @@ function SetupForm({
     workSeconds: mode === 'forTime' && !capOn ? 0 : workSeconds,
     restSeconds,
     rounds,
-    warningSeconds: 0,
+    warningSeconds: mode === 'intervals' ? warningSeconds : 0,
   });
 
   const summary = presetSummary(config);
+  const applyBuiltIn = (preset: IntervalPreset) => {
+    setWorkSeconds(preset.workSeconds);
+    setRestSeconds(preset.restSeconds);
+    setRounds(preset.rounds);
+    setLeadInSeconds(preset.leadInSeconds);
+    setWarningSeconds(preset.warningSeconds);
+    setPickedPreset(preset.id);
+    setSelectedId('');
+    setRunLabel(preset.name);
+  };
+  const editInterval = () => setPickedPreset(null);
+  const intervalPresets = mode === 'intervals' ? (
+    <ChipRow
+      centered={tv}
+      accent={accent}
+      options={INTERVAL_PRESETS.map((preset) => ({
+        label: preset.name,
+        selected: pickedPreset === preset.id,
+        onPress: () => applyBuiltIn(preset),
+        testID: `interval-preset-${preset.id}`,
+      }))}
+    />
+  ) : null;
+  const intervalWarning = mode === 'intervals' ? (
+    <ChipRow
+      centered={tv}
+      accent={accent}
+      options={[0, 10, 30].map((seconds) => ({
+        label: seconds === 0 ? 'Off' : `${seconds}s`,
+        selected: warningSeconds === seconds,
+        onPress: () => {
+          editInterval();
+          setWarningSeconds(seconds);
+        },
+        testID: `interval-warning-${seconds}`,
+      }))}
+    />
+  ) : null;
   const shelf = (
     <PresetShelf
       mode={mode}
@@ -212,15 +256,50 @@ function SetupForm({
                 />
               </>
             ) : null}
-            {mode === 'tabata' || mode === 'intervals' ? (
+            {mode === 'intervals' ? (
               <>
-                <TimeField compact preferred label="Work" seconds={workSeconds} onChange={setWorkSeconds} testID="work" accent={accent} />
-                <TimeField compact label="Rest" seconds={restSeconds} onChange={setRestSeconds} testID="rest" accent={accent} />
+                {intervalPresets}
+                <TimeField
+                  compact
+                  preferred
+                  label="Work"
+                  seconds={workSeconds}
+                  onChange={(value) => {
+                    editInterval();
+                    setWorkSeconds(value);
+                  }}
+                  testID="work"
+                  accent={accent}
+                />
+                <TimeField
+                  compact
+                  label="Rest"
+                  seconds={restSeconds}
+                  onChange={(value) => {
+                    editInterval();
+                    setRestSeconds(value);
+                  }}
+                  testID="rest"
+                  accent={accent}
+                />
               </>
             ) : null}
             {mode !== 'forTime' && mode !== 'amrap' ? (
-              <TvCountRow label="Rounds" value={rounds} min={1} max={99} suffix="rds" testID="rounds" accent={accent} onChange={setRounds} />
+              <TvCountRow
+                label="Rounds"
+                value={rounds}
+                min={1}
+                max={99}
+                suffix="rds"
+                testID="rounds"
+                accent={accent}
+                onChange={(value) => {
+                  editInterval();
+                  setRounds(value);
+                }}
+              />
             ) : null}
+            {intervalWarning}
             <TimeField
               compact
               exit
@@ -339,10 +418,29 @@ function SetupForm({
             />
           </>
         ) : null}
-        {mode === 'tabata' || mode === 'intervals' ? (
+        {mode === 'intervals' ? (
           <>
-            <TimeField label="Work" seconds={workSeconds} onChange={setWorkSeconds} testID="work" accent={accent} />
-            <TimeField label="Rest" seconds={restSeconds} onChange={setRestSeconds} testID="rest" accent={accent} />
+            {intervalPresets}
+            <TimeField
+              label="Work"
+              seconds={workSeconds}
+              onChange={(value) => {
+                editInterval();
+                setWorkSeconds(value);
+              }}
+              testID="work"
+              accent={accent}
+            />
+            <TimeField
+              label="Rest"
+              seconds={restSeconds}
+              onChange={(value) => {
+                editInterval();
+                setRestSeconds(value);
+              }}
+              testID="rest"
+              accent={accent}
+            />
           </>
         ) : null}
         {mode !== 'forTime' && mode !== 'amrap' ? (
@@ -359,6 +457,7 @@ function SetupForm({
             />
           </View>
         ) : null}
+        {intervalWarning}
         <TimeField
           label="Lead-in"
           seconds={leadInSeconds}

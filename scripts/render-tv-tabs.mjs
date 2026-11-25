@@ -26,6 +26,9 @@ function resolveWithExtension(base) {
 const rnWeb = {
   name: 'rn-web',
   setup(build) {
+    build.onResolve({ filter: /^expo-modules-core$/ }, () => ({
+      path: path.join(root, 'scripts/stub-expo-modules-core.ts'),
+    }));
     build.onResolve({ filter: /^expo-router$/ }, () => ({
       path: path.join(root, 'scripts/stub-expo-router.tsx'),
     }));
@@ -105,27 +108,38 @@ await esbuild.build({
 
 const frames = [
   { tab: 'wod', width: 1920, height: 1080, file: 'tv-tab-wod-1920x1080.png' },
-  { tab: 'rounds', width: 1920, height: 1080, file: 'tv-tab-rounds-1920x1080.png', seed: true },
   { tab: 'brand', width: 1920, height: 1080, file: 'tv-tab-brand-1920x1080.png' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-fortime-1920x1080.png', seed: true, mode: 'forTime' },
-  { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-tabata-1920x1080.png', seed: true, mode: 'tabata' },
+  { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-intervals-preset-1920x1080.png', seed: true, mode: 'intervals' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-amrap-1920x1080.png', seed: true, mode: 'amrap' },
   { tab: 'setup', width: 960, height: 540, file: 'tv-setup-amrap-960x540.png', seed: true, mode: 'amrap' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-emom-1920x1080.png', seed: true, mode: 'emom' },
   { tab: 'setup', width: 1920, height: 1080, file: 'tv-setup-intervals-1920x1080.png', seed: true, mode: 'intervals' },
   { tab: 'countdown', width: 1920, height: 1080, file: 'tv-countdown-1920x1080.png', seed: true },
   { tab: 'timer', width: 1920, height: 1080, file: 'tv-timer-running-1920x1080.png' },
-  { tab: 'rounds-confirm', width: 1920, height: 1080, file: 'tv-rounds-delete-1920x1080.png', seed: true, confirm: true },
   { tab: 'wod', width: 960, height: 540, file: 'tv-tab-wod-960x540.png' },
-  { tab: 'rounds', width: 960, height: 540, file: 'tv-tab-rounds-960x540.png', seed: true },
-  { tab: 'rounds', width: 1280, height: 720, file: 'tv-tab-rounds-1280x720.png', seed: true },
   { tab: 'brand', width: 960, height: 540, file: 'tv-tab-brand-960x540.png' },
   { tab: 'setup', width: 960, height: 540, file: 'tv-setup-fortime-960x540.png', seed: true, mode: 'forTime' },
-  { tab: 'setup', width: 960, height: 540, file: 'tv-setup-tabata-960x540.png', seed: true, mode: 'tabata' },
-  { tab: 'setup', width: 1280, height: 720, file: 'tv-setup-tabata-1280x720.png', seed: true, mode: 'tabata' },
+  { tab: 'setup', width: 960, height: 540, file: 'tv-setup-intervals-preset-960x540.png', seed: true, mode: 'intervals' },
+  { tab: 'setup', width: 1280, height: 720, file: 'tv-setup-intervals-preset-1280x720.png', seed: true, mode: 'intervals' },
   { tab: 'countdown', width: 960, height: 540, file: 'tv-countdown-960x540.png', seed: true },
-  { tab: 'rounds-confirm', width: 960, height: 540, file: 'tv-rounds-delete-960x540.png', seed: true, confirm: true },
 ];
+
+if (process.env.WATCH_UI_SHOTS === '1') {
+  frames.length = 0;
+  frames.push(
+    {
+      tab: 'brand',
+      width: 1920,
+      height: 1080,
+      file: 'settings-watch-pair-1920x1080.png',
+      category: 'watch',
+      watchCode: '814947',
+      watchMessage: 'Enter this code on your Apple Watch. Both need internet.',
+    },
+    { tab: 'timer', width: 1920, height: 1080, file: 'timer-without-pairing-1920x1080.png' },
+  );
+}
 
 const outDir = '/opt/cursor/artifacts';
 await mkdir(outDir, { recursive: true });
@@ -135,9 +149,9 @@ function presetDocument() {
   return {
     version: 2,
     presets: [
-      item('preset-spar', 'Sparring', 'rounds', { mode: 'rounds', leadInSeconds: 10, workSeconds: 180, restSeconds: 60, rounds: 5, warningSeconds: 10 }, 3),
-      item('preset-morning', 'Morning roll', 'rounds', { mode: 'rounds', leadInSeconds: 10, workSeconds: 300, restSeconds: 60, rounds: 6, warningSeconds: 30 }, 2),
-      item('preset-open', 'Open mat', 'rounds', { mode: 'rounds', leadInSeconds: 0, workSeconds: 600, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 1),
+      item('preset-spar', 'Sparring', 'intervals', { mode: 'intervals', leadInSeconds: 10, workSeconds: 180, restSeconds: 60, rounds: 5, warningSeconds: 10 }, 3),
+      item('preset-morning', 'Morning roll', 'intervals', { mode: 'intervals', leadInSeconds: 10, workSeconds: 300, restSeconds: 60, rounds: 6, warningSeconds: 30 }, 2),
+      item('preset-open', 'Open mat', 'intervals', { mode: 'intervals', leadInSeconds: 0, workSeconds: 600, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 1),
       item('preset-ft12', 'For Time 12', 'forTime', { mode: 'forTime', leadInSeconds: 10, workSeconds: 720, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 6),
       item('preset-ft20', 'For Time 20', 'forTime', { mode: 'forTime', leadInSeconds: 10, workSeconds: 1200, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 5),
       item('preset-cap', 'Cap 8', 'forTime', { mode: 'forTime', leadInSeconds: 10, workSeconds: 480, restSeconds: 0, rounds: 1, warningSeconds: 0 }, 4),
@@ -148,11 +162,16 @@ function presetDocument() {
   };
 }
 
-function pageFor(tab, width, height, seed, confirm, mode) {
+function pageFor(tab, width, height, seed, confirm, mode, frameCategory, frameWatchCode, frameWatchMessage) {
   const storage = seed
     ? `localStorage.setItem('americana.presets.v1', ${JSON.stringify(JSON.stringify(presetDocument()))});`
     : `localStorage.removeItem('americana.presets.v1');`;
   const preview = confirm ? `globalThis.__TV_PRESET_PREVIEW__ = 'confirm';` : `delete globalThis.__TV_PRESET_PREVIEW__;`;
+  const category = frameCategory ? `globalThis.__TV_SETTINGS_CATEGORY__ = ${JSON.stringify(frameCategory)};` : '';
+  const watchCode = frameWatchCode ? `globalThis.__TV_WATCH_CODE__ = ${JSON.stringify(frameWatchCode)};` : '';
+  const watchMessage = frameWatchMessage
+    ? `globalThis.__TV_WATCH_MESSAGE__ = ${JSON.stringify(frameWatchMessage)};`
+    : '';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -166,8 +185,12 @@ function pageFor(tab, width, height, seed, confirm, mode) {
 <body>
 <div id="root"></div>
 <script>
+globalThis.process = globalThis.process || { env: { NODE_ENV: 'development' } };
 ${storage}
 ${preview}
+${category}
+${watchCode}
+${watchMessage}
 globalThis.__TV_TAB__ = ${JSON.stringify(tab)};
 globalThis.__TV_SETUP_MODE__ = ${JSON.stringify(mode ?? '')};
 globalThis.__TV_FRAME__ = { width: ${width}, height: ${height} };
@@ -182,7 +205,17 @@ const server = createServer(async (req, res) => {
   if (url.startsWith('/index.html')) {
     const params = new URL(url, 'http://127.0.0.1').searchParams;
     res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(pageFor(params.get('tab') ?? 'wod', Number(params.get('w') ?? 1920), Number(params.get('h') ?? 1080), params.get('seed') === '1', params.get('confirm') === '1', params.get('mode') ?? ''));
+    res.end(pageFor(
+      params.get('tab') ?? 'wod',
+      Number(params.get('w') ?? 1920),
+      Number(params.get('h') ?? 1080),
+      params.get('seed') === '1',
+      params.get('confirm') === '1',
+      params.get('mode') ?? '',
+      params.get('category') ?? '',
+      params.get('watchCode') ?? '',
+      params.get('watchMessage') ?? '',
+    ));
     return;
   }
   if (url === '/bundle.js') {
@@ -210,7 +243,7 @@ const port = address.port;
 
 function shoot(frame) {
   const shot = path.join(outDir, frame.file);
-  const url = `http://127.0.0.1:${port}/index.html?tab=${frame.tab}&w=${frame.width}&h=${frame.height}&seed=${frame.seed ? 1 : 0}&confirm=${frame.confirm ? 1 : 0}&mode=${encodeURIComponent(frame.mode ?? '')}`;
+  const url = `http://127.0.0.1:${port}/index.html?tab=${frame.tab}&w=${frame.width}&h=${frame.height}&seed=${frame.seed ? 1 : 0}&confirm=${frame.confirm ? 1 : 0}&mode=${encodeURIComponent(frame.mode ?? '')}&category=${encodeURIComponent(frame.category ?? '')}&watchCode=${encodeURIComponent(frame.watchCode ?? '')}&watchMessage=${encodeURIComponent(frame.watchMessage ?? '')}`;
   return new Promise((resolve, reject) => {
     const chrome = spawn(
       '/usr/bin/google-chrome-stable',

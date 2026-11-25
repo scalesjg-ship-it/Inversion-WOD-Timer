@@ -10,7 +10,7 @@ const hidden: RemoteContext = {
   running: false,
 };
 const rounds: RemoteContext = {
-  mode: 'rounds',
+  mode: 'intervals',
   controlsVisible: false,
   confirmOpen: false,
   stableControls: false,
@@ -60,9 +60,9 @@ describe('remote key mapping', () => {
     expect(mapRemoteEvent('swipeRight', { ...hidden, mode: 'forTime' })).toEqual({ type: 'seek', seconds: 10 });
   });
 
-  it('steps rounds for rounds, intervals, and tabata', () => {
+  it('steps rounds on an intervals clock and seeks on EMOM', () => {
     expect(mapRemoteEvent('left', rounds)).toEqual({ type: 'stepRound', direction: -1 });
-    expect(mapRemoteEvent('fastForward', { ...rounds, mode: 'tabata' })).toEqual({ type: 'stepRound', direction: 1 });
+    expect(mapRemoteEvent('fastForward', rounds)).toEqual({ type: 'stepRound', direction: 1 });
     expect(mapRemoteEvent('rewind', { ...rounds, mode: 'intervals' })).toEqual({ type: 'stepRound', direction: -1 });
     expect(mapRemoteEvent('right', { ...rounds, mode: 'emom' })).toEqual({ type: 'seek', seconds: 10 });
   });
@@ -73,7 +73,8 @@ describe('remote key mapping', () => {
     expect(mapRemoteEvent('up', shown)).toEqual({ type: 'ignore' });
     expect(mapRemoteEvent('back', tv)).toEqual({ type: 'menu' });
     expect(mapRemoteEvent('menu', tv)).toEqual({ type: 'menu' });
-    expect(mapRemoteEvent('select', tv)).toEqual({ type: 'pause', focusResume: true });
+    expect(mapRemoteEvent('select', tv)).toEqual({ type: 'ignore' });
+    expect(mapRemoteEvent('select', { ...hidden, running: true })).toEqual({ type: 'pause', focusResume: true });
     expect(mapRemoteEvent('playPause', tv)).toEqual({ type: 'toggle' });
     expect(mapRemoteEvent('back', tvStopped)).toEqual({ type: 'menu' });
     expect(mapRemoteEvent('menu', tvStopped)).toEqual({ type: 'menu' });

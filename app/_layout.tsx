@@ -8,7 +8,9 @@ import 'react-native-reanimated';
 
 import { BrandingProvider, useBranding } from '@/src/branding/BrandingProvider';
 import { RouteErrorBoundary } from '@/src/components/RouteErrorBoundary';
+import { PreferencesProvider, usePreferences } from '@/src/preferences/PreferencesProvider';
 import { TimerSessionProvider } from '@/src/session/TimerSession';
+import { WatchLinkProvider } from '@/src/watch/WatchLinkProvider';
 import { chrome } from '@/src/theme/chrome';
 
 export function ErrorBoundary(props: { error: Error; retry: () => Promise<void> }) {
@@ -29,23 +31,28 @@ export default function RootLayout() {
 
   return (
     <BrandingProvider>
-      <TimerSessionProvider>
-        <RootGate fontsLoaded={loaded} />
-      </TimerSessionProvider>
+      <PreferencesProvider>
+        <TimerSessionProvider>
+          <WatchLinkProvider>
+            <RootGate fontsLoaded={loaded} />
+          </WatchLinkProvider>
+        </TimerSessionProvider>
+      </PreferencesProvider>
     </BrandingProvider>
   );
 }
 
 function RootGate({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { ready } = useBranding();
+  const { ready: preferencesReady } = usePreferences();
 
   useEffect(() => {
-    if (fontsLoaded && ready) {
+    if (fontsLoaded && ready && preferencesReady) {
       void SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, ready]);
+  }, [fontsLoaded, preferencesReady, ready]);
 
-  if (!fontsLoaded || !ready) {
+  if (!fontsLoaded || !ready || !preferencesReady) {
     // iPhone keeps the native splash (null). TV draws the same mark centered in the window
     // so a Fire OS splash that sits left of center is covered as soon as JS runs.
     if (Platform.isTV !== true) return null;

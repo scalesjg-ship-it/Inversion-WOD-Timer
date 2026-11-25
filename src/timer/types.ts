@@ -1,4 +1,4 @@
-export type TimerMode = 'forTime' | 'amrap' | 'emom' | 'tabata' | 'intervals' | 'rounds' | 'countdown';
+export type TimerMode = 'forTime' | 'amrap' | 'emom' | 'intervals' | 'countdown';
 
 export type Phase = 'idle' | 'leadIn' | 'work' | 'rest' | 'finished';
 
@@ -30,12 +30,20 @@ export interface Segment {
   extraCues?: { offsetMs: number; kind: 'warning' | 'tick'; remainingMs: number }[];
 }
 
+export type VoiceCount = 3 | 2 | 1;
+
 export type Cue =
   | { type: 'phase'; phase: 'leadIn' | 'work' | 'rest'; round: number }
   | { type: 'tick'; remainingMs: number }
+  | { type: 'voice'; count: VoiceCount }
   | { type: 'warning'; round: number }
   | { type: 'roundEnd'; round: number }
   | { type: 'finished' };
+
+/** Voice countdown is a device preference. Off keeps today's beeps. */
+export interface CueScheduleOptions {
+  voiceCountdown?: boolean;
+}
 
 export interface EngineState {
   config: TimerConfig;
@@ -63,7 +71,7 @@ export interface TimerSnapshot {
   segmentIndex: number;
 }
 
-export type SoundName = 'tick' | 'warning' | 'start' | 'bell';
+export type SoundName = 'tick' | 'warning' | 'start' | 'bell' | 'three' | 'two' | 'one';
 
 export interface TimedCue {
   atElapsedMs: number;

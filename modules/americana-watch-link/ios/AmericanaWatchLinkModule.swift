@@ -30,6 +30,7 @@ public class AmericanaWatchLinkModule: Module {
     WatchTvLink.shared.onLink = { [weak self] json in
       self?.onLink(WatchLinkEvent(json: json))
     }
+    WatchTvLink.shared.noteLaunchStatus()
   }
 
   @JS
@@ -74,14 +75,32 @@ final class WatchTvLink: @unchecked Sendable {
     }
   }
 
+  /// UI tests pass `-AmericanaWatchStatus unsupported` to open the HD code
+  /// screen without presenting DeviceDiscoveryUI. TestFlight launches do not.
+  /// `unsupported` means this TV cannot browse for a watch, so the JS relay
+  /// shows a pairing code instead of blocking the button.
+  func noteLaunchStatus() {
+    guard let name = Self.launchStatus() else { return }
+    log("launch status \(name)")
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+      self?.emitLink(name)
+    }
+  }
+
   func presentPicker() async -> Bool {
     #if os(tvOS)
     if #available(tvOS 16.0, *) {
       return await MainActor.run {
-        guard DDDevicePickerViewController.isSupported(
+        // DeviceDiscoveryUI needs no extra entitlement. Apple documents it for
+        // Apple TV 4K on tvOS 16 and later. Apple TV HD, including A1625,
+        // makes isSupported return false. The Info.plist Browses entry is the
+        // declaration on tvOS; the watch Advertises the same service name.
+        let supported = DDDevicePickerViewController.isSupported(
           .applicationService(name: WatchWire.serviceName),
           using: .applicationService
-        ) else {
+        )
+        log("isSupported=\(supported) service=\(WatchWire.serviceName)")
+        guard supported else {
           self.emitLink("unsupported")
           return false
         }
@@ -98,6 +117,7 @@ final class WatchTvLink: @unchecked Sendable {
           self.emitLink("unavailable")
           return false
         }
+        log("presenting on \(type(of: host))")
         host.present(picker, animated: true)
         Task { @MainActor in
           do {
@@ -131,20 +151,78 @@ final class WatchTvLink: @unchecked Sendable {
     }
   }
 
+  /// React Native on tvOS often has no foreground-active scene yet. Walk every
+  /// window scene, then the app delegate window, and skip a controller that is
+  /// already on its way out.
   @MainActor
   private static func topViewController() -> UIViewController? {
-    let scene = UIApplication.shared.connectedScenes
-      .compactMap { $0 as? UIWindowScene }
-      .first { $0.activationState == .foregroundActive }
-    let root = scene?.windows.first(where: \.isKeyWindow)?.rootViewController
-      ?? scene?.windows.first?.rootViewController
-    var current = root
-    while let presented = current?.presentedViewController {
+    var found: [UIViewController] = []
+    for window in candidateWindows() {
+      if let presenter = topPresenter(from: window.rootViewController) {
+        found.append(presenter)
+      }
+    }
+    if let visible = found.first(where: { $0.viewIfLoaded?.window != nil && !$0.isBeingDismissed }) {
+      return visible
+    }
+    return found.first(where: { !$0.isBeingDismissed }) ?? found.first
+  }
+
+  @MainActor
+  private static func candidateWindows() -> [UIWindow] {
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    let active = scenes.filter { $0.activationState == .foregroundActive }
+    let rest = scenes.filter { $0.activationState != .foregroundActive }
+    var windows: [UIWindow] = []
+    func take(_ group: [UIWindowScene]) {
+      for scene in group {
+        let key = scene.windows.first(where: \.isKeyWindow)
+        if let key {
+          windows.append(key)
+        }
+        for window in scene.windows {
+          if let key, window === key { continue }
+          windows.append(window)
+        }
+      }
+    }
+    take(active)
+    take(rest)
+    if let window = UIApplication.shared.delegate?.window ?? nil {
+      if !windows.contains(where: { $0 === window }) {
+        windows.append(window)
+      }
+    }
+    return windows
+  }
+
+  @MainActor
+  private static func topPresenter(from root: UIViewController?) -> UIViewController? {
+    guard var current = root else { return nil }
+    var steps = 0
+    while steps < 8, let presented = current.presentedViewController, !presented.isBeingDismissed {
       current = presented
+      steps += 1
+    }
+    if current.isBeingDismissed, let host = current.presentingViewController, !host.isBeingDismissed {
+      return host
     }
     return current
   }
   #endif
+
+  private static func launchStatus() -> String? {
+    let args = ProcessInfo.processInfo.arguments
+    guard let index = args.firstIndex(of: "-AmericanaWatchStatus"), index + 1 < args.count else {
+      return nil
+    }
+    switch args[index + 1] {
+    case "unsupported", "picker-unavailable", "unavailable", "cancelled", "connected", "disconnected":
+      return args[index + 1]
+    default:
+      return nil
+    }
+  }
 
   private func handleState(_ state: NWConnection.State) {
     switch state {
@@ -180,8 +258,13 @@ final class WatchTvLink: @unchecked Sendable {
   }
 
   private func emitLink(_ json: String) {
+    log("link \(json)")
     DispatchQueue.main.async { [weak self] in
       self?.onLink?(json)
     }
+  }
+
+  private func log(_ message: String) {
+    print("AmericanaWatchLink \(message)")
   }
 }

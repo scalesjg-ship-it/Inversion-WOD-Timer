@@ -36,12 +36,8 @@ const MODES: { mode: TimerMode; detail: string }[] = [
     detail: 'Every X minutes. The clock resets when the interval does.',
   },
   {
-    mode: 'tabata',
-    detail: '20 seconds on, 10 seconds off, eight rounds.',
-  },
-  {
     mode: 'intervals',
-    detail: 'Your own work, rest, and number of rounds.',
+    detail: 'Work and rest. Tabata and martial-arts rounds are one tap.',
   },
   {
     mode: 'countdown',
@@ -265,7 +261,7 @@ export default function WodScreen() {
           </>
         ) : null}
         <Text style={[styles.hint, tv && home ? { fontSize: home.hintSize, lineHeight: home.hintLine, marginTop: 0 } : null]}>
-          Jiu-jitsu, boxing, and sparring rounds are on the Rounds tab.
+          Tabata, BJJ, boxing, MMA, and Muay Thai are presets on Intervals.
         </Text>
       </WodFrame>
     </SafeAreaView>
@@ -319,13 +315,9 @@ function openPreset(preset: SavedPreset) {
     case 'countdown':
       router.push({ pathname: '/countdown', params: { presetId: preset.id } });
       return;
-    case 'rounds':
-      router.navigate({ pathname: '/rounds', params: { presetId: preset.id } });
-      return;
     case 'forTime':
     case 'amrap':
     case 'emom':
-    case 'tabata':
     case 'intervals':
       router.push({ pathname: '/setup', params: { mode: preset.mode, presetId: preset.id } });
       return;

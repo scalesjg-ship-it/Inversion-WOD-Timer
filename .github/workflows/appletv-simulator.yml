@@ -1,5 +1,9 @@
 # Records an Apple TV simulator pass of the Siri Remote UI test.
 # macos-26 is the hosted image that carries Xcode 26.4+ (Expo SDK 58) and a tvOS simulator runtime.
+# workflow_dispatch has no inputs. Run it on the branch under test.
+# Screenshots land in the appletv-simulator artifact, one per step name:
+# "tab Settings", "tab Help", "Intervals presets", "paused For Time shows Watch",
+# and "unsupported Apple TV HD message".
 name: Apple TV simulator
 
 on:
@@ -7,6 +11,7 @@ on:
   push:
     branches:
       - cursor/appletv-sim-uitest-8dd8
+      - cursor/appletv-uitest-finish-sound-bfec
 
 concurrency:
   group: appletv-simulator-${{ github.ref }}
@@ -51,6 +56,7 @@ jobs:
             grep -nE 'SDKROOT|TARGETED_DEVICE_FAMILY|TVOS' ios/*.xcodeproj/project.pbxproj | head -n 40
             exit 1
           fi
+          python3 scripts/ci-tvos-signing.py check-watch-browse --ios-dir ios
 
       - name: Add the XCUITest target
         run: node scripts/wire-tvos-ui-test.mjs

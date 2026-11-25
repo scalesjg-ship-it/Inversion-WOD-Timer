@@ -2,12 +2,81 @@ import SwiftUI
 
 struct WatchRoot: View {
   @ObservedObject var session: WatchSession
+  @Environment(\.scenePhase) private var scenePhase
+  /// 0 is the clock. 1 is Settings, where pairing lives.
+  @State private var tab = 0
 
   var body: some View {
-    TimerFace(model: session.model) { command in
-      session.sendCommand(command)
+    Group {
+      if session.screen == .pad {
+        PairingPad(
+          digits: session.codeDigits,
+          status: session.pairStatus,
+          onDigit: { session.typeDigit($0) },
+          onDelete: { session.deleteDigit() },
+          onSubmit: { session.submitCode() },
+          onCancel: { session.cancelPairing() }
+        )
+      } else {
+        TabView(selection: $tab) {
+          TimerFace(model: session.model, onCommand: { command in
+            session.sendCommand(command)
+          })
+          .tag(0)
+          WatchSettings(
+            model: session.model,
+            onPair: {
+              tab = 1
+              session.beginPairing()
+            },
+            onForget: { session.forgetTV() }
+          )
+          .tag(1)
+        }
+        .tabViewStyle(.page)
+      }
     }
     .onAppear { session.start() }
+    .onChange(of: scenePhase) { phase in
+      if phase == .active {
+        session.noteForeground()
+      }
+    }
+  }
+}
+
+struct WatchSettings: View {
+  let model: WatchFaceModel
+  let onPair: () -> Void
+  let onForget: () -> Void
+
+  var body: some View {
+    ScrollView {
+      VStack(spacing: 8) {
+        Text("Settings")
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundStyle(Color(red: 0.957, green: 0.969, blue: 0.984))
+        Text(model.status)
+          .font(.system(size: 13))
+          .foregroundStyle(Color(red: 0.576, green: 0.627, blue: 0.690))
+          .multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
+        if !model.connected {
+          Button("Pair with code", action: onPair)
+            .buttonStyle(.borderedProminent)
+            .tint(Color(red: 1, green: 0.302, blue: 0.180))
+        }
+        if model.showsForget {
+          Button("Forget TV", action: onForget)
+            .buttonStyle(.bordered)
+        }
+      }
+      .font(.system(size: 15, weight: .semibold))
+      .padding(.horizontal, 8)
+      .padding(.vertical, 6)
+      .frame(maxWidth: .infinity)
+    }
+    .background(Color(red: 0.027, green: 0.031, blue: 0.039).ignoresSafeArea())
   }
 }
 
@@ -50,8 +119,8 @@ struct TimerFace: View {
         .font(.system(size: 11))
         .foregroundStyle(Color(red: 0.576, green: 0.627, blue: 0.690))
         .multilineTextAlignment(.center)
-        .lineLimit(2)
-        .minimumScaleFactor(0.8)
+        .lineLimit(3)
+        .minimumScaleFactor(0.7)
     }
     .padding(.horizontal, 6)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -97,7 +166,8 @@ enum WatchPreviewFace: String {
         primaryCommand: "pause",
         canReset: true,
         status: "Apple TV",
-        connected: true
+        connected: true,
+        showsForget: false
       )
     case .work:
       return WatchFaceModel(
@@ -109,7 +179,8 @@ enum WatchPreviewFace: String {
         primaryCommand: "pause",
         canReset: true,
         status: "Apple TV",
-        connected: true
+        connected: true,
+        showsForget: false
       )
     case .rest:
       return WatchFaceModel(
@@ -121,7 +192,8 @@ enum WatchPreviewFace: String {
         primaryCommand: "pause",
         canReset: true,
         status: "Apple TV",
-        connected: true
+        connected: true,
+        showsForget: false
       )
     case .finished:
       return WatchFaceModel(
@@ -133,7 +205,8 @@ enum WatchPreviewFace: String {
         primaryCommand: "start",
         canReset: true,
         status: "Apple TV",
-        connected: true
+        connected: true,
+        showsForget: false
       )
     }
   }

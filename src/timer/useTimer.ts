@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { clearScheduledCues, syncScheduledCues } from '@/src/audio/cueScheduler';
-import { playCueBatch } from '@/src/audio/sounds';
+import { playCueBatch, stopSounds } from '@/src/audio/sounds';
 
 import {
   complete,
@@ -17,11 +17,12 @@ import {
   start,
   stepRound,
 } from './engine';
-import type { EngineState, TimerConfig, TimerSnapshot } from './types';
+import type { CueScheduleOptions, EngineState, TimerConfig, TimerSnapshot } from './types';
 
 interface UseTimerOptions {
   autoStart?: boolean;
   gymName: string;
+  voiceCountdown?: boolean;
 }
 
 export function useTimer(config: TimerConfig, options: UseTimerOptions) {
@@ -30,6 +31,7 @@ export function useTimer(config: TimerConfig, options: UseTimerOptions) {
   const stateRef = useRef(state);
   const lastElapsedRef = useRef(-1);
   const gymNameRef = useRef(options.gymName);
+  const voiceRef = useRef(options.voiceCountdown === true);
 
   useEffect(() => {
     stateRef.current = state;
@@ -39,11 +41,22 @@ export function useTimer(config: TimerConfig, options: UseTimerOptions) {
     gymNameRef.current = options.gymName;
   }, [options.gymName]);
 
+  useEffect(() => {
+    voiceRef.current = options.voiceCountdown === true;
+    const current = stateRef.current;
+    if (current.status !== 'running') return;
+    void syncScheduledCues(current, Date.now(), gymNameRef.current, cueOptions());
+  }, [options.voiceCountdown]);
+
   const publish = useCallback((next: EngineState, wall: number) => {
     stateRef.current = next;
     setState(next);
     setNow(wall);
   }, []);
+
+  function cueOptions(): CueScheduleOptions {
+    return { voiceCountdown: voiceRef.current };
+  }
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -54,7 +67,7 @@ export function useTimer(config: TimerConfig, options: UseTimerOptions) {
       const next = reconcile(current, wall);
       const elapsed = elapsedMs(next, wall);
       if (AppState.currentState === 'active') {
-        const cues = cuesBetween(current, lastElapsedRef.current, elapsed);
+        const cues = cuesBetween(current, lastElapsedRef.current, elapsed, cueOptions());
         if (cues.length > 0) void playCueBatch(cues);
       }
       lastElapsedRef.current = elapsed;
@@ -73,15 +86,16 @@ export function useTimer(config: TimerConfig, options: UseTimerOptions) {
     lastElapsedRef.current = 0;
     publish(next, wall);
     if (AppState.currentState === 'active') {
-      void playCueBatch(cuesBetween(next, -1, 0));
+      void playCueBatch(cuesBetween(next, -1, 0, cueOptions()));
     }
-    void syncScheduledCues(next, wall, gymNameRef.current);
+    void syncScheduledCues(next, wall, gymNameRef.current, cueOptions());
   }, [publish]);
 
   const pauseTimer = useCallback(() => {
     const wall = Date.now();
     const next = pause(stateRef.current, wall);
     lastElapsedRef.current = elapsedMs(next, wall);
+    stopSounds();
     publish(next, wall);
     void clearScheduledCues();
   }, [publish]);
@@ -89,6 +103,7 @@ export function useTimer(config: TimerConfig, options: UseTimerOptions) {
   const resetTimer = useCallback(() => {
     const next = reset(stateRef.current);
     lastElapsedRef.current = -1;
+    stopSounds();
     publish(next, Date.now());
     void clearScheduledCues();
   }, [publish]);
@@ -97,14 +112,16 @@ export function useTimer(config: TimerConfig, options: UseTimerOptions) {
     const wall = Date.now();
     const next = complete(stateRef.current, wall);
     lastElapsedRef.current = elapsedMs(next, wall);
+    stopSounds();
     publish(next, wall);
     void clearScheduledCues();
   }, [publish]);
 
   const moveClock = useCallback((next: EngineState, wall: number) => {
     lastElapsedRef.current = elapsedMs(next, wall);
+    stopSounds();
     publish(next, wall);
-    if (next.status === 'running') void syncScheduledCues(next, wall, gymNameRef.current);
+    if (next.status === 'running') void syncScheduledCues(next, wall, gymNameRef.current, cueOptions());
     else void clearScheduledCues();
   }, [publish]);
 

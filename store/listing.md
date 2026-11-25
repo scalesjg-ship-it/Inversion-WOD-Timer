@@ -51,7 +51,7 @@ Expected rating: 4+.
 
 ### App Privacy
 
-Data not collected. Photos are used only to pick a logo and are not linked to an identity or used for tracking. Notifications are local.
+Data not collected. Photos are used only to pick a logo and are not linked to an identity or used for tracking. Notifications are local. Apple Watch code pairing sends the clock and timer commands through Supabase Realtime only long enough to deliver them. They are not stored, not tied to an account, and not used for tracking. The direct Apple TV 4K link stays on the local network.
 
 ## Amazon Appstore
 

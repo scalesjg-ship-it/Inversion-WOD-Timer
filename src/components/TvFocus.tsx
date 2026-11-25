@@ -116,17 +116,39 @@ export function TvTextField({
   onBlur,
   focusUp = null,
   focusDown = null,
+  focusLeft = null,
+  focusRight = null,
+  onHost,
   ...rest
-}: TextInputProps & { accent?: string; focusUp?: TvFocusTag | null; focusDown?: TvFocusTag | null }) {
+}: TextInputProps & {
+  accent?: string;
+  focusUp?: TvFocusTag | null;
+  focusDown?: TvFocusTag | null;
+  focusLeft?: TvFocusTag | null;
+  focusRight?: TvFocusTag | null;
+  onHost?: (node: ComponentRef<typeof TextInput> | null) => void;
+}) {
   const tv = Platform.isTV === true;
   const { width, height } = useWindowDimensions();
   const [focused, setFocused] = useState(false);
+  const onHostRef = useRef(onHost);
+  useEffect(() => {
+    onHostRef.current = onHost;
+  }, [onHost]);
+  const setHost = useCallback((node: ComponentRef<typeof TextInput> | null) => {
+    onHostRef.current?.(node);
+  }, []);
+  const linked =
+    tv && (focusUp != null || focusDown != null || focusLeft != null || focusRight != null || onHost != null);
   return (
     <TextInput
       {...rest}
-      {...(tv && (focusUp != null || focusDown != null) ? { focusable: true as const } : {})}
+      {...(linked ? { focusable: true as const } : {})}
       {...(tv && focusUp != null ? { nextFocusUp: focusUp } : {})}
       {...(tv && focusDown != null ? { nextFocusDown: focusDown } : {})}
+      {...(tv && focusLeft != null ? { nextFocusLeft: focusLeft } : {})}
+      {...(tv && focusRight != null ? { nextFocusRight: focusRight } : {})}
+      ref={setHost}
       onFocus={(event) => {
         if (tv) setFocused(true);
         onFocus?.(event);

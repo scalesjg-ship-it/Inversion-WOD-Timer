@@ -6,11 +6,11 @@ import SetupScreen from '../app/setup';
 import TimerScreen from '../app/timer';
 import BrandScreen from '../app/(tabs)/brand';
 import WodScreen from '../app/(tabs)/index';
-import RoundsScreen from '../app/(tabs)/rounds';
 import { BrandingProvider } from '../src/branding/BrandingProvider';
 import { TvTabBar } from '../src/components/TvTabBar';
 import { TvTabFocusProvider } from '../src/components/TvTabFocus';
 import { TimerSessionProvider } from '../src/session/TimerSession';
+import { WatchLinkProvider } from '../src/watch/WatchLinkProvider';
 import { chrome } from '../src/theme/chrome';
 
 Object.defineProperty(Platform, 'isTV', {
@@ -30,7 +30,6 @@ try {
 
 function Screen() {
   const tab = (globalThis as { __TV_TAB__?: string }).__TV_TAB__ ?? 'wod';
-  if (tab === 'rounds' || tab === 'rounds-confirm') return <RoundsScreen />;
   if (tab === 'brand') return <BrandScreen />;
   if (tab === 'setup') return <SetupScreen />;
   if (tab === 'countdown') return <CountdownScreen />;
@@ -50,12 +49,14 @@ function Frame() {
       <View style={{ width: frame.width, height: frame.height, backgroundColor: chrome.bg }}>
         <BrandingProvider>
           <TimerSessionProvider>
+            <WatchLinkProvider>
             <TvTabFocusProvider>
               {stacked ? null : <TvTabBar />}
               <View style={{ flex: 1, width: frame.width, height: stacked ? frame.height : undefined }}>
                 <Screen />
               </View>
             </TvTabFocusProvider>
+            </WatchLinkProvider>
           </TimerSessionProvider>
         </BrandingProvider>
       </View>

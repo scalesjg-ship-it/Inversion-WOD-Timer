@@ -24,9 +24,19 @@ const plugins = app.expo.plugins.map((plugin) => {
   ];
 });
 
+// SUPABASE_URL and SUPABASE_ANON_KEY are placeholders until the build environment sets them.
+// The anon key is the public client key. Never put the service role key here.
+const supabaseUrl = typeof process.env.SUPABASE_URL === 'string' ? process.env.SUPABASE_URL.trim() : '';
+const supabaseAnonKey = typeof process.env.SUPABASE_ANON_KEY === 'string' ? process.env.SUPABASE_ANON_KEY.trim() : '';
+
 module.exports = {
   expo: {
     ...app.expo,
     plugins,
+    extra: {
+      ...app.expo.extra,
+      supabaseUrl,
+      supabaseAnonKey,
+    },
   },
 };

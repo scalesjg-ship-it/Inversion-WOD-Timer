@@ -8,13 +8,13 @@ import { TvFocusPressable } from '@/src/components/TvFocus';
 import { useTvTabFocus } from '@/src/components/TvTabFocus';
 import { chrome } from '@/src/theme/chrome';
 import { tabBarControlSize } from '@/src/tv/controls';
-import { tvDirectionalProps, tvTabIndex, tvTabLink } from '@/src/tv/tabFocus';
+import { TV_TAB_ROUTES, tvDirectionalProps, tvTabIndex, tvTabLink } from '@/src/tv/tabFocus';
 
-const TABS: { href: Href; title: string; testID: string }[] = [
-  { href: '/', title: 'WOD', testID: 'tab-wod' },
-  { href: '/rounds', title: 'Rounds', testID: 'tab-rounds' },
-  { href: '/brand', title: 'Brand', testID: 'tab-brand' },
-];
+const TABS: { href: Href; title: string; testID: string }[] = TV_TAB_ROUTES.map((tab) => ({
+  href: tab.path as Href,
+  title: tab.title,
+  testID: tab.testID,
+}));
 
 /** react-native-web has no focus guide. Television builds export the real one. */
 const TabGuide = TVFocusGuideView ?? View;
@@ -65,10 +65,16 @@ export function TvTabBar() {
         const color = active ? tint : chrome.muted;
         const link = tvTabLink(index, TABS.length);
         const tags = tabFocus?.tabTags ?? [];
+        // Down is explicit only for the screen that registered an entry.
+        // The settings sidebar is on the left, under WOD, so a geometric Down
+        // from Settings would land in the option pane.
+        const entryDown =
+          index === selected && tabFocus?.entryTab === index ? tabFocus.entryTag : null;
         const links = tvDirectionalProps(true, {
           left: tags[link.left],
           right: tags[link.right],
           up: tags[link.up],
+          down: entryDown,
         });
         return (
           <TvFocusPressable
@@ -82,6 +88,7 @@ export function TvTabBar() {
             nextFocusLeft={links.nextFocusLeft}
             nextFocusRight={links.nextFocusRight}
             nextFocusUp={links.nextFocusUp}
+            nextFocusDown={links.nextFocusDown}
             onFocus={() => open(index)}
             onPress={() => open(index)}
             style={({ pressed }) => [

@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  RESET_CONFIRM,
   backStep,
+  focusAfterResetPrompt,
   nextDialogFocus,
   nextRunningFocus,
   onScreenBackFocusable,
   onScreenBackPress,
-  showsOnScreenBack,
   preferredTransportRole,
+  resetConfirmResult,
+  showsOnScreenBack,
+  transportPress,
   tvTransportButtons,
 } from './timerTransport';
 
@@ -21,23 +25,26 @@ describe('TV transport buttons', () => {
     expect(buttons[0].testID).toBe('timer-pause');
   });
 
-  it('keeps Stop and Reset on a For Time clock, including while it is paused', () => {
+  it('keeps Finish and Reset on a For Time clock, including while it is paused', () => {
     expect(tvTransportButtons({ ...running, mode: 'forTime' }).map((button) => button.label)).toEqual([
       'Pause',
-      'Stop',
+      'Finish',
       'Reset',
     ]);
     expect(
       tvTransportButtons({ phase: 'work', running: false, paused: true, mode: 'forTime' }).map((button) => button.label),
-    ).toEqual(['Resume', 'Stop', 'Reset']);
+    ).toEqual(['Resume', 'Finish', 'Reset']);
+    expect(tvTransportButtons({ ...running, mode: 'forTime' }).find((button) => button.role === 'stop')?.testID).toBe(
+      'timer-finish',
+    );
   });
 
   it('offers Resume for a paused round clock and Go again when the clock is finished', () => {
     expect(
-      tvTransportButtons({ phase: 'rest', running: false, paused: true, mode: 'tabata' }).map((button) => button.label),
+      tvTransportButtons({ phase: 'rest', running: false, paused: true, mode: 'intervals' }).map((button) => button.label),
     ).toEqual(['Resume', 'Reset']);
     expect(
-      tvTransportButtons({ phase: 'finished', running: false, paused: false, mode: 'rounds' }).map(
+      tvTransportButtons({ phase: 'finished', running: false, paused: false, mode: 'intervals' }).map(
         (button) => button.label,
       ),
     ).toEqual(['Go again', 'Reset']);
@@ -46,6 +53,17 @@ describe('TV transport buttons', () => {
         (button) => button.label,
       ),
     ).toEqual(['Start']);
+  });
+
+  it('pauses only from the primary button, and Reset asks on the first press', () => {
+    const runningWork = { running: true, phase: 'work' as const };
+    expect(transportPress('primary', runningWork)).toBe('pause');
+    expect(transportPress('stop', runningWork)).toBe('finish');
+    expect(transportPress('reset', runningWork)).toBe('ask-reset');
+    expect(transportPress('primary', { running: false, phase: 'work' })).toBe('resume');
+    expect(transportPress('primary', { running: false, phase: 'idle' })).toBe('start');
+    expect(transportPress('primary', { running: false, phase: 'finished' })).toBe('start');
+    expect(transportPress('reset', { running: false, phase: 'rest' })).toBe('ask-reset');
   });
 });
 
@@ -111,5 +129,13 @@ describe('TV timer focus', () => {
     expect(nextDialogFocus('destructive', 'up')).toBe('safe');
     expect(nextDialogFocus('safe', 'up')).toBe('safe');
     expect(nextDialogFocus('destructive', 'left')).toBe('destructive');
+  });
+
+  it('asks Are you sure, lands on No, and returns focus to Reset', () => {
+    expect(RESET_CONFIRM).toEqual({ title: 'Are you sure?', yes: 'Yes', no: 'No', initialFocus: 'no' });
+    expect(resetConfirmResult(RESET_CONFIRM.initialFocus)).toBe('keep');
+    expect(resetConfirmResult('yes')).toBe('reset');
+    expect(nextDialogFocus('safe', 'down')).toBe('destructive');
+    expect(focusAfterResetPrompt()).toBe('reset');
   });
 });

@@ -112,7 +112,10 @@
             "./assets/sounds/start.wav",
             "./assets/sounds/warning.wav",
             "./assets/sounds/bell.wav",
-            "./assets/sounds/tick.wav"
+            "./assets/sounds/tick.wav",
+            "./assets/sounds/three.wav",
+            "./assets/sounds/two.wav",
+            "./assets/sounds/one.wav"
           ],
           "enableRemoteNotifications": false
         }

@@ -1,14 +1,31 @@
-import { useState } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useState, type ComponentRef } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { downloadLogo } from '@/src/branding/downloadLogo';
 import { prepareLogo } from '@/src/branding/logo';
 import { parseLogoUrl } from '@/src/branding/logoUrl';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
+import type { TvFocusTag } from '@/src/components/TvTabFocus';
 import { chrome } from '@/src/theme/chrome';
 import { fitTvStyle } from '@/src/tv/layout';
 
-export function TvLogoUrl({ onStored }: { onStored: (uri: string) => Promise<void> }) {
+export interface TvLogoFocus {
+  up?: TvFocusTag | null;
+  down?: TvFocusTag | null;
+  left?: TvFocusTag | null;
+  right?: TvFocusTag | null;
+  onFocus?: () => void;
+}
+
+export function TvLogoUrl({
+  onStored,
+  field,
+  save,
+}: {
+  onStored: (uri: string) => Promise<void>;
+  field?: TvLogoFocus & { onHost?: (node: ComponentRef<typeof TextInput> | null) => void };
+  save?: TvLogoFocus & { onHost?: (node: ComponentRef<typeof Pressable> | null) => void };
+}) {
   const [text, setText] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
@@ -58,6 +75,12 @@ export function TvLogoUrl({ onStored }: { onStored: (uri: string) => Promise<voi
           placeholder="https://"
           placeholderTextColor={chrome.muted}
           style={input}
+          focusUp={field?.up ?? null}
+          focusDown={field?.down ?? null}
+          focusLeft={field?.left ?? null}
+          focusRight={field?.right ?? null}
+          onHost={field?.onHost}
+          onFocus={field?.onFocus}
         />
         <TvFocusPressable
           accessibilityRole="button"
@@ -65,6 +88,12 @@ export function TvLogoUrl({ onStored }: { onStored: (uri: string) => Promise<voi
           accessibilityState={{ disabled: busy }}
           disabled={busy}
           testID="logo-url-load"
+          focusUp={save?.up ?? null}
+          focusDown={save?.down ?? null}
+          focusLeft={save?.left ?? null}
+          focusRight={save?.right ?? null}
+          onHost={save?.onHost}
+          onFocus={save?.onFocus}
           onPress={() => void load()}
           style={({ pressed }) => [button, { opacity: busy ? 0.5 : pressed ? 0.8 : 1 }]}
         >

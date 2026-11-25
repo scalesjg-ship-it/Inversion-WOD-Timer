@@ -13,9 +13,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
+import { usePreferences } from '@/src/preferences/PreferencesProvider';
 import { readableDigitColor } from '@/src/branding/color';
-import { TvLogoTransfer } from '@/src/branding/lan/TvLogoTransfer';
+import { TvSettings } from '@/src/components/TvSettings';
 import { prepareLogo } from '@/src/branding/logo';
+import { TvLogoTransfer } from '@/src/branding/lan/TvLogoTransfer';
 import { clockFontFamily } from '@/src/branding/palettes';
 import type { LogoPlacement } from '@/src/branding/types';
 import { BrandChoices } from '@/src/components/BrandChoices';
@@ -23,11 +25,12 @@ import { ColorPicker } from '@/src/components/ColorPicker';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
 import { RouteErrorBoundary } from '@/src/components/RouteErrorBoundary';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
-import { useTvTabFocus } from '@/src/components/TvTabFocus';
 import { TvLogoUrl } from '@/src/components/TvLogoUrl';
 import { Chip, TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_SECTION_FONT, fitTvStyle, tvColorGridTight, tvSafeBox, tvScaled } from '@/src/tv/layout';
+import { TV_BODY_FONT, TV_SECTION_FONT, fitTvStyle, tvSafeBox } from '@/src/tv/layout';
+import { watchLinkEnabled } from '@/src/watch/gate';
+import { useWatchLinkContext } from '@/src/watch/WatchLinkProvider';
 
 export function ErrorBoundary(props: { error: Error; retry: () => Promise<void> }) {
   return <RouteErrorBoundary {...props} />;
@@ -41,12 +44,14 @@ const PLACEMENTS: { id: LogoPlacement; label: string }[] = [
 
 export default function BrandScreen() {
   const { branding, update, reset } = useBranding();
+  const { preferences, update: updatePreferences } = usePreferences();
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
   const digits = readableDigitColor(branding.digitColor, branding.backgroundColor);
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   const { width, height } = useWindowDimensions();
   const tv = Platform.isTV === true;
-  const tabFocus = useTvTabFocus();
+  const appleWatch = watchLinkEnabled({ os: Platform.OS, tv });
+  const watchLink = useWatchLinkContext();
   const box = tvSafeBox(tv, width, height);
   const labelStyle = [styles.fieldLabel, tv && styles.fieldLabelTv];
 
@@ -108,92 +113,28 @@ export default function BrandScreen() {
 
   if (tv) {
     return (
-      <View style={[styles.safe, fitTvStyle(styles.tvColumns, width, height), { paddingLeft: box.horizontal, paddingRight: box.horizontal, paddingTop: box.vertical, paddingBottom: box.vertical }]} testID="screen-brand">
-        <View style={fitTvStyle(styles.tvColumn, width, height)}>
-          <Text testID="screen-brand" style={[styles.lede, fitTvStyle(styles.ledeTv, width, height), { color: chrome.muted }]}>
-            Your gym name, colors, and logo stay on this device.
-          </Text>
-          <View
-            testID="brand-preview"
-            style={[styles.preview, fitTvStyle(styles.previewTv, width, height), { backgroundColor: branding.backgroundColor }]}
-            onLayout={(event) => {
-              const next = event.nativeEvent.layout;
-              setFrame({ width: next.width, height: next.height });
-            }}
-          >
-            <LogoBackdrop branding={branding} width={frame.width} height={frame.height} />
-            <View style={styles.previewTop}>
-              <Text style={[styles.previewGym, { color: chrome.text }]} numberOfLines={1}>{branding.gymName}</Text>
-              <CornerLogo branding={branding} size={28} />
-            </View>
-            <Text style={[styles.previewClock, fitTvStyle(styles.previewClockTv, width, height), { color: digits, fontFamily: clockFontFamily(branding.clockWeight) }]}>
-              05:00
-            </Text>
-            <Text style={[styles.previewPhase, { color: readableDigitColor(branding.workColor, branding.backgroundColor) }]}>Work</Text>
-          </View>
-          <Text style={[fitTvStyle(styles.fieldLabel, width, height), fitTvStyle(styles.fieldLabelTv, width, height), { color: chrome.muted }]}>Gym name</Text>
-          <GymNameField value={branding.gymName} onCommit={(gymName) => void update({ gymName })} focusUp={tabFocus?.upTag ?? null} />
-          <TvLogoTransfer branding={branding} update={update} accent={accent}>
-            <TvLogoUrl onStored={async (logoUri) => update({ logoUri })} />
-            <View style={styles.chips}>
-              {PLACEMENTS.map((placement) => (
-                <Chip
-                  key={placement.id}
-                  label={placement.label}
-                  color={accent}
-                  selected={branding.logoPlacement === placement.id}
-                  onPress={() => void update({ logoPlacement: placement.id })}
-                  testID={`placement-${placement.id}`}
-                />
-              ))}
-            </View>
-            <TvToggle
-              label="Blur the full-bleed logo"
-              value={branding.logoBlur}
-              onValueChange={(logoBlur) => void update({ logoBlur })}
-              disabled={branding.logoPlacement !== 'fullBleed'}
-              testID="logo-blur"
-              accent={accent}
-            />
-          </TvLogoTransfer>
-          <TvFocusPressable
-            accessibilityRole="button"
-            testID="reset-brand"
-            onPress={confirmReset}
-            style={({ pressed }) => [fitTvStyle(styles.reset, width, height), pressed ? { opacity: 0.75 } : null]}
-          >
-            <Text style={[fitTvStyle(styles.resetLabel, width, height), { color: '#FF8A7A' }]}>Reset to Inversion</Text>
-          </TvFocusPressable>
-        </View>
-        <View style={fitTvStyle(styles.tvColumn, width, height)}>
-          <BrandChoices branding={branding} part="templates" focusUp={tabFocus?.upTag ?? null} onChange={(patch) => void update(patch)} />
-          <BrandChoices branding={branding} part="palettes" onChange={(patch) => void update(patch)} />
-          <Text style={[fitTvStyle(styles.fieldLabel, width, height), fitTvStyle(styles.fieldLabelTv, width, height), { color: chrome.muted }]}>Colors</Text>
-          <View style={[styles.colorGrid, tvColorGridTight(width, height) && { gap: tvScaled(4, width, height) }]}>
-            {(
-              [
-                ['Work', 'color-work', branding.workColor, (workColor: string) => update({ workColor })],
-                ['Rest', 'color-rest', branding.restColor, (restColor: string) => update({ restColor })],
-                ['Lead-in', 'color-lead', branding.leadInColor, (leadInColor: string) => update({ leadInColor })],
-                ['Warning', 'color-warning', branding.warningColor, (warningColor: string) => update({ warningColor })],
-                ['Digits', 'color-digits', branding.digitColor, (digitColor: string) => update({ digitColor })],
-                ['Background', 'color-background', branding.backgroundColor, (backgroundColor: string) => update({ backgroundColor })],
-                ['Accent', 'color-ui', branding.uiColor, (uiColor: string) => update({ uiColor })],
-              ] as const
-            ).map(([label, testID, value, onChange]) => (
-              <View key={testID} style={tvColorGridTight(width, height) ? styles.colorCellTight : styles.colorCell}>
-                <ColorPicker
-                  label={label}
-                  testID={testID}
-                  value={value}
-                  compact={tvColorGridTight(width, height)}
-                  onChange={(next) => void onChange(next)}
-                />
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
+      <TvSettings
+        branding={branding}
+        accent={accent}
+        update={update}
+        reset={reset}
+        voiceCountdown={preferences.voiceCountdown}
+        onVoiceCountdown={(voiceCountdown) => void updatePreferences({ voiceCountdown })}
+        includeWatch={appleWatch}
+        watch={
+          appleWatch
+            ? {
+                message:
+                  (globalThis as { __TV_WATCH_MESSAGE__?: string }).__TV_WATCH_MESSAGE__ ?? watchLink.message,
+                code: (globalThis as { __TV_WATCH_CODE__?: string }).__TV_WATCH_CODE__ ?? watchLink.pairingCode,
+                offerUnpair: watchLink.offerUnpair,
+                onPresent: watchLink.presentPicker,
+                onRefresh: watchLink.pairWithCode,
+                onUnpair: watchLink.unpair,
+              }
+            : null
+        }
+      />
     );
   }
 
@@ -210,6 +151,24 @@ export default function BrandScreen() {
         <Text style={[styles.lede, tv && styles.ledeTv]}>
           Your gym name, colors, and logo stay on this device. The timer reads them on every screen.
         </Text>
+
+        <Text style={labelStyle}>Sound</Text>
+        <View style={styles.switchRow}>
+          <View style={styles.switchCopy}>
+            <Text style={styles.voiceLabel}>Voice countdown</Text>
+            <Text style={styles.help}>
+              Says three, two, one before a round, a rest, or get ready ends. Off leaves the beeps.
+            </Text>
+          </View>
+          <Switch
+            testID="voice-countdown"
+            accessibilityLabel="Voice countdown"
+            value={preferences.voiceCountdown}
+            onValueChange={(voiceCountdown) => void updatePreferences({ voiceCountdown })}
+            trackColor={{ false: '#2A3140', true: accent }}
+            thumbColor={chrome.text}
+          />
+        </View>
 
         <View
           testID="brand-preview"
@@ -591,9 +550,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
+  switchCopy: {
+    flex: 1,
+    gap: 4,
+  },
   switchLabel: {
     color: chrome.text,
     flex: 1,
+  },
+  voiceLabel: {
+    color: chrome.text,
+    fontFamily: 'OswaldMedium',
+    fontSize: 16,
   },
   reset: {
     marginTop: 8,
