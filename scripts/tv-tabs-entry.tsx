@@ -9,6 +9,7 @@ import WodScreen from '../app/(tabs)/index';
 import { BrandingProvider } from '../src/branding/BrandingProvider';
 import { TvTabBar } from '../src/components/TvTabBar';
 import { TvTabFocusProvider } from '../src/components/TvTabFocus';
+import { PreferencesProvider } from '../src/preferences/PreferencesProvider';
 import { TimerSessionProvider } from '../src/session/TimerSession';
 import { WatchLinkProvider } from '../src/watch/WatchLinkProvider';
 import { chrome } from '../src/theme/chrome';
@@ -48,6 +49,7 @@ function Frame() {
     <SafeAreaProvider>
       <View style={{ width: frame.width, height: frame.height, backgroundColor: chrome.bg }}>
         <BrandingProvider>
+          <PreferencesProvider>
           <TimerSessionProvider>
             <WatchLinkProvider>
             <TvTabFocusProvider>
@@ -58,6 +60,7 @@ function Frame() {
             </TvTabFocusProvider>
             </WatchLinkProvider>
           </TimerSessionProvider>
+          </PreferencesProvider>
         </BrandingProvider>
       </View>
     </SafeAreaProvider>

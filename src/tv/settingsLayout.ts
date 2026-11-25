@@ -1,5 +1,5 @@
-import { tvTabBarHeight } from './controls';
-import { tvSafeBox, tvScaled } from './layout';
+import { TV_FOCUS_SCALE, tvTabBarHeight } from './controls';
+import { tvFocusGutter, tvSafeBox, tvScaled } from './layout';
 
 /** Left column of the TV settings master-detail. The rest is the option pane. */
 export const SETTINGS_SIDEBAR_FRACTION = 0.3;
@@ -83,6 +83,70 @@ export type SettingsActionResult =
 
 function sidebarBlock(title: number, row: number, gap: number, count: number): number {
   return title + gap + count * row + Math.max(0, count - 1) * gap;
+}
+
+export interface SettingsFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Horizontal inset for the detail pane.
+ * A focused row scales from its center. Without this inset the scale crosses
+ * the pane edge, the scroll view clips it, and the label loses its first letters.
+ */
+export function settingsDetailInset(paneWidth: number): number {
+  if (paneWidth <= 0) return 0;
+  return tvFocusGutter(paneWidth);
+}
+
+/** Width left for rows after the focus inset. */
+export function settingsDetailContentWidth(paneWidth: number): number {
+  return Math.max(0, paneWidth - settingsDetailInset(paneWidth) * 2);
+}
+
+/**
+ * Space between cards on one line.
+ * A focused card grows from its center and must not cover the next card.
+ */
+export function settingsColumnGap(contentWidth: number, columns: number, minGap: number): number {
+  const count = Math.max(1, columns);
+  const floor = Number.isFinite(minGap) && minGap > 0 ? minGap : 0;
+  if (count <= 1 || contentWidth <= 0) return floor;
+  const portion = 1 - 1 / TV_FOCUS_SCALE;
+  const needed = Math.ceil((portion * contentWidth) / (count + portion * (count - 1)));
+  return Math.max(floor, needed);
+}
+
+export function settingsItemWidth(contentWidth: number, columns: number, gap: number): number {
+  const count = Math.max(1, columns);
+  if (contentWidth <= 0) return 0;
+  if (count <= 1) return contentWidth;
+  const used = Math.max(0, gap) * (count - 1);
+  return Math.max(0, Math.floor((contentWidth - used) / count));
+}
+
+/** Bounds of a row after the TV focus scale grows it from the center. */
+export function settingsFocusedFrame(frame: SettingsFrame, scale = TV_FOCUS_SCALE): SettingsFrame {
+  const bleedX = (frame.width * (scale - 1)) / 2;
+  const bleedY = (frame.height * (scale - 1)) / 2;
+  return {
+    x: frame.x - bleedX,
+    y: frame.y - bleedY,
+    width: frame.width * scale,
+    height: frame.height * scale,
+  };
+}
+
+export function frameContains(outer: SettingsFrame, inner: SettingsFrame, slack = 1): boolean {
+  return (
+    inner.x >= outer.x - slack &&
+    inner.y >= outer.y - slack &&
+    inner.x + inner.width <= outer.x + outer.width + slack &&
+    inner.y + inner.height <= outer.y + outer.height + slack
+  );
 }
 
 /** Sizes the sidebar so every category is on screen under the tab bar. */

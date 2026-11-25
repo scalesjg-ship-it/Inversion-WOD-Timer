@@ -3,13 +3,20 @@ import { describe, expect, it } from 'vitest';
 import { tvSafeBox } from './layout';
 import {
   SETTINGS_SIDEBAR_FRACTION,
+  frameContains,
   settingsAction,
   settingsBackTab,
   settingsCategoryRows,
+  settingsColumnGap,
+  settingsDetailContentWidth,
+  settingsDetailInset,
   settingsDetailTestId,
+  settingsFocusedFrame,
+  settingsItemWidth,
   settingsNeighbor,
   TV_SETTINGS_CATEGORIES,
   tvSettingsMetrics,
+  type SettingsFrame,
   type SettingsPlace,
 } from './settingsLayout';
 
@@ -165,6 +172,57 @@ describe('TV settings layout', () => {
       zone: 'sidebar',
       index: sound,
     });
+  });
+
+  it('keeps every focused row inside the detail pane at 1080p and 720p', () => {
+    const templates = Array.from({ length: 10 }, (_, index) => `template-${index}`);
+    const palettes = Array.from({ length: 10 }, (_, index) => `palette-${index}`);
+    for (const size of [
+      { width: 1920, height: 1080 },
+      { width: 1280, height: 720 },
+      { width: 960, height: 540 },
+    ]) {
+      const metrics = tvSettingsMetrics(size.width, size.height);
+      const safe = tvSafeBox(true, size.width, size.height);
+      const inner = size.width - safe.horizontal * 2;
+      const paneWidth = inner - metrics.gap - metrics.sidebarWidth;
+      const pane: SettingsFrame = { x: 0, y: 0, width: paneWidth, height: metrics.viewport };
+      const inset = settingsDetailInset(paneWidth);
+      const contentWidth = settingsDetailContentWidth(paneWidth);
+      expect(inset).toBeGreaterThan(0);
+      expect(contentWidth).toBeGreaterThan(paneWidth * 0.7);
+      expect(safe.horizontal).toBeGreaterThanOrEqual(Math.round(size.width * 0.05));
+
+      for (const groups of settingsCategoryRows(templates, palettes)) {
+        for (const group of groups) {
+          const columns = Math.max(1, group.columns);
+          const gap = settingsColumnGap(contentWidth, columns, metrics.gap);
+          const itemWidth = settingsItemWidth(contentWidth, columns, gap);
+          expect(itemWidth).toBeGreaterThan(0);
+          const rowHeight = Math.max(56, metrics.row - 16);
+          group.ids.forEach((_, index) => {
+            const column = index % columns;
+            const line = Math.floor(index / columns);
+            const frame: SettingsFrame = {
+              x: inset + column * (itemWidth + gap),
+              y: inset + line * (rowHeight + metrics.gap),
+              width: itemWidth,
+              height: rowHeight,
+            };
+            const focused = settingsFocusedFrame(frame);
+            expect(focused.x).toBeGreaterThanOrEqual(-1);
+            expect(focused.x + focused.width).toBeLessThanOrEqual(pane.width + 1);
+            if (line === 0) {
+              expect(frameContains(pane, focused)).toBe(true);
+            }
+            if (column + 1 < columns && index + 1 < group.ids.length) {
+              const neighborX = inset + (column + 1) * (itemWidth + gap);
+              expect(focused.x + focused.width).toBeLessThanOrEqual(neighborX + 1);
+            }
+          });
+        }
+      }
+    }
   });
 
   it('returns to the previous tab, and to WOD when there is no previous tab', () => {
