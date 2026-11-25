@@ -1,3 +1,19 @@
+@font-face {
+  font-family: Oswald;
+  src: url("fonts/Oswald-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Oswald;
+  src: url("fonts/Oswald-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
   --bg: #0c0d10;
@@ -5,6 +21,7 @@
   --muted: #b7b1a6;
   --red: #ff3b24;
   --line: #2a2c33;
+  --card: #17191f;
 }
 
 * {
@@ -20,34 +37,59 @@ body {
   line-height: 1.5;
 }
 
-body {
-  max-width: 42rem;
-  margin: 0 auto;
-  padding: 2.5rem 1.25rem 4rem;
+img {
+  max-width: 100%;
+  height: auto;
 }
 
 a {
   color: var(--red);
 }
 
-nav {
+a:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.skip {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 0.5rem 0.8rem;
+  z-index: 2;
+}
+
+.skip:focus {
+  top: 0.75rem;
+}
+
+body:not(.home) {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+body:not(.home) nav {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.15rem;
   margin-bottom: 2.5rem;
   font-size: 0.95rem;
 }
 
-nav a {
+body:not(.home) nav a {
   color: var(--muted);
   text-decoration: none;
 }
 
-nav a[aria-current="page"],
-nav a:hover {
+body:not(.home) nav a[aria-current="page"],
+body:not(.home) nav a:hover {
   color: var(--ink);
 }
 
-h1 {
+body:not(.home) h1 {
   font-size: 2.4rem;
   letter-spacing: 0.04em;
   line-height: 1;
@@ -55,33 +97,277 @@ h1 {
   text-transform: uppercase;
 }
 
-.mark {
-  color: var(--red);
-}
-
-h2 {
+body:not(.home) h2 {
   margin: 2rem 0 0.4rem;
   font-size: 1.15rem;
 }
 
-p,
-li {
-  color: var(--ink);
-}
-
-.lede {
+body:not(.home) .lede {
   color: var(--muted);
   font-size: 1.15rem;
 }
 
-ul {
+body:not(.home) ul {
   padding-left: 1.2rem;
 }
 
-footer {
+body:not(.home) footer {
   margin-top: 3rem;
   padding-top: 1rem;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.home {
+  min-height: 100vh;
+}
+
+.wrap {
+  width: min(1080px, calc(100% - 2.5rem));
+  margin-inline: auto;
+}
+
+.top {
+  border-bottom: 1px solid var(--line);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  padding-block: 1rem;
+}
+
+.brand {
+  color: var(--ink);
+  font-family: Oswald, "Avenir Next", "Segoe UI", sans-serif;
+  font-weight: 500;
+  font-size: 1.15rem;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+}
+
+.top nav,
+.foot nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.15rem;
+}
+
+.top nav a,
+.foot nav a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.foot p a {
+  color: var(--red);
+  text-underline-offset: 2px;
+}
+
+.top nav a:hover,
+.foot a:hover {
+  color: var(--ink);
+}
+
+.hero {
+  padding: 2.75rem 0 3.25rem;
+  text-align: center;
+}
+
+.icon {
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 1.25rem;
+}
+
+.home h1,
+.home h2,
+.home h3,
+.stores a {
+  font-family: Oswald, "Avenir Next", "Segoe UI", sans-serif;
+  font-weight: 700;
+}
+
+.home h1 {
+  max-width: 11em;
+  margin: 1.15rem auto 0.85rem;
+  font-size: clamp(2.7rem, 8vw, 4.8rem);
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.home .lede {
+  max-width: 36rem;
+  margin: 0 auto;
+  color: var(--muted);
+  font-size: 1.125rem;
+  line-height: 1.45;
+}
+
+.stores {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+}
+
+.stores a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.45rem 1.05rem;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-weight: 500;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+}
+
+.stores a:hover {
+  background: var(--red);
+  color: var(--bg);
+}
+
+.features {
+  padding-bottom: 3.25rem;
+}
+
+.home h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 1.15rem 0 0;
+  padding: 0;
+}
+
+.grid li {
+  margin: 0;
+  padding: 1rem 1.05rem 1.1rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.grid h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.2rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+}
+
+.grid p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.shots {
+  padding-bottom: 3.5rem;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.shot {
+  margin: 0;
+}
+
+.bezel {
+  background: #101116;
+  border: 1px solid #343742;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
+}
+
+.bezel img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.bezel.tv {
+  padding: 0.55rem;
+  border-radius: 1rem;
+}
+
+.bezel.tv img {
+  border-radius: 0.45rem;
+}
+
+figcaption {
+  margin-top: 0.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.close {
+  padding: 0.5rem 0 4.5rem;
+  text-align: center;
+}
+
+.close h2 {
+  text-wrap: balance;
+}
+
+.close .lede {
+  margin-top: 0.7rem;
+}
+
+.site-footer {
+  border-top: 1px solid var(--line);
+  padding: 1.25rem 0 2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  align-items: baseline;
+}
+
+.foot p {
+  margin: 0;
+}
+
+@media (min-width: 700px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 860px) {
+  .hero {
+    padding-top: 3.5rem;
+  }
+}
+
+@media (min-width: 980px) {
+  .grid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
 }
