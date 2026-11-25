@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  PAIRING_CODE_MESSAGE,
+  PAIRING_NETWORK_MESSAGE,
+  PAIRING_SERVER_MESSAGE,
   PAIRING_TTL_MS,
+  classifyPairingFault,
   createHandshake,
   digitsFromBytes,
+  formatPairingCode,
   handshakeChannel,
   isPairingCode,
   isPairingCodeCurrent,
+  normalizePairingCode,
   parseHandshake,
   parsePairingRecord,
   relayBackoffMs,
@@ -82,6 +88,33 @@ describe('pairing codes', () => {
     expect(parseHandshake({ v: 1, kind: 'hello', nonce: 'nope' })).toBeNull();
     expect(parseHandshake({ v: 2, kind: 'hello', nonce })).toBeNull();
     expect(parseHandshake({ v: 1, kind: 'command', nonce })).toBeNull();
+  });
+
+  it('treats the space in 814 947 as display formatting and still pairs that code', () => {
+    expect(normalizePairingCode('814 947')).toBe('814947');
+    expect(normalizePairingCode('814947')).toBe('814947');
+    expect(formatPairingCode('814947')).toBe('814 947');
+    expect(handshakeChannel('814 947')).toBe('americana-pair-814947');
+    expect(handshakeChannel('814947')).toBe(handshakeChannel('814 947'));
+    expect(normalizePairingCode('81494')).toBeNull();
+  });
+
+  it('blames a missing offer on the code, and a socket failure on the network', () => {
+    expect(classifyPairingFault({ type: 'send-before-open' })).toEqual({ blame: 'none', message: null });
+    expect(classifyPairingFault({ type: 'transport' })).toEqual({
+      blame: 'network',
+      message: PAIRING_NETWORK_MESSAGE,
+    });
+    expect(classifyPairingFault({ type: 'join-rejected', reason: 'PrivateOnly: public channels are disabled' })).toEqual({
+      blame: 'server',
+      message: PAIRING_SERVER_MESSAGE,
+    });
+    expect(classifyPairingFault({ type: 'no-offer' })).toEqual({
+      blame: 'code',
+      message: PAIRING_CODE_MESSAGE,
+    });
+    expect(PAIRING_CODE_MESSAGE).not.toContain('internet');
+    expect(PAIRING_NETWORK_MESSAGE).not.toContain('wrong');
   });
 
   it('backs off and then holds at 15 seconds', () => {

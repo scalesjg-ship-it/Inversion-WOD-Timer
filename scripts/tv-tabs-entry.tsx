@@ -10,6 +10,7 @@ import { BrandingProvider } from '../src/branding/BrandingProvider';
 import { TvTabBar } from '../src/components/TvTabBar';
 import { TvTabFocusProvider } from '../src/components/TvTabFocus';
 import { TimerSessionProvider } from '../src/session/TimerSession';
+import { WatchLinkProvider } from '../src/watch/WatchLinkProvider';
 import { chrome } from '../src/theme/chrome';
 
 Object.defineProperty(Platform, 'isTV', {
@@ -48,12 +49,14 @@ function Frame() {
       <View style={{ width: frame.width, height: frame.height, backgroundColor: chrome.bg }}>
         <BrandingProvider>
           <TimerSessionProvider>
+            <WatchLinkProvider>
             <TvTabFocusProvider>
               {stacked ? null : <TvTabBar />}
               <View style={{ flex: 1, width: frame.width, height: stacked ? frame.height : undefined }}>
                 <Screen />
               </View>
             </TvTabFocusProvider>
+            </WatchLinkProvider>
           </TimerSessionProvider>
         </BrandingProvider>
       </View>

@@ -5,6 +5,7 @@ import BrandScreen from '../app/(tabs)/brand';
 import { BrandingProvider } from '../src/branding/BrandingProvider';
 import { PreferencesProvider } from '../src/preferences/PreferencesProvider';
 import { chrome } from '../src/theme/chrome';
+import { WatchLinkProvider } from '../src/watch/WatchLinkProvider';
 import { tvTabBarHeight } from '../src/tv/controls';
 
 const previewTv = (globalThis as { __AMERICANA_PREVIEW_TV?: boolean }).__AMERICANA_PREVIEW_TV !== false;
@@ -20,7 +21,9 @@ function PhoneFrame() {
       <View style={{ flex: 1, backgroundColor: chrome.bg }}>
         <BrandingProvider>
           <PreferencesProvider>
-            <BrandScreen />
+            <WatchLinkProvider>
+              <BrandScreen />
+            </WatchLinkProvider>
           </PreferencesProvider>
         </BrandingProvider>
       </View>
@@ -38,7 +41,9 @@ function Frame() {
       <View style={{ height: height - tabBarHeight, overflow: 'hidden' }}>
         <BrandingProvider>
           <PreferencesProvider>
-            <BrandScreen />
+            <WatchLinkProvider>
+              <BrandScreen />
+            </WatchLinkProvider>
           </PreferencesProvider>
         </BrandingProvider>
       </View>

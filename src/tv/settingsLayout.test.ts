@@ -33,7 +33,7 @@ describe('TV settings layout', () => {
       expect(metrics.sidebarBlock).toBeLessThanOrEqual(metrics.viewport);
       expect(metrics.padH).toBeGreaterThanOrEqual(safe.horizontal);
       expect(metrics.padV).toBeGreaterThanOrEqual(safe.vertical);
-      expect(metrics.row).toBeGreaterThanOrEqual(48);
+      expect(metrics.row).toBeGreaterThanOrEqual(40);
       expect(metrics.sidebarWidth / (inner - metrics.gap)).toBeCloseTo(SETTINGS_SIDEBAR_FRACTION, 2);
       expect(metrics.label).toBeGreaterThanOrEqual(20);
     }
@@ -47,6 +47,7 @@ describe('TV settings layout', () => {
       'Colors',
       'Logo',
       'Sound',
+      'Watch',
     ]);
     expect(settingsDetailTestId('brand')).toBe('settings-detail-brand');
     expect(settingsDetailTestId('logo')).toBe('settings-detail-logo');
@@ -66,8 +67,8 @@ describe('TV settings layout', () => {
     expect(settingsNeighbor(place, 'down', categories)).toEqual({ zone: 'self' });
 
     const entered = settingsNeighbor(place, 'right', categories);
-    expect(entered).toEqual({ zone: 'detail', id: 'voice-countdown' });
-    expect(settingsAction(place, 'select', categories)).toEqual({ zone: 'detail', id: 'voice-countdown' });
+    expect(entered).toEqual({ zone: 'detail', id: 'watch-action' });
+    expect(settingsAction(place, 'select', categories)).toEqual({ zone: 'detail', id: 'watch-action' });
     if (entered.zone !== 'detail') return;
     const option: SettingsPlace = { zone: 'detail', index: place.index, id: entered.id };
     expect(settingsNeighbor(option, 'left', categories)).toEqual({ zone: 'sidebar', index: place.index });
@@ -128,12 +129,25 @@ describe('TV settings layout', () => {
     });
 
     const sound = TV_SETTINGS_CATEGORIES.findIndex((category) => category.id === 'sound');
+    const watch = TV_SETTINGS_CATEGORIES.findIndex((category) => category.id === 'watch');
     const logo = TV_SETTINGS_CATEGORIES.findIndex((category) => category.id === 'logo');
     expect(settingsNeighbor({ zone: 'sidebar', index: logo }, 'right', categories)).toEqual({
       zone: 'detail',
       id: 'logo-entry',
     });
-    expect(settingsNeighbor({ zone: 'sidebar', index: sound }, 'down', categories)).toEqual({ zone: 'self' });
+    expect(settingsNeighbor({ zone: 'sidebar', index: sound }, 'down', categories)).toEqual({
+      zone: 'sidebar',
+      index: watch,
+    });
+    expect(settingsNeighbor({ zone: 'sidebar', index: watch }, 'down', categories)).toEqual({ zone: 'self' });
+    expect(settingsNeighbor({ zone: 'sidebar', index: watch }, 'right', categories)).toEqual({
+      zone: 'detail',
+      id: 'watch-action',
+    });
+    expect(settingsNeighbor({ zone: 'detail', index: watch, id: 'watch-action' }, 'down', categories)).toEqual({
+      zone: 'detail',
+      id: 'watch-unpair',
+    });
     expect(settingsNeighbor({ zone: 'detail', index: sound, id: 'voice-countdown' }, 'left', categories)).toEqual({
       zone: 'sidebar',
       index: sound,

@@ -29,6 +29,8 @@ import { TvLogoUrl } from '@/src/components/TvLogoUrl';
 import { Chip, TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
 import { TV_BODY_FONT, TV_SECTION_FONT, fitTvStyle, tvSafeBox } from '@/src/tv/layout';
+import { watchLinkEnabled } from '@/src/watch/gate';
+import { useWatchLinkContext } from '@/src/watch/WatchLinkProvider';
 
 export function ErrorBoundary(props: { error: Error; retry: () => Promise<void> }) {
   return <RouteErrorBoundary {...props} />;
@@ -48,6 +50,8 @@ export default function BrandScreen() {
   const [frame, setFrame] = useState({ width: 0, height: 0 });
   const { width, height } = useWindowDimensions();
   const tv = Platform.isTV === true;
+  const appleWatch = watchLinkEnabled({ os: Platform.OS, tv });
+  const watchLink = useWatchLinkContext();
   const box = tvSafeBox(tv, width, height);
   const labelStyle = [styles.fieldLabel, tv && styles.fieldLabelTv];
 
@@ -116,6 +120,20 @@ export default function BrandScreen() {
         reset={reset}
         voiceCountdown={preferences.voiceCountdown}
         onVoiceCountdown={(voiceCountdown) => void updatePreferences({ voiceCountdown })}
+        includeWatch={appleWatch}
+        watch={
+          appleWatch
+            ? {
+                message:
+                  (globalThis as { __TV_WATCH_MESSAGE__?: string }).__TV_WATCH_MESSAGE__ ?? watchLink.message,
+                code: (globalThis as { __TV_WATCH_CODE__?: string }).__TV_WATCH_CODE__ ?? watchLink.pairingCode,
+                offerUnpair: watchLink.offerUnpair,
+                onPresent: watchLink.presentPicker,
+                onRefresh: watchLink.pairWithCode,
+                onUnpair: watchLink.unpair,
+              }
+            : null
+        }
       />
     );
   }

@@ -26,6 +26,12 @@ interface UseWatchLinkInput {
   onAction: (action: WatchClockAction) => void;
 }
 
+export interface WatchTimerBinding {
+  readSnapshot: () => TimerSnapshot;
+  readConfig: () => TimerConfig;
+  onAction: (action: WatchClockAction) => void;
+}
+
 export function useWatchLink(input: UseWatchLinkInput): {
   connected: boolean;
   phase: WatchLinkPhase;
@@ -37,6 +43,8 @@ export function useWatchLink(input: UseWatchLinkInput): {
   presentPicker: () => void;
   pairWithCode: () => void;
   unpair: () => void;
+  bindTimer: (live: WatchTimerBinding | null) => void;
+  publishNow: () => void;
 } {
   const snapshotRef = useRef(input.snapshot);
   const configRef = useRef(input.config);
@@ -47,6 +55,7 @@ export function useWatchLink(input: UseWatchLinkInput): {
   const relaySendRef = useRef<(line: string) => void>(() => {});
   const startPairingRef = useRef<(force?: boolean) => void>(() => {});
   const directReadyRef = useRef(false);
+  const liveRef = useRef<WatchTimerBinding | null>(null);
   const [directConnected, setDirectConnected] = useState(false);
   const [directPhase, setDirectPhase] = useState<WatchLinkPhase>('idle');
 
@@ -73,15 +82,26 @@ export function useWatchLink(input: UseWatchLinkInput): {
     startPairingRef.current = relay.startPairing;
   }, [relay.send, relay.startPairing]);
 
+  const readLive = () => {
+    const live = liveRef.current;
+    if (!live) return;
+    snapshotRef.current = live.readSnapshot();
+    configRef.current = live.readConfig();
+    onActionRef.current = live.onAction;
+  };
+
   useEffect(() => {
+    if (liveRef.current) return;
     snapshotRef.current = input.snapshot;
   }, [input.snapshot]);
 
   useEffect(() => {
+    if (liveRef.current) return;
     configRef.current = input.config;
   }, [input.config]);
 
   useEffect(() => {
+    if (liveRef.current) return;
     onActionRef.current = input.onAction;
   }, [input.onAction]);
 
@@ -111,6 +131,7 @@ export function useWatchLink(input: UseWatchLinkInput): {
       return seqRef.current;
     };
     const publish = () => {
+      readLive();
       const snap = snapshotRef.current;
       const state = buildWatchState(snap, configRef.current, nextSeq());
       const stateLine = encodeMessage(state);
@@ -196,5 +217,10 @@ export function useWatchLink(input: UseWatchLinkInput): {
     presentPicker,
     pairWithCode: () => relay.startPairing(true),
     unpair: () => relay.forget(),
+    bindTimer: (live) => {
+      liveRef.current = live;
+      if (live) readLive();
+    },
+    publishNow: () => publishRef.current(),
   };
 }

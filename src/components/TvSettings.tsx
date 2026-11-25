@@ -1,5 +1,5 @@
 import { router, useFocusEffect, type Href } from 'expo-router';
-import { useCallback, useEffect, useRef, useState, type ComponentRef, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactElement } from 'react';
 import {
   BackHandler,
   findNodeHandle,
@@ -22,6 +22,7 @@ import { requestTvFocus, useTvTabFocus, type TvFocusTag } from '@/src/components
 import { TvLogoUrl } from '@/src/components/TvLogoUrl';
 import { TvToggle } from '@/src/components/ui';
 import { chrome } from '@/src/theme/chrome';
+import { formatPairingCode } from '@/src/watch/relay/pairing';
 import { scrollOffsetForFocus } from '@/src/tv/scroll';
 import { acceptRemotePress } from '@/src/tv/keyAction';
 import {
@@ -33,6 +34,7 @@ import {
   settingsNeighbor,
   TV_SETTINGS_CATEGORIES,
   tvSettingsMetrics,
+  visibleSettingsCategories,
   type SettingsCategoryId,
   type SettingsNeighbor,
   type SettingsPlace,
@@ -81,10 +83,20 @@ function readHostTag(node: unknown): TvFocusTag | null {
   }
 }
 
-function settingsRows(): SettingsRow[][] {
+export interface TvWatchPane {
+  message: string | null;
+  code: string | null;
+  offerUnpair: boolean;
+  onPresent: () => void;
+  onRefresh: () => void;
+  onUnpair: () => void;
+}
+
+function settingsRows(includeWatch: boolean): SettingsRow[][] {
   return settingsCategoryRows(
     BRAND_TEMPLATES.map((template) => `template-${template.id}`),
     COLOR_PALETTES.map((palette) => `palette-${palette.id}`),
+    { includeWatch },
   );
 }
 
@@ -121,6 +133,8 @@ export function TvSettings({
   reset,
   voiceCountdown,
   onVoiceCountdown,
+  includeWatch = false,
+  watch = null,
 }: {
   branding: Branding;
   accent: string;
@@ -128,12 +142,19 @@ export function TvSettings({
   reset: () => Promise<void> | void;
   voiceCountdown: boolean;
   onVoiceCountdown: (value: boolean) => void;
+  includeWatch?: boolean;
+  watch?: TvWatchPane | null;
 }) {
   const { width, height } = useWindowDimensions();
   const metrics = tvSettingsMetrics(width, height);
   const tabFocus = useTvTabFocus();
   const tabFocusRef = useRef(tabFocus);
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useState(() => {
+    const id = (globalThis as { __TV_SETTINGS_CATEGORY__?: string }).__TV_SETTINGS_CATEGORY__;
+    if (!id) return 0;
+    const index = visibleSettingsCategories(includeWatch).findIndex((item) => item.id === id);
+    return index >= 0 ? index : 0;
+  });
   const [name, setName] = useState(branding.gymName);
   const [trackedName, setTrackedName] = useState(branding.gymName);
   const [tags, setTags] = useState<Record<string, TvFocusTag | null>>({});
@@ -153,11 +174,12 @@ export function TvSettings({
     setName(branding.gymName);
   }
 
-  const categoryRows = settingsRows();
+  const categories = useMemo(() => visibleSettingsCategories(includeWatch), [includeWatch]);
+  const categoryRows = useMemo(() => settingsRows(includeWatch), [includeWatch]);
   useEffect(() => {
     tabFocusRef.current = tabFocus;
   }, [tabFocus]);
-  const category = TV_SETTINGS_CATEGORIES[selected] ?? TV_SETTINGS_CATEGORIES[0];
+  const category = categories[selected] ?? categories[0] ?? TV_SETTINGS_CATEGORIES[0];
   const selectedTag = tags[category.testID] ?? null;
 
   const bind = useCallback((id: string, node: unknown) => {
@@ -179,7 +201,7 @@ export function TvSettings({
         case 'self':
           return tags[selfId] ?? null;
         case 'sidebar':
-          return tags[TV_SETTINGS_CATEGORIES[neighbor.index]?.testID ?? ''] ?? null;
+          return tags[categories[neighbor.index]?.testID ?? ''] ?? null;
         case 'detail':
           return tags[neighbor.id] ?? null;
         default: {
@@ -188,7 +210,7 @@ export function TvSettings({
         }
       }
     },
-    [tabFocus?.tabTags, tags],
+    [categories, tabFocus?.tabTags, tags],
   );
 
   const linksFor = (place: SettingsPlace, selfId: string) => {
@@ -218,7 +240,7 @@ export function TvSettings({
   }, []);
 
   const focusDetail = (index: number) => {
-    const action = settingsAction({ zone: 'sidebar', index }, 'select', settingsRows());
+    const action = settingsAction({ zone: 'sidebar', index }, 'select', categoryRows);
     if (action.zone !== 'detail') return;
     requestTvFocus(hosts.current[action.id]);
     placeRef.current = { zone: 'detail', index, id: action.id };
@@ -235,16 +257,16 @@ export function TvSettings({
 
   const handleBack = useCallback(() => {
     if (!takeBack(lastBack)) return;
-    const action = settingsAction(placeRef.current, 'back', settingsRows());
+    const action = settingsAction(placeRef.current, 'back', categoryRows);
     if (action.zone === 'sidebar') {
-      const id = TV_SETTINGS_CATEGORIES[action.index]?.testID;
+      const id = categories[action.index]?.testID;
       if (id) requestTvFocus(hosts.current[id]);
       placeRef.current = { zone: 'sidebar', index: action.index };
       setSelected(action.index);
       return;
     }
     if (action.zone === 'leave') leaveSettings();
-  }, [leaveSettings]);
+  }, [categories, categoryRows, leaveSettings]);
 
   useFocusEffect(
     useCallback(() => {
@@ -273,7 +295,7 @@ export function TvSettings({
     if (type === 'left') {
       const edge = detailEdgeRef.current;
       if (!edge || edge.zone !== 'detail') return;
-      const neighbor = settingsNeighbor(edge, 'left', settingsRows());
+      const neighbor = settingsNeighbor(edge, 'left', categoryRows);
       if (neighbor.zone !== 'sidebar') return;
       // The text field's inner view ignores nextFocusLeft, so the focus
       // engine lands on a neighboring category. Pull focus back after that.
@@ -281,7 +303,7 @@ export function TvSettings({
       const pull = () => {
         const current = detailEdgeRef.current;
         if (!current || current.zone !== 'detail' || current.index !== index) return;
-        const id = TV_SETTINGS_CATEGORIES[index]?.testID;
+        const id = categories[index]?.testID;
         if (!id) return;
         requestTvFocus(hosts.current[id]);
         placeRef.current = { zone: 'sidebar', index };
@@ -361,7 +383,7 @@ export function TvSettings({
             <Text style={[styles.title, { fontSize: metrics.title, lineHeight: metrics.title + 6, color: accent }]}>Settings</Text>
           </Guide>
           <Guide style={{ gap: metrics.gap }} collapsable={false} {...(plain ? null : { trapFocusLeft: true })}>
-          {TV_SETTINGS_CATEGORIES.map((item, index) => {
+          {categories.map((item, index) => {
             const selfId = item.testID;
             const place: SettingsPlace = { zone: 'sidebar', index };
             const open = index === selected;
@@ -451,6 +473,7 @@ export function TvSettings({
               reset={reset}
               voiceCountdown={voiceCountdown}
               onVoiceCountdown={onVoiceCountdown}
+              watch={watch}
               metricsHeader={metrics.header}
               metricsBody={metrics.body}
               gap={metrics.gap}
@@ -488,6 +511,7 @@ function DetailBody({
   reset,
   voiceCountdown,
   onVoiceCountdown,
+  watch,
   metricsHeader,
   metricsBody,
   gap,
@@ -509,6 +533,7 @@ function DetailBody({
   reset: () => Promise<void> | void;
   voiceCountdown: boolean;
   onVoiceCountdown: (value: boolean) => void;
+  watch: TvWatchPane | null;
   metricsHeader: number;
   metricsBody: number;
   gap: number;
@@ -656,6 +681,79 @@ function DetailBody({
           })}
         </View>
       );
+    case 'watch': {
+      const action = optionLinks('watch-action');
+      const unpair = optionLinks('watch-unpair');
+      const code = watch?.code ?? null;
+      const actionLabel = code ? formatPairingCode(code) : 'Pair Apple Watch';
+      return (
+        <View style={{ gap }}>
+          {heading('Apple Watch')}
+          <Text testID="watch-status" style={[styles.header, { fontSize: metricsBody, lineHeight: metricsBody + 6, color: chrome.text }]}>
+            {watch?.message ?? 'Open this page to pair. The timer stays clear.'}
+          </Text>
+          <TvFocusPressable
+            testID={code ? 'watch-pair-code' : 'watch-pair'}
+            accessibilityRole="button"
+            accessibilityLabel={code ? `Pairing code ${code}` : 'Pair Apple Watch'}
+            accent={accent}
+            onHost={(node) => bind('watch-action', node)}
+            onPress={() => {
+              if (code) watch?.onRefresh();
+              else watch?.onPresent();
+            }}
+            onFocus={() => onDetail('watch-action')}
+            {...action}
+            style={{
+              minHeight: Math.max(56, metricsBody + 28),
+              borderRadius: 14,
+              paddingHorizontal: 16,
+              justifyContent: 'center',
+              backgroundColor: chrome.surface,
+              borderWidth: 2,
+              borderColor: chrome.line,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: 'Oswald',
+                fontSize: code ? metricsBody + 8 : metricsBody,
+                lineHeight: (code ? metricsBody + 8 : metricsBody) + 4,
+                letterSpacing: code ? 4 : 0,
+                color: chrome.text,
+              }}
+            >
+              {actionLabel}
+            </Text>
+          </TvFocusPressable>
+          {watch?.offerUnpair ? (
+            <TvFocusPressable
+              testID="watch-unpair"
+              accessibilityRole="button"
+              accessibilityLabel="Unpair watch"
+              accent={accent}
+              onHost={(node) => bind('watch-unpair', node)}
+              onPress={() => watch.onUnpair()}
+              onFocus={() => onDetail('watch-unpair')}
+              {...unpair}
+              style={{
+                minHeight: Math.max(56, metricsBody + 28),
+                borderRadius: 14,
+                paddingHorizontal: 16,
+                justifyContent: 'center',
+                backgroundColor: chrome.surface,
+                borderWidth: 2,
+                borderColor: chrome.line,
+              }}
+            >
+              <Text style={{ fontFamily: 'OswaldMedium', fontSize: metricsBody, lineHeight: metricsBody + 4, color: chrome.text }}>
+                Unpair watch
+              </Text>
+            </TvFocusPressable>
+          ) : null}
+        </View>
+      );
+    }
     case 'sound': {
       const links = optionLinks('voice-countdown');
       return (
