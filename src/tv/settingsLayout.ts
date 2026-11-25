@@ -22,6 +22,7 @@ export const TV_SETTINGS_CATEGORIES = [
   { id: 'colors', label: 'Colors', testID: 'settings-category-colors' },
   { id: 'logo', label: 'Logo', testID: 'settings-category-logo' },
   { id: 'sound', label: 'Sound', testID: 'settings-category-sound' },
+  { id: 'watch', label: 'Watch', testID: 'settings-category-watch' },
 ] as const;
 
 export type SettingsCategoryId = (typeof TV_SETTINGS_CATEGORIES)[number]['id'];
@@ -100,7 +101,9 @@ export function tvSettingsMetrics(width: number, height: number): TvSettingsMetr
   const titleBlock = title + gap;
   const gaps = gap * Math.max(0, count - 1);
   const fit = Math.floor((viewport - titleBlock - gaps) / count);
-  const row = Math.max(48, Math.min(tvScaled(88, safeWidth, safeHeight), Math.max(48, fit)));
+  // 40 keeps a finger-sized row when seven categories have to share a 540p safe area.
+  const floor = 40;
+  const row = Math.max(floor, Math.min(tvScaled(88, safeWidth, safeHeight), Math.max(floor, fit)));
   const inner = Math.max(1, safeWidth - safe.horizontal * 2);
   const sidebarWidth = Math.max(1, Math.round((inner - gap) * SETTINGS_SIDEBAR_FRACTION));
   return {
@@ -160,6 +163,8 @@ export function settingsDetailRows(
       ];
     case 'sound':
       return [{ columns: 1, ids: ['voice-countdown'] }];
+    case 'watch':
+      return [{ columns: 1, ids: ['watch-action', 'watch-unpair'] }];
     default: {
       const unexpected: never = category;
       return unexpected;
@@ -167,11 +172,17 @@ export function settingsDetailRows(
   }
 }
 
+export function visibleSettingsCategories(includeWatch: boolean) {
+  return TV_SETTINGS_CATEGORIES.filter((category) => includeWatch || category.id !== 'watch');
+}
+
 export function settingsCategoryRows(
   templateIds: readonly string[],
   paletteIds: readonly string[],
+  options?: { includeWatch?: boolean },
 ): SettingsRow[][] {
-  return TV_SETTINGS_CATEGORIES.map((category) =>
+  const includeWatch = options?.includeWatch !== false;
+  return visibleSettingsCategories(includeWatch).map((category) =>
     settingsDetailRows(category.id, { templateIds, paletteIds }),
   );
 }

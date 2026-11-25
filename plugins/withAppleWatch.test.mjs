@@ -1,5 +1,7 @@
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
@@ -46,6 +48,12 @@ describe('withAppleWatch', () => {
     // linkWatchTarget is exercised against a parsed project in the prebuild check.
     expect(plugin.WATCH_BUNDLE_ID).toBe('com.garrettscales.americana.watchkitapp');
     expect(plugin.WATCH_SOURCES).toContain('WatchRelay.swift');
+    const relay = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../targets/watch/WatchRelay.swift'), 'utf8');
+    expect(relay).toContain("Can't reach the pairing server. Check the internet.");
+    expect(relay).toContain('The pairing server refused the connection.');
+    expect(relay).toContain('That code was not accepted. It may be wrong or expired.');
+    expect(relay).not.toContain('Check the code and the internet');
+    expect(relay).toContain('didOpenWithProtocol');
     expect(plugin.WATCH_SOURCES).toContain('PairingPad.swift');
     expect(typeof project.parseSync).toBe('function');
   });

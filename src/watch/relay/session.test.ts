@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { decodeMessage } from '../protocol';
 
 import { sealRelay } from './envelope';
+import { formatPairingCode, handshakeChannel, type WatchPairing } from './pairing';
+import { parseRealtimeFrame, type RealtimeListener } from './realtime';
 import { TvRelay, type RelayLink, type RelaySnapshot } from './session';
-import type { RealtimeListener } from './realtime';
-import type { WatchPairing } from './pairing';
 
 class FakeLink implements RelayLink {
   sent: unknown[] = [];
@@ -96,6 +96,46 @@ function harness(config: { url: string; anonKey: string } | null = { url: 'https
 }
 
 describe('tv relay session', () => {
+  it('pairs a correct code, including the spaced form 814 947', () => {
+    const rig = harness();
+    rig.relay.start(null);
+    rig.relay.startPairing();
+    const code = rig.snapshot.code;
+    expect(code).toMatch(/^\d{6}$/);
+    const shown = formatPairingCode(code ?? '');
+    expect(shown).toBe(`${code?.slice(0, 3)} ${code?.slice(3)}`);
+    const handshake = rig.links[0];
+    expect(handshake?.channel).toBe(handshakeChannel(shown));
+    expect(handshake?.channel).toBe(`americana-pair-${code}`);
+
+    const nonce = 'ab'.repeat(16);
+    const live = JSON.stringify({
+      ref: null,
+      event: 'broadcast',
+      topic: `realtime:${handshake?.channel}`,
+      payload: {
+        type: 'broadcast',
+        event: 'americana',
+        payload: { v: 1, kind: 'hello', nonce },
+      },
+    });
+    const frame = parseRealtimeFrame(live);
+    expect(frame.kind).toBe('broadcast');
+    if (frame.kind !== 'broadcast') return;
+    handshake?.join();
+    handshake?.deliver(frame.payload);
+    const offer = handshake?.sent[0] as { kind: string; pairingId: string; secret: string };
+    expect(offer.kind).toBe('offer');
+    handshake?.deliver(TvRelay.accept(offer.pairingId, nonce));
+    expect(rig.saved).toEqual([{ pairingId: offer.pairingId, secret: offer.secret, pairedAt: 1_700_000_000_000 }]);
+    const session = rig.links[1];
+    expect(session?.channel).toBe(`americana-session-${offer.pairingId}`);
+    session?.join();
+    expect(rig.snapshot.phase).toBe('connected');
+    expect(rig.snapshot.paired).toBe(true);
+    expect(rig.snapshot.code).toBeNull();
+  });
+
   it('shows a code, offers one secret, then follows the watch onto the long channel', () => {
     const rig = harness();
     rig.relay.start(null);

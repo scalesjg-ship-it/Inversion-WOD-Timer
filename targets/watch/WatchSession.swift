@@ -13,7 +13,6 @@ struct WatchFaceModel: Equatable {
   var canReset: Bool
   var status: String
   var connected: Bool
-  var showsPair: Bool
   var showsForget: Bool
 
   static let waiting = WatchFaceModel(
@@ -24,9 +23,8 @@ struct WatchFaceModel: Equatable {
     primaryTitle: "Start",
     primaryCommand: "start",
     canReset: false,
-    status: "Waiting for Apple TV",
+    status: "Not paired. Open Settings to pair.",
     connected: false,
-    showsPair: true,
     showsForget: false
   )
 }
@@ -264,9 +262,12 @@ final class WatchSession: ObservableObject {
 
   private func refreshLink(status: String) {
     model.connected = directReady || relay.isConnected
-    model.showsPair = !model.connected
     model.showsForget = relay.hasPairing
     if model.status == "Not now" { return }
+    if !model.connected && !relay.hasPairing && (status == "Waiting for Apple TV" || status.isEmpty) {
+      model.status = "Not paired. Open Settings to pair."
+      return
+    }
     model.status = status
   }
 
@@ -323,7 +324,6 @@ final class WatchSession: ObservableObject {
     model.primaryTitle = title(for: primary)
     model.canReset = canReset
     model.connected = true
-    model.showsPair = false
     if model.status == "Not now" || model.status == "Waiting for Apple TV" || model.status == "Reconnecting…" {
       model.status = "Apple TV"
     }

@@ -71,6 +71,10 @@ final class WatchRelayClient {
   private var retry: Task<Void, Never>?
   private var seen: [String: Int64] = [:]
   private let config = WatchRelayConfig.current
+  private var activeChannel = ""
+  private var socketDelegate: WatchSocketDelegate?
+  private var offerWait: Task<Void, Never>?
+  private var helloRepeat: Task<Void, Never>?
 
   init() {
     record = WatchRelayStore.load()
@@ -89,6 +93,7 @@ final class WatchRelayClient {
     resumeStored()
   }
 
+  /// Digits only. "814 947" and "814947" join the same channel. Matches normalizePairingCode.
   func pair(code: String) {
     let digits = code.filter(\.isNumber)
     guard digits.count == 6 else { return }
@@ -143,6 +148,7 @@ final class WatchRelayClient {
     let gen = generation
     closeSocket()
     self.mode = mode
+    activeChannel = channel
     topic = "realtime:\(channel)"
     isConnected = false
     joined = false
@@ -151,22 +157,39 @@ final class WatchRelayClient {
       report("Pairing keys are not on this watch yet", connected: false)
       return
     }
-    let session = URLSession(configuration: .default)
+    let delegate = WatchSocketDelegate()
+    delegate.onOpen = { [weak self] in
+      self?.sendJoin(gen: gen, channel: channel)
+    }
+    delegate.onComplete = { [weak self] _ in
+      guard let self, gen == self.generation else { return }
+      self.failTransport(gen: gen)
+    }
+    socketDelegate = delegate
+    let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
     let next = session.webSocketTask(with: url)
     socket = session
     task = next
     next.resume()
     receive(gen: gen, channel: channel)
-    let join = WatchRelayFrame.join(channel: channel, accessToken: config.anonKey)
-    next.send(.string(join)) { [weak self] error in
-      if error != nil {
-        Task { @MainActor in self?.drop(gen: gen) }
-      }
-    }
     heart = Task { @MainActor [weak self] in
       while !Task.isCancelled {
         try? await Task.sleep(nanoseconds: 20_000_000_000)
         self?.beat(gen: gen)
+      }
+    }
+  }
+
+  /// Join only after the socket is open. watchOS reports "Socket is not connected"
+  /// when send runs immediately after resume, and treating that as a bad code
+  /// cancels a handshake that would have succeeded.
+  private func sendJoin(gen: Int, channel: String) {
+    guard gen == generation, let task else { return }
+    let join = WatchRelayFrame.join(channel: channel, accessToken: config.anonKey)
+    task.send(.string(join)) { [weak self] error in
+      Task { @MainActor in
+        guard let self, gen == self.generation, error != nil else { return }
+        self.failTransport(gen: gen)
       }
     }
   }
@@ -188,7 +211,7 @@ final class WatchRelayClient {
         case .success:
           self.receive(gen: gen, channel: channel)
         case .failure:
-          self.drop(gen: gen)
+          self.failTransport(gen: gen)
         }
       }
     }
@@ -198,16 +221,17 @@ final class WatchRelayClient {
     guard let frame = WatchRelayFrame.parse(text) else { return }
     let topic = "realtime:\(channel)"
     switch frame {
-    case .reply(let ref, let ok, let frameTopic):
+    case .reply(let ref, let ok, let frameTopic, let reason):
       guard ref == "1", frameTopic == topic else { return }
       if !ok {
-        drop(gen: gen)
+        failJoin(gen: gen, reason: reason)
         return
       }
       joined = true
       attempt = 0
       if mode == .handshake {
-        sendPayload(["v": 1, "kind": "hello", "nonce": helloNonce])
+        sendHello()
+        armOfferWait(gen: gen)
       } else {
         isConnected = true
         report("Apple TV", connected: true)
@@ -220,18 +244,44 @@ final class WatchRelayClient {
         noteEnvelope(payload)
       }
     case .closed(let frameTopic):
-      if frameTopic == topic { drop(gen: gen) }
+      if frameTopic == topic { failTransport(gen: gen) }
     case .other:
       break
     }
   }
 
+  private func sendHello() {
+    sendPayload(["v": 1, "kind": "hello", "nonce": helloNonce])
+  }
+
+  /// The TV may still be joining. Broadcast is not stored, so a single hello
+  /// sent too early is gone. Say the code is wrong only after several hellos
+  /// get no offer. Keep the socket open so a late offer can still finish.
+  private func armOfferWait(gen: Int) {
+    helloRepeat?.cancel()
+    offerWait?.cancel()
+    helloRepeat = Task { @MainActor [weak self] in
+      try? await Task.sleep(nanoseconds: 2_000_000_000)
+      guard let self, gen == self.generation, self.mode == .handshake, self.joined, self.record == nil else { return }
+      self.sendHello()
+      try? await Task.sleep(nanoseconds: 3_000_000_000)
+      guard gen == self.generation, self.mode == .handshake, self.joined, self.record == nil else { return }
+      self.sendHello()
+    }
+    offerWait = Task { @MainActor [weak self] in
+      try? await Task.sleep(nanoseconds: 12_000_000_000)
+      guard let self, gen == self.generation, self.mode == .handshake, self.joined, self.record == nil else { return }
+      self.report(PairingCopy.code, connected: false)
+    }
+  }
+
   private func noteOffer(_ payload: [String: Any]) {
-    guard (payload["v"] as? Int) == 1, (payload["kind"] as? String) == "offer",
+    guard jsonInt(payload["v"]) == 1, (payload["kind"] as? String) == "offer",
           let pairingId = payload["pairingId"] as? String, isHex(pairingId, count: 32),
           let secret = payload["secret"] as? String, isHex(secret, count: 64) else {
       return
     }
+    cancelHandshakeWaits()
     let saved = WatchRelayRecord(pairingId: pairingId, secret: secret, pairedAt: Date().timeIntervalSince1970)
     record = saved
     hasPairing = true
@@ -245,7 +295,7 @@ final class WatchRelayClient {
 
   private func noteEnvelope(_ payload: [String: Any]) {
     guard let record,
-          (payload["v"] as? Int) == 1,
+          jsonInt(payload["v"]) == 1,
           (payload["type"] as? String) == "relay",
           let seq = (payload["seq"] as? NSNumber)?.int64Value, seq >= 1,
           let ts = (payload["ts"] as? NSNumber)?.int64Value,
@@ -269,27 +319,56 @@ final class WatchRelayClient {
     task.send(.string(text)) { _ in }
   }
 
-  private func drop(gen: Int) {
+  /// Socket died or the join frame never went out. The digits were not rejected.
+  private func failTransport(gen: Int) {
     guard gen == generation else { return }
+    let channel = activeChannel
+    let handshake = mode == .handshake
+    let pairing = record
     generation += 1
     closeSocket()
     isConnected = false
     joined = false
     attempt += 1
     let delay = relayDelay(attempt)
-    let pairing = record
-    let handshake = mode == .handshake
-    report(handshake ? "Check the code and the internet" : "Reconnecting…", connected: false)
-    retry?.cancel()
+    if handshake {
+      report(PairingCopy.network, connected: false)
+      guard attempt <= 4, !channel.isEmpty else { return }
+      retry = Task { @MainActor [weak self] in
+        try? await Task.sleep(nanoseconds: delay)
+        guard let self else { return }
+        self.connect(channel: channel, mode: .handshake, status: "Connecting…")
+      }
+      return
+    }
+    report("Reconnecting…", connected: false)
+    guard let pairing else { return }
     retry = Task { @MainActor [weak self] in
       try? await Task.sleep(nanoseconds: delay)
       guard let self else { return }
-      if handshake {
-        self.report("Check the code and the internet", connected: false)
-        return
-      }
-      guard let pairing else { return }
       self.connect(channel: "americana-session-\(pairing.pairingId)", mode: .session, status: "Reconnecting…")
+    }
+  }
+
+  /// Realtime refused the channel. That is authorization or a server error,
+  /// not a mismatched 6-digit code. Retry twice in case the project was waking up.
+  private func failJoin(gen: Int, reason: String) {
+    guard gen == generation else { return }
+    let channel = activeChannel
+    let handshake = mode == .handshake
+    generation += 1
+    closeSocket()
+    isConnected = false
+    joined = false
+    attempt += 1
+    print("[AmericanaWatch] join rejected \(reason)")
+    report(PairingCopy.server, connected: false)
+    guard handshake, attempt <= 2, !channel.isEmpty else { return }
+    let delay = relayDelay(attempt)
+    retry = Task { @MainActor [weak self] in
+      try? await Task.sleep(nanoseconds: delay)
+      guard let self else { return }
+      self.connect(channel: channel, mode: .handshake, status: "Connecting…")
     }
   }
 
@@ -298,11 +377,20 @@ final class WatchRelayClient {
     heart = nil
     retry?.cancel()
     retry = nil
+    cancelHandshakeWaits()
     task?.cancel(with: .goingAway, reason: nil)
     task = nil
     socket?.invalidateAndCancel()
     socket = nil
+    socketDelegate = nil
     joined = false
+  }
+
+  private func cancelHandshakeWaits() {
+    helloRepeat?.cancel()
+    helloRepeat = nil
+    offerWait?.cancel()
+    offerWait = nil
   }
 
   private func report(_ text: String, connected: Bool) {
@@ -330,8 +418,40 @@ final class WatchRelayClient {
   }
 }
 
+private enum PairingCopy {
+  /// Keep these identical to PAIRING_NETWORK_MESSAGE, PAIRING_SERVER_MESSAGE, and PAIRING_CODE_MESSAGE.
+  static let network = "Can't reach the pairing server. Check the internet."
+  static let server = "The pairing server refused the connection."
+  static let code = "That code was not accepted. It may be wrong or expired."
+}
+
+private func jsonInt(_ value: Any?) -> Int? {
+  guard let number = value as? NSNumber else { return nil }
+  if CFGetTypeID(number) == CFBooleanGetTypeID() { return nil }
+  return number.intValue
+}
+
+private final class WatchSocketDelegate: NSObject, URLSessionWebSocketDelegate {
+  var onOpen: (@MainActor () -> Void)?
+  var onComplete: (@MainActor (Error?) -> Void)?
+
+  func urlSession(
+    _ session: URLSession,
+    webSocketTask: URLSessionWebSocketTask,
+    didOpenWithProtocol protocolName: String?
+  ) {
+    let callback = onOpen
+    Task { @MainActor in callback?() }
+  }
+
+  func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    let callback = onComplete
+    Task { @MainActor in callback?(error) }
+  }
+}
+
 private enum WatchRelayFrame {
-  case reply(ref: String, ok: Bool, topic: String)
+  case reply(ref: String, ok: Bool, topic: String, reason: String)
   case broadcast(topic: String, event: String, payload: [String: Any])
   case closed(topic: String)
   case other
@@ -380,27 +500,38 @@ private enum WatchRelayFrame {
 
   static func parse(_ text: String) -> WatchRelayFrame? {
     guard let data = text.data(using: .utf8),
-          let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+          let json = try? JSONSerialization.jsonObject(with: data) else {
       return .other
     }
-    let topic = object["topic"] as? String ?? ""
-    let event = object["event"] as? String ?? ""
-    let ref: String
-    if let text = object["ref"] as? String {
-      ref = text
-    } else if let number = object["ref"] as? NSNumber {
-      ref = number.stringValue
+    if let row = json as? [Any] {
+      guard row.count >= 5 else { return .other }
+      return interpret(topic: row[2], event: row[3], payload: row[4], ref: row[1])
+    }
+    guard let object = json as? [String: Any] else { return .other }
+    return interpret(topic: object["topic"], event: object["event"], payload: object["payload"], ref: object["ref"])
+  }
+
+  private static func interpret(topic: Any?, event: Any?, payload: Any?, ref: Any?) -> WatchRelayFrame {
+    let topicText = topic as? String ?? ""
+    let eventText = event as? String ?? ""
+    let refText: String
+    if let text = ref as? String {
+      refText = text
+    } else if let number = ref as? NSNumber {
+      refText = number.stringValue
     } else {
-      ref = ""
+      refText = ""
     }
-    if event == "phx_close" || event == "phx_error" { return .closed(topic: topic) }
-    if event == "phx_reply", let payload = object["payload"] as? [String: Any] {
-      return .reply(ref: ref, ok: (payload["status"] as? String) == "ok", topic: topic)
+    if eventText == "phx_close" || eventText == "phx_error" { return .closed(topic: topicText) }
+    if eventText == "phx_reply", let body = payload as? [String: Any] {
+      let response = body["response"] as? [String: Any]
+      let reason = response?["reason"] as? String ?? ""
+      return .reply(ref: refText, ok: (body["status"] as? String) == "ok", topic: topicText, reason: reason)
     }
-    if event == "broadcast", let payload = object["payload"] as? [String: Any] {
-      let user = payload["event"] as? String ?? ""
-      let body = payload["payload"] as? [String: Any] ?? [:]
-      return .broadcast(topic: topic, event: user, payload: body)
+    if eventText == "broadcast", let body = payload as? [String: Any] {
+      let user = body["event"] as? String ?? ""
+      let nested = body["payload"] as? [String: Any] ?? [:]
+      return .broadcast(topic: topicText, event: user, payload: nested)
     }
     return .other
   }

@@ -10,6 +10,7 @@ import { BrandingProvider, useBranding } from '@/src/branding/BrandingProvider';
 import { RouteErrorBoundary } from '@/src/components/RouteErrorBoundary';
 import { PreferencesProvider, usePreferences } from '@/src/preferences/PreferencesProvider';
 import { TimerSessionProvider } from '@/src/session/TimerSession';
+import { WatchLinkProvider } from '@/src/watch/WatchLinkProvider';
 import { chrome } from '@/src/theme/chrome';
 
 export function ErrorBoundary(props: { error: Error; retry: () => Promise<void> }) {
@@ -32,7 +33,9 @@ export default function RootLayout() {
     <BrandingProvider>
       <PreferencesProvider>
         <TimerSessionProvider>
-          <RootGate fontsLoaded={loaded} />
+          <WatchLinkProvider>
+            <RootGate fontsLoaded={loaded} />
+          </WatchLinkProvider>
         </TimerSessionProvider>
       </PreferencesProvider>
     </BrandingProvider>

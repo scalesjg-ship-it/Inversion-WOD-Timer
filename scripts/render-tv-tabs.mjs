@@ -26,6 +26,9 @@ function resolveWithExtension(base) {
 const rnWeb = {
   name: 'rn-web',
   setup(build) {
+    build.onResolve({ filter: /^expo-modules-core$/ }, () => ({
+      path: path.join(root, 'scripts/stub-expo-modules-core.ts'),
+    }));
     build.onResolve({ filter: /^expo-router$/ }, () => ({
       path: path.join(root, 'scripts/stub-expo-router.tsx'),
     }));
@@ -122,6 +125,22 @@ const frames = [
   { tab: 'countdown', width: 960, height: 540, file: 'tv-countdown-960x540.png', seed: true },
 ];
 
+if (process.env.WATCH_UI_SHOTS === '1') {
+  frames.length = 0;
+  frames.push(
+    {
+      tab: 'brand',
+      width: 1920,
+      height: 1080,
+      file: 'settings-watch-pair-1920x1080.png',
+      category: 'watch',
+      watchCode: '814947',
+      watchMessage: 'Enter this code on your Apple Watch. Both need internet.',
+    },
+    { tab: 'timer', width: 1920, height: 1080, file: 'timer-without-pairing-1920x1080.png' },
+  );
+}
+
 const outDir = '/opt/cursor/artifacts';
 await mkdir(outDir, { recursive: true });
 
@@ -143,11 +162,16 @@ function presetDocument() {
   };
 }
 
-function pageFor(tab, width, height, seed, confirm, mode) {
+function pageFor(tab, width, height, seed, confirm, mode, frameCategory, frameWatchCode, frameWatchMessage) {
   const storage = seed
     ? `localStorage.setItem('americana.presets.v1', ${JSON.stringify(JSON.stringify(presetDocument()))});`
     : `localStorage.removeItem('americana.presets.v1');`;
   const preview = confirm ? `globalThis.__TV_PRESET_PREVIEW__ = 'confirm';` : `delete globalThis.__TV_PRESET_PREVIEW__;`;
+  const category = frameCategory ? `globalThis.__TV_SETTINGS_CATEGORY__ = ${JSON.stringify(frameCategory)};` : '';
+  const watchCode = frameWatchCode ? `globalThis.__TV_WATCH_CODE__ = ${JSON.stringify(frameWatchCode)};` : '';
+  const watchMessage = frameWatchMessage
+    ? `globalThis.__TV_WATCH_MESSAGE__ = ${JSON.stringify(frameWatchMessage)};`
+    : '';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -161,8 +185,12 @@ function pageFor(tab, width, height, seed, confirm, mode) {
 <body>
 <div id="root"></div>
 <script>
+globalThis.process = globalThis.process || { env: { NODE_ENV: 'development' } };
 ${storage}
 ${preview}
+${category}
+${watchCode}
+${watchMessage}
 globalThis.__TV_TAB__ = ${JSON.stringify(tab)};
 globalThis.__TV_SETUP_MODE__ = ${JSON.stringify(mode ?? '')};
 globalThis.__TV_FRAME__ = { width: ${width}, height: ${height} };
@@ -177,7 +205,17 @@ const server = createServer(async (req, res) => {
   if (url.startsWith('/index.html')) {
     const params = new URL(url, 'http://127.0.0.1').searchParams;
     res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(pageFor(params.get('tab') ?? 'wod', Number(params.get('w') ?? 1920), Number(params.get('h') ?? 1080), params.get('seed') === '1', params.get('confirm') === '1', params.get('mode') ?? ''));
+    res.end(pageFor(
+      params.get('tab') ?? 'wod',
+      Number(params.get('w') ?? 1920),
+      Number(params.get('h') ?? 1080),
+      params.get('seed') === '1',
+      params.get('confirm') === '1',
+      params.get('mode') ?? '',
+      params.get('category') ?? '',
+      params.get('watchCode') ?? '',
+      params.get('watchMessage') ?? '',
+    ));
     return;
   }
   if (url === '/bundle.js') {
@@ -205,7 +243,7 @@ const port = address.port;
 
 function shoot(frame) {
   const shot = path.join(outDir, frame.file);
-  const url = `http://127.0.0.1:${port}/index.html?tab=${frame.tab}&w=${frame.width}&h=${frame.height}&seed=${frame.seed ? 1 : 0}&confirm=${frame.confirm ? 1 : 0}&mode=${encodeURIComponent(frame.mode ?? '')}`;
+  const url = `http://127.0.0.1:${port}/index.html?tab=${frame.tab}&w=${frame.width}&h=${frame.height}&seed=${frame.seed ? 1 : 0}&confirm=${frame.confirm ? 1 : 0}&mode=${encodeURIComponent(frame.mode ?? '')}&category=${encodeURIComponent(frame.category ?? '')}&watchCode=${encodeURIComponent(frame.watchCode ?? '')}&watchMessage=${encodeURIComponent(frame.watchMessage ?? '')}`;
   return new Promise((resolve, reject) => {
     const chrome = spawn(
       '/usr/bin/google-chrome-stable',

@@ -10,6 +10,13 @@ export const PAIRING_CODE_LENGTH = 6;
 export const PAIRING_TTL_MS = 10 * 60 * 1000;
 export const HANDSHAKE_PREFIX = 'americana-pair-';
 export const SESSION_PREFIX = 'americana-session-';
+
+/** Shown when the watch socket fails. The digits were not checked. */
+export const PAIRING_NETWORK_MESSAGE = "Can't reach the pairing server. Check the internet.";
+/** Shown when Realtime rejects the join. A wrong code does not do this. */
+export const PAIRING_SERVER_MESSAGE = 'The pairing server refused the connection.';
+/** Shown after a successful join when the TV never offers a secret. */
+export const PAIRING_CODE_MESSAGE = 'That code was not accepted. It may be wrong or expired.';
 export const PAIRING_STORAGE_KEY = 'americana.watch.relay.v1';
 export const PAIRING_ID_HEX = 32;
 export const PAIRING_SECRET_HEX = 64;
@@ -55,8 +62,58 @@ export interface AcceptMessage {
 
 export type HandshakeMessage = HelloMessage | OfferMessage | AcceptMessage;
 
+/**
+ * The channel name is the six digits only. A space in "814 947" is display
+ * formatting and must not change the channel.
+ */
+export function normalizePairingCode(value: string): string | null {
+  const digits = value.replace(/\D/g, '');
+  return isPairingCode(digits) ? digits : null;
+}
+
+export function formatPairingCode(code: string): string {
+  const digits = normalizePairingCode(code);
+  if (!digits) return code;
+  return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+}
+
 export function handshakeChannel(code: string): string {
-  return `${HANDSHAKE_PREFIX}${code}`;
+  const digits = normalizePairingCode(code);
+  return `${HANDSHAKE_PREFIX}${digits ?? code}`;
+}
+
+export type PairingFault =
+  | { type: 'send-before-open' }
+  | { type: 'transport' }
+  | { type: 'join-rejected'; reason: string }
+  | { type: 'no-offer' };
+
+export type PairingFaultClass = {
+  blame: 'none' | 'network' | 'server' | 'code';
+  message: string | null;
+};
+
+/**
+ * The 6-digit code is the Realtime channel name. The server does not accept
+ * or reject those digits. A join failure is a network or server problem.
+ * A wrong or expired code joins an empty channel and never receives an offer.
+ * Sending before the watch socket opens is a watchOS race, not a bad code.
+ */
+export function classifyPairingFault(fault: PairingFault): PairingFaultClass {
+  switch (fault.type) {
+    case 'send-before-open':
+      return { blame: 'none', message: null };
+    case 'transport':
+      return { blame: 'network', message: PAIRING_NETWORK_MESSAGE };
+    case 'join-rejected':
+      return { blame: 'server', message: PAIRING_SERVER_MESSAGE };
+    case 'no-offer':
+      return { blame: 'code', message: PAIRING_CODE_MESSAGE };
+    default: {
+      const unexpected: never = fault;
+      return unexpected;
+    }
+  }
 }
 
 export function sessionChannel(pairingId: string): string {

@@ -11,9 +11,7 @@ import { clockEdgeHeight, clockFontFamily } from '@/src/branding/palettes';
 import type { Branding } from '@/src/branding/types';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
 import { TvFocusPressable } from '@/src/components/TvFocus';
-import type { TvFocusTag } from '@/src/components/TvTabFocus';
 import { BigButton } from '@/src/components/ui';
-import { WatchPairBar } from '@/src/components/WatchPairBar';
 import { usePreferences } from '@/src/preferences/PreferencesProvider';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
@@ -40,8 +38,8 @@ import {
 import { useRemoteCommands } from '@/src/tv/useRemoteCommands';
 import { useTvFocusTag } from '@/src/tv/useTvFocusTag';
 import { watchLinkEnabled } from '@/src/watch/gate';
-import { watchLinkTone } from '@/src/watch/linkStatus';
-import { useWatchLink } from '@/src/watch/useWatchLink';
+import { useWatchLinkContext } from '@/src/watch/WatchLinkProvider';
+import type { WatchClockAction } from '@/src/watch/commands';
 
 const KEEP_AWAKE = 'americana-timer';
 const FocusGuide = TVFocusGuideView ?? View;
@@ -92,8 +90,6 @@ export default function TimerScreen() {
   const [primaryNode, setPrimaryNode] = useState<ComponentRef<typeof Pressable> | null>(null);
   const [stopTag, onStopHost] = useTvFocusTag();
   const [resetTag, onResetHost] = useTvFocusTag();
-  const [watchTag, onWatchHost] = useTvFocusTag();
-  const [pairTag, setPairTag] = useState<TvFocusTag | null>(null);
   const appleTv = watchLinkEnabled({ os: Platform.OS, tv });
   const [confirmResetTag, onConfirmResetHost] = useTvFocusTag();
   const [confirmCancelTag, onConfirmCancelHost] = useTvFocusTag();
@@ -322,21 +318,8 @@ export default function TimerScreen() {
 
   // Wrist commands call the same start, pause, resume, and reset functions as
   // Select. leaveArmed stays clear, so hardware Back still follows backStep.
-  const {
-    presentPicker,
-    pairWithCode,
-    unpair,
-    message: watchMessage,
-    phase: watchPhase,
-    watchControlVisible,
-    pairingCode,
-    offerPairCode,
-    offerUnpair,
-  } = useWatchLink({
-    enabled: appleTv,
-    snapshot: timer.snapshot,
-    config,
-    onAction: (action) => {
+  const watchLink = useWatchLinkContext();
+  const onWatchAction = (action: WatchClockAction) => {
       if (action === 'ignore') return;
       leaveArmed.current = false;
       if (action === 'reset') {
@@ -361,8 +344,30 @@ export default function TimerScreen() {
           return unexpected;
         }
       }
-    },
-  });
+  };
+  const watchTimer = useRef(timer);
+  const watchConfig = useRef(config);
+  const watchAction = useRef(onWatchAction);
+  useEffect(() => {
+    watchTimer.current = timer;
+    watchConfig.current = config;
+    watchAction.current = onWatchAction;
+  }, [config, onWatchAction, timer]);
+  const { bindTimer, publishNow } = watchLink;
+  useEffect(() => {
+    if (!appleTv) return undefined;
+    bindTimer({
+      readSnapshot: () => watchTimer.current.readSnapshot(),
+      readConfig: () => watchConfig.current,
+      onAction: (action) => watchAction.current(action),
+    });
+    publishNow();
+    return () => bindTimer(null);
+  }, [appleTv, bindTimer, publishNow]);
+  useEffect(() => {
+    if (!appleTv) return;
+    publishNow();
+  }, [appleTv, publishNow, timer.snapshot.phase, timer.snapshot.round, timer.snapshot.running, timer.snapshot.paused]);
 
   const transport = tvTransportButtons({
     phase: timer.snapshot.phase,
@@ -371,16 +376,14 @@ export default function TimerScreen() {
     mode: config.mode,
   });
   const transportRoles = transport.map((button) => button.role);
-  const showWatch = appleTv && watchControlVisible;
   const appleFrame = appleTv
     ? tvAppleTimerFrame({
         screenWidth: width,
         screenHeight: height,
         safeBottom: safe.bottom,
         safeHorizontal: Math.max(safe.left, safe.right),
-        buttonCount: transport.length + (showWatch ? 1 : 0),
-        linkStatus: Boolean(watchMessage) || Boolean(pairingCode) || offerPairCode || offerUnpair,
-        linkRows: pairingCode ? 3 : 2,
+        buttonCount: transport.length,
+        linkStatus: false,
         warning: timer.snapshot.warningActive,
         paused: timer.snapshot.paused,
       })
@@ -490,29 +493,10 @@ export default function TimerScreen() {
                 : undefined
           }
           focusLeft={tagFor(transportNeighbor(transportRoles, button.role, -1))}
-          focusRight={
-            showWatch && button.role === transportRoles[transportRoles.length - 1]
-              ? watchTag
-              : tagFor(transportNeighbor(transportRoles, button.role, 1))
-          }
-          focusUp={pairTag}
+          focusRight={tagFor(transportNeighbor(transportRoles, button.role, 1))}
+          focusUp={null}
         />
       ))}
-      {showWatch ? (
-        <BigButton
-          label="Watch"
-          color={digits}
-          variant="ghost"
-          testID="timer-watch"
-          tvMetrics={appleFrame?.button}
-          onPress={presentPicker}
-          onHost={onWatchHost}
-          focusable={confirmKind === null}
-          focusLeft={tagFor(transportRoles[transportRoles.length - 1])}
-          focusRight={watchTag}
-          focusUp={pairTag}
-        />
-      ) : null}
     </>
   );
   const Overlay = tv ? FocusGuide : View;
@@ -637,23 +621,6 @@ export default function TimerScreen() {
               },
             ]}
           >
-            {watchMessage || pairingCode || offerPairCode || offerUnpair ? (
-              <WatchPairBar
-                message={watchMessage}
-                code={pairingCode}
-                offerPair={offerPairCode}
-                offerUnpair={offerUnpair}
-                color={watchLinkTone(watchPhase) === 'alert' ? attention : palette.text}
-                fontSize={appleFrame.linkFont}
-                lineHeight={appleFrame.linkLine}
-                gap={appleFrame.linkGap}
-                onPair={pairWithCode}
-                onUnpair={unpair}
-                onRefresh={pairWithCode}
-                focusDown={primaryTag}
-                onTag={setPairTag}
-              />
-            ) : null}
             <View
               style={{
                 alignSelf: 'stretch',

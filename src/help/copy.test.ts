@@ -24,7 +24,9 @@ describe('help copy', () => {
     expect(apple?.body).toContain('tvOS 16');
     expect(apple?.body).toContain('same Wi-Fi');
     expect(apple?.body).toContain('iCloud');
-    expect(apple?.body).toContain('press Watch');
+    expect(apple?.body).toContain('Settings');
+    expect(apple?.body).toContain('choose Watch');
+    expect(apple?.body).not.toContain('press Watch');
     expect(apple?.body).toContain('6-digit code');
     expect(apple?.body).toContain('internet');
     expect(apple?.body).toContain('Unpair watch');

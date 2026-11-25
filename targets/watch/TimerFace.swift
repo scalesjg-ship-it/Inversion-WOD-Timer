@@ -3,6 +3,8 @@ import SwiftUI
 struct WatchRoot: View {
   @ObservedObject var session: WatchSession
   @Environment(\.scenePhase) private var scenePhase
+  /// 0 is the clock. 1 is Settings, where pairing lives.
+  @State private var tab = 0
 
   var body: some View {
     Group {
@@ -16,9 +18,22 @@ struct WatchRoot: View {
           onCancel: { session.cancelPairing() }
         )
       } else {
-        TimerFace(model: session.model, onCommand: { command in
-          session.sendCommand(command)
-        }, onPair: { session.beginPairing() }, onForget: { session.forgetTV() })
+        TabView(selection: $tab) {
+          TimerFace(model: session.model, onCommand: { command in
+            session.sendCommand(command)
+          })
+          .tag(0)
+          WatchSettings(
+            model: session.model,
+            onPair: {
+              tab = 1
+              session.beginPairing()
+            },
+            onForget: { session.forgetTV() }
+          )
+          .tag(1)
+        }
+        .tabViewStyle(.page)
       }
     }
     .onAppear { session.start() }
@@ -30,11 +45,44 @@ struct WatchRoot: View {
   }
 }
 
+struct WatchSettings: View {
+  let model: WatchFaceModel
+  let onPair: () -> Void
+  let onForget: () -> Void
+
+  var body: some View {
+    ScrollView {
+      VStack(spacing: 8) {
+        Text("Settings")
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundStyle(Color(red: 0.957, green: 0.969, blue: 0.984))
+        Text(model.status)
+          .font(.system(size: 13))
+          .foregroundStyle(Color(red: 0.576, green: 0.627, blue: 0.690))
+          .multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
+        if !model.connected {
+          Button("Pair with code", action: onPair)
+            .buttonStyle(.borderedProminent)
+            .tint(Color(red: 1, green: 0.302, blue: 0.180))
+        }
+        if model.showsForget {
+          Button("Forget TV", action: onForget)
+            .buttonStyle(.bordered)
+        }
+      }
+      .font(.system(size: 15, weight: .semibold))
+      .padding(.horizontal, 8)
+      .padding(.vertical, 6)
+      .frame(maxWidth: .infinity)
+    }
+    .background(Color(red: 0.027, green: 0.031, blue: 0.039).ignoresSafeArea())
+  }
+}
+
 struct TimerFace: View {
   let model: WatchFaceModel
   let onCommand: (String) -> Void
-  var onPair: () -> Void = {}
-  var onForget: () -> Void = {}
 
   var body: some View {
     VStack(spacing: 4) {
@@ -71,19 +119,8 @@ struct TimerFace: View {
         .font(.system(size: 11))
         .foregroundStyle(Color(red: 0.576, green: 0.627, blue: 0.690))
         .multilineTextAlignment(.center)
-        .lineLimit(2)
-        .minimumScaleFactor(0.8)
-      if model.showsPair {
-        Button("Pair with code", action: onPair)
-          .buttonStyle(.bordered)
-          .font(.system(size: 14, weight: .semibold))
-      }
-      if model.showsForget {
-        Button("Forget TV", action: onForget)
-          .buttonStyle(.plain)
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(Color(red: 0.576, green: 0.627, blue: 0.690))
-      }
+        .lineLimit(3)
+        .minimumScaleFactor(0.7)
     }
     .padding(.horizontal, 6)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -130,7 +167,6 @@ enum WatchPreviewFace: String {
         canReset: true,
         status: "Apple TV",
         connected: true,
-        showsPair: false,
         showsForget: false
       )
     case .work:
@@ -144,7 +180,6 @@ enum WatchPreviewFace: String {
         canReset: true,
         status: "Apple TV",
         connected: true,
-        showsPair: false,
         showsForget: false
       )
     case .rest:
@@ -158,7 +193,6 @@ enum WatchPreviewFace: String {
         canReset: true,
         status: "Apple TV",
         connected: true,
-        showsPair: false,
         showsForget: false
       )
     case .finished:
@@ -172,7 +206,6 @@ enum WatchPreviewFace: String {
         canReset: true,
         status: "Apple TV",
         connected: true,
-        showsPair: false,
         showsForget: false
       )
     }
