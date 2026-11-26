@@ -27,6 +27,12 @@ describe('saved gym branding', () => {
     expect(ignored.backgroundStyle).toBe('solid');
   });
 
+  it('uses Your Gym when a saved record has no gym name', () => {
+    expect(sanitizeBranding({}).gymName).toBe('Your Gym');
+    expect(sanitizeBranding({ gymName: '   ' }).gymName).toBe('Your Gym');
+    expect(sanitizeBranding({ gymName: 12 }).gymName).toBe('Your Gym');
+  });
+
   it('reads older work and rest colors and fills the newer roles', () => {
     const saved = sanitizeBranding({
       primaryColor: '#112233',

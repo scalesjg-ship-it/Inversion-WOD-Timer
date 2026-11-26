@@ -1,8 +1,8 @@
 # Anthem Gym Timer
 
-Anthem Gym Timer is a gym timer for CrossFit Inversion and any gym that wants the same clock with its own name, colors, and logo. One Expo codebase ships to iPhone, iPad, Apple TV, Google Play (phones and Android TV from one app bundle), a sideloadable Android APK, and Amazon Fire TV.
+Anthem Gym Timer is a gym timer for any gym that wants the clock with its own name, colors, and logo. One Expo codebase ships to iPhone, iPad, Apple TV, Google Play (phones and Android TV from one app bundle), a sideloadable Android APK, and Amazon Fire TV.
 
-The default brand is CrossFit Inversion. A gym can replace the name, work/rest colors, and logo on the device. Nothing is uploaded.
+The default gym name is Your Gym. A gym can replace the name, work/rest colors, and logo on the device. Nothing is uploaded. A name already saved on a device stays until someone edits it or resets branding.
 
 Store-name availability for “Anthem Gym Timer” was not checked. This repository does not make a trademark claim. Search App Store Connect and the Amazon Appstore before you lock the display name.
 
@@ -46,10 +46,10 @@ Custom notification sounds and background audio are not fully available in Expo 
 The Brand tab stores, on this device only:
 
 - Gym name
-- Colors for work, rest, lead-in, warning, the clock digits, the background, and the accent. Each one has swatches, a hue strip, and a hex field, and the open color row shows a ring and a dot on the swatch that is in use. Preset templates are Inversion, Dark, High-contrast, Neon, and Fight (red/blue), plus a few more one-tap looks. If a digit color cannot be read on the background, Anthem Gym Timer swaps in black or white.
+- Colors for work, rest, lead-in, warning, the clock digits, the background, and the accent. Each one has swatches, a hue strip, and a hex field, and the open color row shows a ring and a dot on the swatch that is in use. Preset templates are Default, Dark, High-contrast, Neon, and Fight (red/blue), plus a few more one-tap looks. If a digit color cannot be read on the background, Anthem Gym Timer swaps in black or white.
 - A logo from the photo library or from Files on a phone. Any image is accepted. It is resized and kept locally. The default placement is a large faded watermark, about 88% of the shorter screen edge, centered. Full bleed (optional blur) and a corner mark are the other placements.
 - On Apple TV and Fire TV, the Logo section of Brand shows a QR code. Scan it with a phone on the same Wi-Fi, pick a logo, and optionally set the gym name, colors, and placement. The TV saves that logo with the same resize step as a photo picked on the device. The page is served by the TV. The image is not sent to a server on the internet. The listener stops when you leave Brand, or after 10 minutes. If the TV cannot open that link, paste an https image address in the same Logo section.
-- Reset to Inversion, which restores the CrossFit Inversion name and colors and clears the logo.
+- Reset to default, which restores the name Your Gym and the default colors and clears the logo.
 
 Every mode has a lead-in length, including zero.
 

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 
 import { BRAND_TEMPLATES, COLOR_PALETTES, paletteColors, paletteMatches, templateMatches, templatePatch } from '@/src/branding/palettes';
-import type { BackgroundStyle, Branding, ClockWeight, LogoPlacement } from '@/src/branding/types';
+import { RESET_BRAND_LABEL, type BackgroundStyle, type Branding, type ClockWeight, type LogoPlacement } from '@/src/branding/types';
 import { TvLogoTransfer } from '@/src/branding/lan/TvLogoTransfer';
 import { ColorPicker } from '@/src/components/ColorPicker';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
@@ -850,7 +850,7 @@ function DetailBody({
           />
           <SettingChoice
             id="reset-brand"
-            label="Reset to Inversion"
+            label={RESET_BRAND_LABEL}
             selected={false}
             accent="#FF8A7A"
             width={undefined}

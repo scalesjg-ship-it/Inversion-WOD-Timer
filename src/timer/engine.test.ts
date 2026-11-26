@@ -303,8 +303,8 @@ describe('notification plan', () => {
       createInitial(roundsConfig({ leadInSeconds: 10, workSeconds: 60, restSeconds: 0, rounds: 1, warningSeconds: 10 })),
       5_000,
     );
-    const plan = notificationPlan(state, 'CrossFit Inversion');
-    expect(plan[0]).toMatchObject({ atElapsedMs: 0, sound: 'tick', title: 'Get ready', body: 'CrossFit Inversion' });
+    const plan = notificationPlan(state, 'Your Gym');
+    expect(plan[0]).toMatchObject({ atElapsedMs: 0, sound: 'tick', title: 'Get ready', body: 'Your Gym' });
     expect(plan.some((item) => item.sound === 'warning' && item.atElapsedMs === 60_000)).toBe(true);
     expect(plan.at(-1)).toMatchObject({ sound: 'bell', title: 'Done' });
 
