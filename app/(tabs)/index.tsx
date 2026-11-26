@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
+import { ProductMark } from '@/src/components/ProductMark';
 import { TvFocusPressable } from '@/src/components/TvFocus';
 import { TvMenuCell } from '@/src/components/TvMenuCell';
 import { useTvTabFocus, type TvFocusTag } from '@/src/components/TvTabFocus';
@@ -118,16 +119,13 @@ export default function WodScreen() {
             : null,
         ]}
       >
-        <Text
-          style={[
-            styles.wordmark,
-            { color: accent },
-            tenFoot && !tv && styles.wordmarkTv,
-            tv && home ? { fontSize: home.wordmarkSize, lineHeight: home.wordmarkLine, marginTop: 0 } : null,
-          ]}
-        >
-          Americana
-        </Text>
+        <ProductMark
+          variant="wordmark"
+          color={accent}
+          large={tenFoot && !tv}
+          size={tv && home ? home.wordmarkSize : undefined}
+          flush={tv}
+        />
         <Text
           style={[
             styles.gym,
@@ -497,22 +495,11 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     gap: 6,
   },
-  wordmark: {
-    fontFamily: 'OswaldMedium',
-    fontSize: 14,
-    letterSpacing: 4,
-    textTransform: 'uppercase',
-    marginTop: 8,
-  },
   gym: {
     fontFamily: 'Oswald',
     fontSize: 36,
     lineHeight: 40,
     color: chrome.text,
-  },
-  wordmarkTv: {
-    fontSize: 28,
-    marginTop: 12,
   },
   gymTv: {
     fontSize: 72,

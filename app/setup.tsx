@@ -6,12 +6,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
+import { ProductMark } from '@/src/components/ProductMark';
 import { TvSetupFocus } from '@/src/components/TvSetupFocus';
 import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvCountRow, TvLinkedStart, TvToggle } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, tvSafeBox } from '@/src/tv/layout';
+import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, tvSafeBox } from '@/src/tv/layout';
 import { tvSetupFrame, tvSetupMetrics, tvSetupScaled } from '@/src/tv/setupLayout';
 import { showsOnScreenBack } from '@/src/tv/timerTransport';
 import { normalizeConfig } from '@/src/timer/engine';
@@ -205,7 +206,7 @@ function SetupForm({
       <View style={[styles.safe, { paddingHorizontal: frame.horizontal, paddingTop: frame.vertical }]}>
         <View style={[styles.header, appleTv && styles.headerApple]}>
           <HeaderBack onPress={() => router.back()} color={accent} />
-          <Text style={[styles.kicker, styles.kickerTv]} numberOfLines={1}>Americana</Text>
+          <ProductMark variant="kicker" color={chrome.text} />
         </View>
         <View style={[styles.tvBody, { paddingBottom: frame.vertical, gap: metrics.rowGap }]}>
           <Text testID="screen-setup" style={[styles.title, styles.titleCenter, { fontSize: titleSize, lineHeight: titleSize + 6 }]}>{modeTitle(mode)}</Text>
@@ -334,7 +335,7 @@ function SetupForm({
     >
       <View style={styles.header}>
         <HeaderBack onPress={() => router.back()} color={accent} />
-        <Text style={[styles.kicker, tv && styles.kickerTv]}>Americana</Text>
+        <ProductMark variant="kicker" />
       </View>
       <ScrollView
         style={tv ? styles.scrollTv : undefined}
@@ -515,17 +516,6 @@ const styles = StyleSheet.create({
   },
   headerApple: {
     justifyContent: 'flex-end',
-  },
-  kicker: {
-    color: chrome.muted,
-    fontFamily: 'OswaldMedium',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    fontSize: 13,
-  },
-  kickerTv: {
-    color: chrome.text,
-    fontSize: TV_SECTION_FONT,
   },
   tvStack: {
     flex: 1,

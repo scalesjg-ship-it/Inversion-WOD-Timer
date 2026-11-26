@@ -1,26 +1,26 @@
 {
   "expo": {
-    "name": "Americana",
+    "name": "Anthem Gym Timer",
     "slug": "americana",
     "owner": "scalesgym",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "americana",
     "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "com.garrettscales.americana",
-      "buildNumber": "18",
+      "buildNumber": "24",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "Americana uses your photo library so your gym logo can appear on the timer.",
-        "NSLocalNetworkUsageDescription": "Americana listens on your Wi-Fi so a phone on the same network can send a gym logo to this TV. The logo is saved on this TV and is not sent to a server."
+        "NSPhotoLibraryUsageDescription": "Anthem Gym Timer uses your photo library so your gym logo can appear on the timer.",
+        "NSLocalNetworkUsageDescription": "Anthem Gym Timer listens on your Wi-Fi so a phone on the same network can send a gym logo to this TV. The logo is saved on this TV and is not sent to a server."
       }
     },
     "android": {
       "package": "com.garrettscales.americana",
-      "versionCode": 12,
+      "versionCode": 20,
       "adaptiveIcon": {
         "backgroundColor": "#07080A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -73,7 +73,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Americana uses your photo library so your gym logo can appear on the timer.",
+          "photosPermission": "Anthem Gym Timer uses your photo library so your gym logo can appear on the timer.",
           "microphonePermission": false,
           "cameraPermission": false
         }

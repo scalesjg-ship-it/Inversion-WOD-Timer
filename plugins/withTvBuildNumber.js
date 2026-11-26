@@ -2,10 +2,10 @@ const { withInfoPlist } = require('@expo/config-plugins');
 
 /**
  * Default tvOS CFBundleVersion. Phone iOS keeps the buildNumber in app.json.
- * 1.0.1 (23) is already VALID on App Store Connect.
+ * The last Apple TV TestFlight upload is 1.0.2 (30).
  * The signed TestFlight workflow sets TVOS_BUILD_NUMBER from its build_number input.
  */
-const TVOS_BUILD_NUMBER = '24';
+const TVOS_BUILD_NUMBER = '31';
 const BUILD_NUMBER_PATTERN = /^[1-9]\d{0,8}$/;
 
 function isTvBuild(env = process.env) {

@@ -11,11 +11,10 @@
 # does not start an external beta review, and does not select this build on the
 # App Store version that is already in review (iOS 1.0 build 18).
 #
-# Marketing version stays 1.0.0 from app.json. build_number (default 19) is the
+# Marketing version is 1.0.1 from app.json. build_number (default 24) is the
 # CFBundleVersion for both the iPhone app and the embedded watch app. It must
-# be greater than 18. app.json ios.buildNumber is not changed. Android
-# versionName and versionCode are not changed. EXPO_TV is not set, so this is
-# not a tvOS archive.
+# be greater than 23, the last TestFlight upload. EXPO_TV is not set, so this
+# is not a tvOS archive.
 #
 # confirm=VERIFY_ONLY archives, exports, and checks the signature, then stops.
 # confirm=UPLOAD does that and then sends the IPA to internal TestFlight.
@@ -29,9 +28,9 @@ on:
         required: true
         type: string
       build_number:
-        description: CFBundleVersion for the iPhone app and the embedded watch app. Positive integer greater than 18. Marketing version stays 1.0.0.
+        description: CFBundleVersion for the iPhone app and the embedded watch app. Positive integer greater than 23. Marketing version is 1.0.1.
         required: false
-        default: "19"
+        default: "24"
         type: string
 
 concurrency:
@@ -166,9 +165,9 @@ jobs:
           echo "CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY"
           echo "iPhone profile=$IOS_PROFILE_NAME"
           echo "Watch profile=$WATCH_PROFILE_NAME"
-          echo "CURRENT_PROJECT_VERSION=$IOS_BUILD_NUMBER MARKETING_VERSION=1.0.0"
-          if [ "$MARKETING_VERSION" != "1.0.0" ]; then
-            echo "::error::Refusing to archive marketing version '${MARKETING_VERSION}'. iOS stays 1.0.0."
+          echo "CURRENT_PROJECT_VERSION=$IOS_BUILD_NUMBER MARKETING_VERSION=1.0.1"
+          if [ "$MARKETING_VERSION" != "1.0.1" ]; then
+            echo "::error::Refusing to archive marketing version '${MARKETING_VERSION}'. iOS stays 1.0.1."
             exit 1
           fi
           # Do not pass PRODUCT_BUNDLE_IDENTIFIER or PROVISIONING_PROFILE_SPECIFIER.
@@ -190,7 +189,7 @@ jobs:
             DEVELOPMENT_TEAM=BNP9QFC679 \
             "CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY" \
             "CURRENT_PROJECT_VERSION=$IOS_BUILD_NUMBER" \
-            MARKETING_VERSION=1.0.0 \
+            MARKETING_VERSION=1.0.1 \
             | tee artifacts/xcodebuild.log
 
       - name: Export the App Store IPA
@@ -245,7 +244,7 @@ jobs:
             cp "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8" "$dir/"
             chmod 600 "$dir/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
           done
-          echo "Uploading iOS 1.0.0 (${IOS_BUILD_NUMBER}) to App Store Connect app ${ASC_APP_ID} for TestFlight processing."
+          echo "Uploading iOS 1.0.1 (${IOS_BUILD_NUMBER}) to App Store Connect app ${ASC_APP_ID} for TestFlight processing."
           echo "Team BNP9QFC679. This does not submit the app for App Review and does not attach the build to the in-review version."
           # -t ios is the iPhone platform. appletvos is not used. There is no
           # submit step and no beta review call after the upload.
@@ -276,7 +275,7 @@ jobs:
           {
             echo "## Signed IPA verified"
             echo
-            echo "- App: Americana (\`${BUNDLE_ID}\`) and watch (\`${WATCH_BUNDLE_ID}\`)"
+            echo "- App: Anthem Gym Timer (\`${BUNDLE_ID}\`) and watch (\`${WATCH_BUNDLE_ID}\`)"
             echo "- Team: BNP9QFC679 (CrossFit Inversion LLC)"
             echo "- CFBundleVersion: ${IOS_BUILD_NUMBER} (iPhone and watch)"
             echo "- CFBundleShortVersionString: ${MARKETING_VERSION}"
@@ -293,7 +292,7 @@ jobs:
           {
             echo "## TestFlight upload"
             echo
-            echo "- App: Americana (\`${BUNDLE_ID}\`) and watch (\`${WATCH_BUNDLE_ID}\`)"
+            echo "- App: Anthem Gym Timer (\`${BUNDLE_ID}\`) and watch (\`${WATCH_BUNDLE_ID}\`)"
             echo "- App Store Connect app: ${ASC_APP_ID}"
             echo "- Team: BNP9QFC679 (CrossFit Inversion LLC)"
             echo "- Platform: iOS + watchOS"

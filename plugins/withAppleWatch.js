@@ -30,7 +30,7 @@ function isTvBuild(env = process.env) {
 const IOS_BUILD_NUMBER_PATTERN = /^[1-9]\d{0,8}$/;
 
 /**
- * iPhone TestFlight passes IOS_BUILD_NUMBER. app.json stays 1.0.0 (18).
+ * iPhone TestFlight passes IOS_BUILD_NUMBER. app.json is 1.0.1 (24).
  * A tvOS prebuild ignores it so the Apple TV workflow is unchanged.
  */
 function resolveIosArchiveBuild(env = process.env) {
@@ -52,7 +52,7 @@ function tvApplicationServices() {
       {
         NSApplicationServiceIdentifier: WATCH_SERVICE,
         NSApplicationServiceUsageDescription:
-          'Americana finds your Apple Watch on this Wi-Fi so you can start, pause, and reset the gym timer from your wrist. This direct link stays on your Wi-Fi.',
+          'Anthem Gym Timer finds your Apple Watch on this Wi-Fi so you can start, pause, and reset the gym timer from your wrist. This direct link stays on your Wi-Fi.',
         NSApplicationServicePlatformSupport: ['watchOS'],
       },
     ],

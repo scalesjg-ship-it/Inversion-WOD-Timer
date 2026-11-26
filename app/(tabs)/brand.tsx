@@ -23,6 +23,7 @@ import type { LogoPlacement } from '@/src/branding/types';
 import { BrandChoices } from '@/src/components/BrandChoices';
 import { ColorPicker } from '@/src/components/ColorPicker';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
+import { ProductMark } from '@/src/components/ProductMark';
 import { RouteErrorBoundary } from '@/src/components/RouteErrorBoundary';
 import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
 import { TvLogoUrl } from '@/src/components/TvLogoUrl';
@@ -146,7 +147,7 @@ export default function BrandScreen() {
         contentContainerStyle={[styles.content, tv && styles.contentTv]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={[styles.wordmark, { color: accent }, tv && styles.wordmarkTv]}>Americana</Text>
+        <ProductMark variant="wordmark" color={accent} large={tv} />
         <Text style={[styles.title, tv && styles.titleTv]}>Brand</Text>
         <Text style={[styles.lede, tv && styles.ledeTv]}>
           Your gym name, colors, and logo stay on this device. The timer reads them on every screen.
@@ -346,9 +347,6 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingBottom: 4,
   },
-  wordmarkTv: {
-    fontSize: 32,
-  },
   titleTv: {
     fontSize: 56,
     lineHeight: 64,
@@ -387,13 +385,6 @@ const styles = StyleSheet.create({
   previewClockTv: {
     fontSize: 40,
     lineHeight: 46,
-  },
-  wordmark: {
-    fontFamily: 'OswaldMedium',
-    fontSize: 14,
-    letterSpacing: 4,
-    textTransform: 'uppercase',
-    marginTop: 8,
   },
   title: {
     fontFamily: 'Oswald',

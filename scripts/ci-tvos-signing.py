@@ -27,16 +27,15 @@ from pathlib import Path
 TEAM_ID = "BNP9QFC679"
 BUNDLE_ID = "com.garrettscales.americana"
 ASC_APP_ID = "6833266123"
-# tvOS 1.0 build 22 is approved and live. App Store Connect error 90062
-# rejects another upload whose CFBundleShortVersionString is 1.0.0.
-APPROVED_TVOS_MARKETING = (1, 0, 0)
+# tvOS 1.0.2 (30) is the latest TestFlight upload. A new archive must be higher.
+APPROVED_TVOS_MARKETING = (1, 0, 2)
 MARKETING_VERSION_RE = re.compile(r"(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){1,2}")
 # Committed fallback in plugins/withTvBuildNumber.js. workflow_dispatch input
 # build_number arrives as TVOS_BUILD_NUMBER and replaces this for an upload.
-PLUGIN_TVOS_BUILD_NUMBER = "24"
+PLUGIN_TVOS_BUILD_NUMBER = "31"
 BUILD_NUMBER_RE = re.compile(r"^[1-9]\d{0,8}$")
 # Marketing versions that already have a VALID build on App Store Connect.
-TVOS_BUILD_ALREADY_UPLOADED = {"1.0.1": 23}
+TVOS_BUILD_ALREADY_UPLOADED = {"1.0.1": 23, "1.0.2": 30}
 FORBIDDEN_MARK = "pushpress"
 TVOS_PLATFORMS = {"tvos", "appletvos", "com.apple.platform.appletvos"}
 UUID_RE = re.compile(
@@ -170,8 +169,8 @@ def assert_repo_identity(root: Path) -> str:
     """Return the marketing version. Refuse a tree whose ids drifted."""
     app = json.loads((root / "app.json").read_text())
     expo = app["expo"]
-    if expo.get("name") != "Americana":
-        fail(f"app.json name is {expo.get('name')!r}, expected Americana")
+    if expo.get("name") != "Anthem Gym Timer":
+        fail(f"app.json name is {expo.get('name')!r}, expected Anthem Gym Timer")
     bundle = expo.get("ios", {}).get("bundleIdentifier")
     if bundle != BUNDLE_ID:
         fail(f"app.json bundle id is {bundle!r}, expected {BUNDLE_ID}")
@@ -184,7 +183,7 @@ def assert_repo_identity(root: Path) -> str:
         fail(f"eas.json ascAppId is {submit.get('ascAppId')!r}, expected {ASC_APP_ID}")
     if submit.get("appleTeamId") != TEAM_ID:
         fail(f"eas.json appleTeamId is {submit.get('appleTeamId')!r}, expected {TEAM_ID}")
-    # Pins the plugin default at 24 and validates TVOS_BUILD_NUMBER when set.
+    # Pins the plugin default at 31 and validates TVOS_BUILD_NUMBER when set.
     read_tvos_build_number(root)
     return version
 
@@ -194,7 +193,7 @@ def version_key(value: str) -> tuple[int, ...]:
 
 
 def normalize_marketing_version(value: str) -> str:
-    """Accept a tvOS marketing version higher than the approved 1.0.0."""
+    """Accept a tvOS marketing version higher than the latest upload, 1.0.2."""
     text = value.strip()
     if not MARKETING_VERSION_RE.fullmatch(text):
         fail(f"marketing_version must be a numeric version such as 1.0.1 (got {text!r})")
@@ -204,8 +203,8 @@ def normalize_marketing_version(value: str) -> str:
     approved = APPROVED_TVOS_MARKETING + (0,) * (width - len(APPROVED_TVOS_MARKETING))
     if padded <= approved:
         fail(
-            "tvOS CFBundleShortVersionString must be higher than the approved version "
-            f"1.0.0 (App Store Connect error 90062). Got {text}."
+            "tvOS CFBundleShortVersionString must be higher than the latest upload "
+            f"1.0.2 (30). 1.0.0 is already approved (App Store Connect error 90062). Got {text}."
         )
     return text
 
@@ -692,7 +691,7 @@ def check_env() -> None:
     marketing = None
     if raw_marketing is not None:
         marketing = normalize_marketing_version(raw_marketing)
-        print(f"tvOS marketing version {marketing} is higher than the approved 1.0.0.")
+        print(f"tvOS marketing version {marketing} is higher than the latest upload 1.0.2.")
     build = read_tvos_build_number(repo_root())
     if marketing is not None:
         reject_known_tvos_build(marketing, build)

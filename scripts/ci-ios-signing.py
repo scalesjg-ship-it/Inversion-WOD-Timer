@@ -3,8 +3,8 @@
 
 The upload is internal TestFlight processing only. It does not submit the app
 for App Review and it does not select a build on the App Store version that is
-already in review. app.json stays 1.0.0. The workflow_dispatch build_number
-becomes CFBundleVersion on the iPhone app and the embedded watch app.
+already in review. app.json marketing version is 1.0.1. The workflow_dispatch
+build_number becomes CFBundleVersion on the iPhone app and the embedded watch app.
 """
 
 from __future__ import annotations
@@ -30,9 +30,10 @@ TEAM_ID = tvos.TEAM_ID
 PHONE_BUNDLE = "com.garrettscales.americana"
 WATCH_BUNDLE = "com.garrettscales.americana.watchkitapp"
 ASC_APP_ID = tvos.ASC_APP_ID
-IOS_MARKETING = "1.0.0"
-# iOS 1.0 (18) is the build in App Review. A TestFlight upload must be newer.
-IN_REVIEW_BUILD = 18
+IOS_MARKETING = "1.0.1"
+# The last iPhone + watch TestFlight upload is build 23. The next CFBundleVersion
+# must be higher, including on the 1.0.1 train.
+LAST_TESTFLIGHT_BUILD = 23
 BUILD_NUMBER_RE = tvos.BUILD_NUMBER_RE
 FORBIDDEN_MARK = tvos.FORBIDDEN_MARK
 PHONE_PLATFORMS = {"ios", "iphoneos"}
@@ -64,17 +65,17 @@ repo_root = tvos.repo_root
 
 
 def normalize_ios_build_number(value: str) -> str:
-    """A CFBundleVersion newer than the iOS 1.0 build that is in review."""
+    """A CFBundleVersion newer than the last iPhone TestFlight upload."""
     text = value.strip()
     if not BUILD_NUMBER_RE.fullmatch(text):
         fail(
             "build_number must be a positive integer CFBundleVersion with no leading zero "
             f"(got {text!r})"
         )
-    if int(text) <= IN_REVIEW_BUILD:
+    if int(text) <= LAST_TESTFLIGHT_BUILD:
         fail(
-            f"build_number must be greater than {IN_REVIEW_BUILD}. "
-            f"iOS {IOS_MARKETING} ({IN_REVIEW_BUILD}) is already in App Review and must stay attached to that submission."
+            f"build_number must be greater than {LAST_TESTFLIGHT_BUILD}. "
+            f"iOS 1.0 ({LAST_TESTFLIGHT_BUILD}) is already on TestFlight."
         )
     return text
 
@@ -92,8 +93,8 @@ def assert_repo_identity(root: Path) -> None:
         fail("iPhone signing refuses EXPO_TV. Prebuild the iPhone app with EXPO_TV unset.")
     app = tvos.json.loads((root / "app.json").read_text())
     expo = app["expo"]
-    if expo.get("name") != "Americana":
-        fail(f"app.json name is {expo.get('name')!r}, expected Americana")
+    if expo.get("name") != "Anthem Gym Timer":
+        fail(f"app.json name is {expo.get('name')!r}, expected Anthem Gym Timer")
     if expo.get("version") != IOS_MARKETING:
         fail(f"app.json version is {expo.get('version')!r}, expected {IOS_MARKETING}")
     bundle = expo.get("ios", {}).get("bundleIdentifier")

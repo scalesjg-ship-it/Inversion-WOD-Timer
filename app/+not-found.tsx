@@ -11,12 +11,12 @@ export default function NotFoundScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Americana', headerShown: !appleTv }} />
+      <Stack.Screen options={{ title: 'Anthem Gym Timer', headerShown: !appleTv }} />
       <View style={[styles.container, androidPhone ? { paddingBottom: 24 + insets.bottom } : null]}>
         <Text style={styles.title}>That screen is not on the clock.</Text>
         {appleTv ? null : (
           <Link href="/" style={styles.link}>
-            <Text style={styles.linkText}>Back to Americana</Text>
+            <Text style={styles.linkText}>Back to Anthem Gym Timer</Text>
           </Link>
         )}
       </View>

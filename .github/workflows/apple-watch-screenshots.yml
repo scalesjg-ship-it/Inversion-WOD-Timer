@@ -54,7 +54,7 @@ jobs:
     env:
       EXPO_NO_TELEMETRY: "1"
       COCOAPODS_DISABLE_STATS: "1"
-      IOS_BUILD_NUMBER: "19"
+      IOS_BUILD_NUMBER: "24"
       WATCH_BUNDLE_ID: "com.garrettscales.americana.watchkitapp"
       DEVICE: ${{ inputs.device }}
       STATES: ${{ inputs.states }}

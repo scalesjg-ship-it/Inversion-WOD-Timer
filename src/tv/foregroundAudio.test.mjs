@@ -23,14 +23,14 @@ describe('tvOS foreground audio', () => {
   });
 
   it('drops the key when audio was the only background mode', () => {
-    const plist = { UIBackgroundModes: ['audio'], CFBundleName: 'Americana' };
+    const plist = { UIBackgroundModes: ['audio'], CFBundleName: 'Anthem Gym Timer' };
     stripBackgroundAudioMode(plist);
     expect(plist.UIBackgroundModes).toBeUndefined();
-    expect(plist.CFBundleName).toBe('Americana');
+    expect(plist.CFBundleName).toBe('Anthem Gym Timer');
   });
 
   it('leaves a plist that never declared background modes', () => {
-    const plist = { CFBundleName: 'Americana' };
+    const plist = { CFBundleName: 'Anthem Gym Timer' };
     expect(stripBackgroundAudioMode(plist)).toBe(plist);
   });
 
@@ -43,16 +43,16 @@ describe('tvOS foreground audio', () => {
   });
 
   it('sets the tvOS build and the Android version code for the next artifacts', () => {
-    expect(app.expo.ios.buildNumber).toBe('18');
-    expect(app.expo.version).toBe('1.0.0');
-    expect(app.expo.android.versionCode).toBe(12);
+    expect(app.expo.ios.buildNumber).toBe('24');
+    expect(app.expo.version).toBe('1.0.1');
+    expect(app.expo.android.versionCode).toBe(20);
     expect(app.expo.ios.infoPlist.UIBackgroundModes).toBeUndefined();
     const audioPlugin = app.expo.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === 'expo-audio');
     expect(audioPlugin[1].enableBackgroundPlayback).toBe(true);
-    expect(TVOS_BUILD_NUMBER).toBe('24');
-    expect(applyTvBuildNumber({ ios: { buildNumber: '18' } }, {}).ios.buildNumber).toBe('18');
-    expect(applyTvBuildNumber({ ios: { buildNumber: '18' } }, { TVOS_BUILD_NUMBER: '25' }).ios.buildNumber).toBe('18');
-    expect(applyTvBuildNumber({ ios: { buildNumber: '18' } }, { EXPO_TV: '1' }).ios.buildNumber).toBe('24');
+    expect(TVOS_BUILD_NUMBER).toBe('31');
+    expect(applyTvBuildNumber({ ios: { buildNumber: '24' } }, {}).ios.buildNumber).toBe('24');
+    expect(applyTvBuildNumber({ ios: { buildNumber: '24' } }, { TVOS_BUILD_NUMBER: '25' }).ios.buildNumber).toBe('24');
+    expect(applyTvBuildNumber({ ios: { buildNumber: '24' } }, { EXPO_TV: '1' }).ios.buildNumber).toBe('31');
     expect(applyTvBuildNumber({ ios: { buildNumber: '18' } }, { EXPO_TV: '1', TVOS_BUILD_NUMBER: '25' }).ios.buildNumber).toBe('25');
     expect(resolveTvBuildNumber({ TVOS_BUILD_NUMBER: ' 30 ' })).toBe('30');
     expect(() => resolveTvBuildNumber({ TVOS_BUILD_NUMBER: '23;touch' })).toThrow(/TVOS_BUILD_NUMBER/);

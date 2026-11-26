@@ -87,17 +87,18 @@ def project_text() -> str:
 
 class BuildNumberTests(unittest.TestCase):
     def test_build_number_must_be_newer_than_the_in_review_build(self):
-        self.assertEqual(signing.normalize_ios_build_number("19"), "19")
-        self.assertEqual(signing.normalize_ios_build_number("20"), "20")
-        expect_fail(self, "greater than 18", lambda: signing.normalize_ios_build_number("18"))
-        expect_fail(self, "greater than 18", lambda: signing.normalize_ios_build_number("1"))
+        self.assertEqual(signing.normalize_ios_build_number("24"), "24")
+        self.assertEqual(signing.normalize_ios_build_number("25"), "25")
+        expect_fail(self, "greater than 23", lambda: signing.normalize_ios_build_number("23"))
+        expect_fail(self, "greater than 23", lambda: signing.normalize_ios_build_number("1"))
         expect_fail(self, "positive integer", lambda: signing.normalize_ios_build_number("019"))
         expect_fail(self, "positive integer", lambda: signing.normalize_ios_build_number("0"))
 
-    def test_app_json_marketing_version_stays_1_0_0(self):
+    def test_app_json_marketing_version_is_1_0_1(self):
         app = (ROOT / "app.json").read_text()
-        self.assertIn('"version": "1.0.0"', app)
-        self.assertIn('"buildNumber": "18"', app)
+        self.assertIn('"version": "1.0.1"', app)
+        self.assertIn('"buildNumber": "24"', app)
+        self.assertIn('"name": "Anthem Gym Timer"', app)
 
 
 class ProfileTests(unittest.TestCase):
@@ -126,18 +127,18 @@ class ProfileTests(unittest.TestCase):
 
 class SigningProjectTests(unittest.TestCase):
     def test_both_targets_get_the_same_build_and_their_own_profile(self):
-        updated, counts = signing.apply_versions(project_text(), "19")
+        updated, counts = signing.apply_versions(project_text(), "24")
         self.assertEqual(counts[PHONE], 1)
         self.assertEqual(counts[WATCH], 1)
-        self.assertEqual(updated.count("CURRENT_PROJECT_VERSION = 19;"), 2)
-        self.assertEqual(updated.count("MARKETING_VERSION = 1.0.0;"), 2)
+        self.assertEqual(updated.count("CURRENT_PROJECT_VERSION = 24;"), 2)
+        self.assertEqual(updated.count("MARKETING_VERSION = 1.0.1;"), 2)
         self.assertNotIn("CURRENT_PROJECT_VERSION = 18;", updated)
         signed, signed_counts = signing.apply_manual_signing(
             project_text(),
             "Americana iOS App Store",
             "Americana Watch App Store",
             "Apple Distribution: CrossFit Inversion LLC (BNP9QFC679)",
-            "19",
+            "24",
         )
         self.assertEqual(signed_counts[PHONE], 1)
         self.assertEqual(signed_counts[WATCH], 1)
@@ -172,25 +173,25 @@ class SigningProjectTests(unittest.TestCase):
 
     def test_built_plists_must_match(self):
         good = {
-            "CFBundleVersion": "19",
+            "CFBundleVersion": "24",
             "CFBundleIdentifier": PHONE,
-            "CFBundleShortVersionString": "1.0.0",
+            "CFBundleShortVersionString": "1.0.1",
             "DTPlatformName": "iphoneos",
         }
-        signing.verify_built_plist(good, PHONE, "19", "iphoneos")
+        signing.verify_built_plist(good, PHONE, "24", "iphoneos")
         watch = dict(good)
         watch["CFBundleIdentifier"] = WATCH
         watch["DTPlatformName"] = "watchos"
-        signing.verify_built_plist(watch, WATCH, "19", "watchos")
+        signing.verify_built_plist(watch, WATCH, "24", "watchos")
         drifted = dict(watch)
         drifted["CFBundleVersion"] = "18"
-        expect_fail(self, "CFBundleVersion", lambda: signing.verify_built_plist(drifted, WATCH, "19", "watchos"))
+        expect_fail(self, "CFBundleVersion", lambda: signing.verify_built_plist(drifted, WATCH, "24", "watchos"))
         other_marketing = dict(good)
-        other_marketing["CFBundleShortVersionString"] = "1.0.1"
-        expect_fail(self, "1.0.0", lambda: signing.verify_built_plist(other_marketing, PHONE, "19", "iphoneos"))
+        other_marketing["CFBundleShortVersionString"] = "1.0.0"
+        expect_fail(self, "1.0.1", lambda: signing.verify_built_plist(other_marketing, PHONE, "24", "iphoneos"))
         tv = dict(good)
         tv["DTPlatformName"] = "appletvos"
-        expect_fail(self, "Apple TV", lambda: signing.verify_built_plist(tv, PHONE, "19", "iphoneos"))
+        expect_fail(self, "Apple TV", lambda: signing.verify_built_plist(tv, PHONE, "24", "iphoneos"))
 
     def test_profile_decode_stays_outside_the_iphone_app(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -282,10 +283,10 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn('codesign", "--force"', helper)
         self.assertNotIn('"-s"', helper)
         self.assertIn("build_number:", text)
-        self.assertIn('default: "19"', text)
+        self.assertIn('default: "24"', text)
         self.assertIn("IOS_BUILD_NUMBER: ${{ inputs.build_number }}", text)
-        self.assertIn("MARKETING_VERSION=1.0.0", text)
-        self.assertIn('"$MARKETING_VERSION" != "1.0.0"', text)
+        self.assertIn("MARKETING_VERSION=1.0.1", text)
+        self.assertIn('"$MARKETING_VERSION" != "1.0.1"', text)
         upload = text.split("uses: actions/upload-artifact@v4", 1)[1]
         self.assertIn("artifacts/public-logs/*.log", upload)
         self.assertNotIn(".ipa", upload)

@@ -10,15 +10,11 @@
 # TestFlight processing and does not submit the app for App Review or for
 # external beta review.
 #
-# tvOS 1.0 build 22 is approved and live. App Store Connect error 90062
-# rejects another upload with CFBundleShortVersionString 1.0.0.
-# marketing_version (default 1.0.1) is applied to this tvOS archive only.
-# app.json stays 1.0.0, which is the iOS marketing version still in review.
-# Android versionName and versionCode are left as they are in app.json.
-# build_number (default 24) is the tvOS CFBundleVersion. 1.0.1 (23) is already
-# VALID, so another 1.0.1 upload must use 24 or higher. The prebuild plugin and
-# ci-tvos-signing.py both read it from TVOS_BUILD_NUMBER. The iOS buildNumber
-# in app.json is not changed.
+# The latest Apple TV TestFlight upload is 1.0.2 (30). marketing_version
+# (default 1.0.3) is applied to this tvOS archive only. app.json version is the
+# iOS marketing version, 1.0.1. Android versionName and versionCode stay as in
+# app.json. build_number (default 31) is the tvOS CFBundleVersion. The prebuild
+# plugin and ci-tvos-signing.py both read it from TVOS_BUILD_NUMBER.
 name: Apple TV signed TestFlight
 
 on:
@@ -29,14 +25,14 @@ on:
         required: true
         type: string
       marketing_version:
-        description: tvOS CFBundleShortVersionString. Must be higher than the approved 1.0.0. iOS stays 1.0.0. Android versionName and versionCode stay as in app.json.
+        description: tvOS CFBundleShortVersionString. Must be higher than 1.0.2. iOS stays 1.0.1. Android versionName and versionCode stay as in app.json.
         required: false
-        default: "1.0.1"
+        default: "1.0.3"
         type: string
       build_number:
-        description: tvOS CFBundleVersion. Positive integer. 1.0.1 (23) is already VALID, so use 24 or higher for 1.0.1. Does not change the iOS build number.
+        description: tvOS CFBundleVersion. Positive integer greater than 30. Does not change the iOS build number.
         required: false
-        default: "24"
+        default: "31"
         type: string
 
 concurrency:
@@ -164,8 +160,8 @@ jobs:
           echo "CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY"
           echo "PROVISIONING_PROFILE_SPECIFIER=$PROFILE_NAME"
           echo "CURRENT_PROJECT_VERSION=$TVOS_BUILD_NUMBER MARKETING_VERSION=$MARKETING_VERSION"
-          if [ -z "${MARKETING_VERSION:-}" ] || [ "$MARKETING_VERSION" = "1.0.0" ]; then
-            echo "::error::Refusing to archive tvOS marketing version '${MARKETING_VERSION:-}'. App Store Connect already approved 1.0.0 (error 90062)."
+          if [ -z "${MARKETING_VERSION:-}" ] || [ "$MARKETING_VERSION" = "1.0.0" ] || [ "$MARKETING_VERSION" = "1.0.1" ] || [ "$MARKETING_VERSION" = "1.0.2" ]; then
+            echo "::error::Refusing to archive tvOS marketing version '${MARKETING_VERSION:-}'. The latest TestFlight upload is 1.0.2 (30). Use 1.0.3 or higher."
             exit 1
           fi
           # Expo writes CFBundleShortVersionString into the tvOS Info.plist as a
@@ -278,7 +274,7 @@ jobs:
           {
             echo "## TestFlight upload"
             echo
-            echo "- App: Americana (\`${BUNDLE_ID}\`)"
+            echo "- App: Anthem Gym Timer (\`${BUNDLE_ID}\`)"
             echo "- App Store Connect app: ${ASC_APP_ID}"
             echo "- Team: BNP9QFC679 (CrossFit Inversion LLC)"
             echo "- Platform: tvOS"

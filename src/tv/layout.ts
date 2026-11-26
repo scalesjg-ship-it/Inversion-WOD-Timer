@@ -25,6 +25,16 @@ export const TV_REF_HEIGHT = 1080;
 
 /** Apple TV overscan at 1080p. About 60pt horizontal and 80pt vertical. */
 export const TV_SAFE_HORIZONTAL = 60;
+
+/** Subtitle under the product lockup. Matches ProductMark when `size` is set. */
+export function lockupSubtitleSize(titleSize: number): number {
+  return Math.max(1, Math.round(titleSize * 0.5));
+}
+
+/** Title, the 1px subtitle gap, and the subtitle. The TV home header budgets this. */
+export function lockupBlockHeight(titleSize: number): number {
+  return titleSize + 1 + lockupSubtitleSize(titleSize);
+}
 export const TV_SAFE_VERTICAL = 80;
 
 /**
@@ -384,7 +394,7 @@ export function tvHomeLayout(
   const gymSize = options.header === 'home' ? Math.max(1, Math.round(40 * scale)) : 0;
   const sectionSize = options.header === 'home' ? Math.max(1, Math.round(TV_SECTION_FONT * scale)) : 0;
   const hintSize = Math.max(1, Math.round(TV_BODY_FONT * scale));
-  const wordmarkLine = wordmarkSize === 0 ? 0 : wordmarkSize + lineExtra;
+  const wordmarkLine = wordmarkSize === 0 ? 0 : lockupBlockHeight(wordmarkSize);
   const gymLine = gymSize === 0 ? 0 : gymSize + lineExtra;
   const sectionLine = sectionSize === 0 ? 0 : sectionSize + lineExtra;
   const hintLine = options.hint ? hintSize + lineExtra : 0;

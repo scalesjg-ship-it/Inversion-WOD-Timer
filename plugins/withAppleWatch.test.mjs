@@ -12,9 +12,9 @@ const app = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'ut
 
 describe('withAppleWatch', () => {
   it('keeps the phone version and the tvOS bundle id alone', () => {
-    expect(app.expo.version).toBe('1.0.0');
-    expect(app.expo.ios.buildNumber).toBe('18');
-    expect(app.expo.android.versionCode).toBe(12);
+    expect(app.expo.version).toBe('1.0.1');
+    expect(app.expo.ios.buildNumber).toBe('24');
+    expect(app.expo.android.versionCode).toBe(20);
     expect(plugin.isTvBuild({ EXPO_TV: '1' })).toBe(true);
     expect(plugin.isTvBuild({ EXPO_TV: 'true' })).toBe(true);
     expect(plugin.isTvBuild({})).toBe(false);
@@ -38,8 +38,8 @@ describe('withAppleWatch', () => {
     expect(plugin.resolveIosArchiveBuild({ EXPO_TV: '1', IOS_BUILD_NUMBER: '19' })).toBeNull();
     expect(() => plugin.resolveIosArchiveBuild({ IOS_BUILD_NUMBER: '0' })).toThrow(/IOS_BUILD_NUMBER/);
     expect(() => plugin.resolveIosArchiveBuild({ IOS_BUILD_NUMBER: '018' })).toThrow(/IOS_BUILD_NUMBER/);
-    expect(app.expo.version).toBe('1.0.0');
-    expect(app.expo.ios.buildNumber).toBe('18');
+    expect(app.expo.version).toBe('1.0.1');
+    expect(app.expo.ios.buildNumber).toBe('24');
   });
 
   it('embeds the watch app in an iPhone project and not as a second tvOS bundle', () => {

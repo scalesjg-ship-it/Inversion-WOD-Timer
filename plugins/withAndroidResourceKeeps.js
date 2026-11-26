@@ -61,7 +61,7 @@ function withAndroidResourceKeeps(config) {
 
   return withAppBuildGradle(config, (mod) => {
     if (mod.modResults.language !== 'groovy') {
-      throw new Error('Americana notification resource keeps require the Groovy app/build.gradle.');
+      throw new Error('Notification resource keeps require the Groovy app/build.gradle.');
     }
     const resources = notificationSoundResources(mod);
     if (resources.length === 0) return mod;

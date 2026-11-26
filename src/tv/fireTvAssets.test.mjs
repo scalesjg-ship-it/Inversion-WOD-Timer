@@ -89,9 +89,9 @@ function markHits(image, box, step = 8) {
 }
 
 describe('Fire TV store and launcher art', () => {
-  it('keeps the Americana name on main', () => {
+  it('keeps the display name and the americana package id', () => {
     const app = JSON.parse(readFileSync(join(ROOT, 'app.json'), 'utf8'));
-    expect(app.expo.name).toBe('Americana');
+    expect(app.expo.name).toBe('Anthem Gym Timer');
     expect(app.expo.android.package).toBe('com.garrettscales.americana');
   });
 

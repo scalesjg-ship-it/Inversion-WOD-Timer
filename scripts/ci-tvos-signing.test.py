@@ -248,9 +248,9 @@ class PrebuildTests(unittest.TestCase):
         previous = os.environ.get("TVOS_BUILD_NUMBER")
         os.environ.pop("TVOS_BUILD_NUMBER", None)
         try:
-            self.assertEqual(signing.read_plugin_tvos_build_number(ROOT), "24")
-            self.assertEqual(signing.read_tvos_build_number(ROOT), "24")
-            self.assertEqual(signing.assert_repo_identity(ROOT), "1.0.0")
+            self.assertEqual(signing.read_plugin_tvos_build_number(ROOT), "31")
+            self.assertEqual(signing.read_tvos_build_number(ROOT), "31")
+            self.assertEqual(signing.assert_repo_identity(ROOT), "1.0.1")
         finally:
             if previous is not None:
                 os.environ["TVOS_BUILD_NUMBER"] = previous
@@ -279,7 +279,7 @@ class PrebuildTests(unittest.TestCase):
             app.mkdir()
             with (app / "Info.plist").open("wb") as handle:
                 plistlib.dump(
-                    {"CFBundleVersion": "24", "CFBundleShortVersionString": "1.0.0", **watch_browse()},
+                    {"CFBundleVersion": "31", "CFBundleShortVersionString": "1.0.1", **watch_browse()},
                     handle,
                 )
             env_file = ios / "prebuild.env"
@@ -305,14 +305,14 @@ class PrebuildTests(unittest.TestCase):
                     os.environ["GITHUB_ENV"] = previous
             exported = github_env.read_text()
             self.assertIn("SCHEME=Americana", exported)
-            self.assertIn("TVOS_BUILD_NUMBER=24", exported)
-            self.assertIn("MARKETING_VERSION=1.0.0", exported)
-            self.assertIn("SOURCE_MARKETING_VERSION=1.0.0", exported)
+            self.assertIn("TVOS_BUILD_NUMBER=31", exported)
+            self.assertIn("MARKETING_VERSION=1.0.1", exported)
+            self.assertIn("SOURCE_MARKETING_VERSION=1.0.1", exported)
             self.assertIn("Americana.xcworkspace", exported)
             self.assertIn("SCHEME=Americana", env_file.read_text())
             self.assertEqual(
                 plistlib.loads((app / "Info.plist").read_bytes())["CFBundleShortVersionString"],
-                "1.0.0",
+                "1.0.1",
             )
 
     def test_real_prebuild_tree_is_tvos_build_24(self):
@@ -331,18 +331,18 @@ class PrebuildTests(unittest.TestCase):
             if created:
                 workspace.rmdir()
         self.assertEqual(result["SCHEME"], "Americana")
-        self.assertEqual(result["TVOS_BUILD_NUMBER"], "24")
-        self.assertEqual(result["MARKETING_VERSION"], "1.0.0")
-        self.assertEqual(result["SOURCE_MARKETING_VERSION"], "1.0.0")
+        self.assertEqual(result["TVOS_BUILD_NUMBER"], "31")
+        self.assertEqual(result["MARKETING_VERSION"], "1.0.1")
+        self.assertEqual(result["SOURCE_MARKETING_VERSION"], "1.0.1")
         self.assertTrue(result["WORKSPACE"].endswith("Americana.xcworkspace"))
 
 
 def write_tvos_tree(
     ios: Path,
-    short_version: str = "1.0.0",
+    short_version: str = "1.0.1",
     *,
     variable_short_version: bool = False,
-    build_number: str = "24",
+    build_number: str = "31",
 ) -> Path:
     project = ios / "Americana.xcodeproj"
     schemes = project / "xcshareddata" / "xcschemes"
@@ -457,12 +457,14 @@ class WatchBrowseTests(unittest.TestCase):
 
 class MarketingVersionTests(unittest.TestCase):
     def test_marketing_version_must_be_higher_than_the_approved_release(self):
-        self.assertEqual(signing.normalize_marketing_version("1.0.1"), "1.0.1")
+        self.assertEqual(signing.normalize_marketing_version("1.0.3"), "1.0.3")
         self.assertEqual(signing.normalize_marketing_version(" 1.2 "), "1.2")
         self.assertEqual(signing.normalize_marketing_version("2.0.0"), "2.0.0")
-        expect_fail(self, "90062", lambda: signing.normalize_marketing_version("1.0.0"))
-        expect_fail(self, "90062", lambda: signing.normalize_marketing_version("1.0"))
-        expect_fail(self, "90062", lambda: signing.normalize_marketing_version("0.9.0"))
+        expect_fail(self, "1.0.2", lambda: signing.normalize_marketing_version("1.0.2"))
+        expect_fail(self, "1.0.2", lambda: signing.normalize_marketing_version("1.0.1"))
+        expect_fail(self, "1.0.2", lambda: signing.normalize_marketing_version("1.0.0"))
+        expect_fail(self, "1.0.2", lambda: signing.normalize_marketing_version("1.0"))
+        expect_fail(self, "1.0.2", lambda: signing.normalize_marketing_version("0.9.0"))
         expect_fail(self, "1.0.1", lambda: signing.normalize_marketing_version("1.0.1;rm -rf"))
         expect_fail(self, "marketing_version", lambda: signing.normalize_marketing_version(""))
         expect_fail(self, "marketing_version", lambda: signing.normalize_marketing_version("1.0.1\n2.0.0"))
@@ -471,13 +473,14 @@ class MarketingVersionTests(unittest.TestCase):
         self.assertEqual(signing.normalize_build_number("24"), "24")
         self.assertEqual(signing.normalize_build_number(" 25 "), "25")
         signing.reject_known_tvos_build("1.0.1", "24")
-        signing.reject_known_tvos_build("1.0.2", "1")
+        signing.reject_known_tvos_build("1.0.3", "31")
         expect_fail(self, "CFBundleVersion", lambda: signing.normalize_build_number("0"))
         expect_fail(self, "CFBundleVersion", lambda: signing.normalize_build_number("024"))
         expect_fail(self, "CFBundleVersion", lambda: signing.normalize_build_number("24;rm"))
         expect_fail(self, "CFBundleVersion", lambda: signing.normalize_build_number(""))
         expect_fail(self, "already VALID", lambda: signing.reject_known_tvos_build("1.0.1", "23"))
         expect_fail(self, "already VALID", lambda: signing.reject_known_tvos_build("1.0.1", "1"))
+        expect_fail(self, "already VALID", lambda: signing.reject_known_tvos_build("1.0.2", "30"))
 
     def test_check_env_rejects_build_23_for_1_0_1_before_secrets(self):
         previous = {
@@ -487,7 +490,7 @@ class MarketingVersionTests(unittest.TestCase):
         os.environ["TVOS_MARKETING_VERSION"] = "1.0.1"
         os.environ["TVOS_BUILD_NUMBER"] = "23"
         try:
-            expect_fail(self, "already VALID", signing.check_env)
+            expect_fail(self, "1.0.2", signing.check_env)
         finally:
             for key, value in previous.items():
                 if value is None:
@@ -504,17 +507,17 @@ class MarketingVersionTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 ios = Path(tmp)
                 write_tvos_tree(ios, build_number="25")
-                result = signing.verify_prebuild(ROOT, ios, "1.0.1")
+                result = signing.verify_prebuild(ROOT, ios, "1.0.3")
                 plist = plistlib.loads((ios / "Americana" / "Info.plist").read_bytes())
             self.assertEqual(result["TVOS_BUILD_NUMBER"], "25")
-            self.assertEqual(result["MARKETING_VERSION"], "1.0.1")
+            self.assertEqual(result["MARKETING_VERSION"], "1.0.3")
             self.assertEqual(plist["CFBundleVersion"], "25")
-            self.assertEqual(plist["CFBundleShortVersionString"], "1.0.1")
+            self.assertEqual(plist["CFBundleShortVersionString"], "1.0.3")
             self.assertEqual((ROOT / "app.json").read_bytes(), app_json)
             stored = json.loads(app_json)
-            self.assertEqual(stored["expo"]["version"], "1.0.0")
-            self.assertEqual(stored["expo"]["ios"]["buildNumber"], "18")
-            self.assertEqual(stored["expo"]["android"]["versionCode"], 12)
+            self.assertEqual(stored["expo"]["version"], "1.0.1")
+            self.assertEqual(stored["expo"]["ios"]["buildNumber"], "24")
+            self.assertEqual(stored["expo"]["android"]["versionCode"], 20)
         finally:
             if previous is None:
                 os.environ.pop("TVOS_BUILD_NUMBER", None)
@@ -528,10 +531,10 @@ class MarketingVersionTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmp:
                 ios = Path(tmp)
                 write_tvos_tree(ios, build_number="23")
-                expect_fail(self, "already VALID", lambda: signing.verify_prebuild(ROOT, ios, "1.0.1"))
+                expect_fail(self, "1.0.2", lambda: signing.verify_prebuild(ROOT, ios, "1.0.1"))
                 stored = json.loads((ROOT / "app.json").read_text())
-                self.assertEqual(stored["expo"]["ios"]["buildNumber"], "18")
-                self.assertEqual(stored["expo"]["version"], "1.0.0")
+                self.assertEqual(stored["expo"]["ios"]["buildNumber"], "24")
+                self.assertEqual(stored["expo"]["version"], "1.0.1")
         finally:
             if previous is None:
                 os.environ.pop("TVOS_BUILD_NUMBER", None)
@@ -542,7 +545,7 @@ class MarketingVersionTests(unittest.TestCase):
         previous = os.environ.get("TVOS_BUILD_NUMBER")
         os.environ["TVOS_BUILD_NUMBER"] = "   "
         try:
-            self.assertEqual(signing.read_tvos_build_number(ROOT), "24")
+            self.assertEqual(signing.read_tvos_build_number(ROOT), "31")
         finally:
             if previous is None:
                 os.environ.pop("TVOS_BUILD_NUMBER", None)
@@ -591,15 +594,15 @@ class MarketingVersionTests(unittest.TestCase):
                 "\t\t};",
             ]
         )
-        updated = signing.apply_tvos_marketing_version(project, "1.0.1")
-        self.assertEqual(updated.count("MARKETING_VERSION = 1.0.1;"), 2)
+        updated = signing.apply_tvos_marketing_version(project, "1.0.3")
+        self.assertEqual(updated.count("MARKETING_VERSION = 1.0.3;"), 2)
         self.assertNotIn("MARKETING_VERSION = 1.0;", updated)
-        self.assertIn("INFOPLIST_KEY_CFBundleShortVersionString = 1.0.1;", updated)
+        self.assertIn("INFOPLIST_KEY_CFBundleShortVersionString = 1.0.3;", updated)
         self.assertIn("CURRENT_PROJECT_VERSION = 23;", updated)
         self.assertIn('PRODUCT_BUNDLE_IDENTIFIER = "com.garrettscales.americana.uitests";', updated)
         app_block = updated.split("TESTS /* Release */", 1)[0]
         test_block = updated.split("TESTS /* Release */", 1)[1]
-        self.assertEqual(app_block.count("MARKETING_VERSION = 1.0.1;"), 2)
+        self.assertEqual(app_block.count("MARKETING_VERSION = 1.0.3;"), 2)
         self.assertNotIn("MARKETING_VERSION", test_block)
         expect_fail(self, "90062", lambda: signing.apply_tvos_marketing_version(project, "1.0.0"))
 
@@ -623,7 +626,7 @@ class MarketingVersionTests(unittest.TestCase):
                         "--env-file",
                         str(env_file),
                         "--marketing-version",
-                        "1.0.1",
+                        "1.0.3",
                     ]
                 )
             finally:
@@ -632,12 +635,12 @@ class MarketingVersionTests(unittest.TestCase):
                 else:
                     os.environ["GITHUB_ENV"] = previous
             exported = github_env.read_text()
-            self.assertIn("MARKETING_VERSION=1.0.1", exported)
-            self.assertIn("SOURCE_MARKETING_VERSION=1.0.0", exported)
-            self.assertIn("TVOS_BUILD_NUMBER=24", exported)
+            self.assertIn("MARKETING_VERSION=1.0.3", exported)
+            self.assertIn("SOURCE_MARKETING_VERSION=1.0.1", exported)
+            self.assertIn("TVOS_BUILD_NUMBER=31", exported)
             app_plist = plistlib.loads((ios / "Americana" / "Info.plist").read_bytes())
-            self.assertEqual(app_plist["CFBundleShortVersionString"], "1.0.1")
-            self.assertEqual(app_plist["CFBundleVersion"], "24")
+            self.assertEqual(app_plist["CFBundleShortVersionString"], "1.0.3")
+            self.assertEqual(app_plist["CFBundleVersion"], "31")
             self.assertEqual(app_plist["CFBundleName"], "Americana")
             other = plistlib.loads((ios / "Other" / "Info.plist").read_bytes())
             self.assertEqual(other["CFBundleShortVersionString"], "1.0.0")
@@ -645,30 +648,30 @@ class MarketingVersionTests(unittest.TestCase):
             pods = plistlib.loads((ios / "Pods" / "Info.plist").read_bytes())
             self.assertEqual(pods["CFBundleShortVersionString"], "1.0.0")
             project_text = pbx.read_text()
-            self.assertIn("MARKETING_VERSION = 1.0.1;", project_text)
-            self.assertIn("INFOPLIST_KEY_CFBundleShortVersionString = 1.0.1;", project_text)
+            self.assertIn("MARKETING_VERSION = 1.0.3;", project_text)
+            self.assertIn("INFOPLIST_KEY_CFBundleShortVersionString = 1.0.3;", project_text)
             self.assertIn("CURRENT_PROJECT_VERSION = 23;", project_text)
             signed, count = signing.apply_manual_signing(
                 project_text, "Americana tvOS App Store b17", "23"
             )
             self.assertEqual(count, 1)
-            self.assertIn("MARKETING_VERSION = 1.0.1;", signed)
+            self.assertIn("MARKETING_VERSION = 1.0.3;", signed)
             self.assertIn("CURRENT_PROJECT_VERSION = 23;", signed)
             self.assertEqual((ROOT / "app.json").read_bytes(), app_json)
             stored = json.loads(app_json)
-            self.assertEqual(stored["expo"]["version"], "1.0.0")
-            self.assertEqual(stored["expo"]["ios"]["buildNumber"], "18")
-            self.assertEqual(stored["expo"]["android"]["versionCode"], 12)
+            self.assertEqual(stored["expo"]["version"], "1.0.1")
+            self.assertEqual(stored["expo"]["ios"]["buildNumber"], "24")
+            self.assertEqual(stored["expo"]["android"]["versionCode"], 20)
 
     def test_variable_short_version_is_replaced_with_the_override(self):
         with tempfile.TemporaryDirectory() as tmp:
             ios = Path(tmp)
             write_tvos_tree(ios, variable_short_version=True)
-            result = signing.verify_prebuild(ROOT, ios, "1.0.1")
+            result = signing.verify_prebuild(ROOT, ios, "1.0.3")
             plist = plistlib.loads((ios / "Americana" / "Info.plist").read_bytes())
-            self.assertEqual(plist["CFBundleShortVersionString"], "1.0.1")
-            self.assertEqual(result["MARKETING_VERSION"], "1.0.1")
-            self.assertEqual(result["SOURCE_MARKETING_VERSION"], "1.0.0")
+            self.assertEqual(plist["CFBundleShortVersionString"], "1.0.3")
+            self.assertEqual(result["MARKETING_VERSION"], "1.0.3")
+            self.assertEqual(result["SOURCE_MARKETING_VERSION"], "1.0.1")
 
 
 class SecretHandlingTests(unittest.TestCase):
@@ -781,10 +784,10 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("confirm", text)
         self.assertIn("UPLOAD", text)
         self.assertIn("marketing_version:", text)
-        self.assertIn('default: "1.0.1"', text)
+        self.assertIn('default: "1.0.3"', text)
         self.assertIn("TVOS_MARKETING_VERSION: ${{ inputs.marketing_version }}", text)
         self.assertIn("build_number:", text)
-        self.assertIn('default: "24"', text)
+        self.assertIn('default: "31"', text)
         self.assertIn("TVOS_BUILD_NUMBER: ${{ inputs.build_number }}", text)
         self.assertNotIn("CFBundleVersion stays 23", text)
         self.assertIn('--marketing-version "$TVOS_MARKETING_VERSION"', text)
