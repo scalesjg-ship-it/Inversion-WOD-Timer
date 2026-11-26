@@ -12,6 +12,7 @@ on:
     branches:
       - cursor/appletv-sim-uitest-8dd8
       - cursor/appletv-uitest-finish-sound-bfec
+      - cursor/tvos-menu-cancel-path-3b4f
 
 concurrency:
   group: appletv-simulator-${{ github.ref }}
