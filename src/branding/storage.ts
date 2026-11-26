@@ -1,13 +1,30 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { normalizeHex } from './color';
-import { DEFAULT_BRANDING, type BrandColors, type Branding, type LogoPlacement } from './types';
+import {
+  DEFAULT_BRANDING,
+  type BackgroundStyle,
+  type BrandColors,
+  type Branding,
+  type ClockWeight,
+  type LogoPlacement,
+} from './types';
 
 const KEY = 'americana.branding.v1';
 
 function placement(value: unknown): LogoPlacement {
   if (value === 'watermark' || value === 'fullBleed' || value === 'corner') return value;
   return DEFAULT_BRANDING.logoPlacement;
+}
+
+function clockWeight(value: unknown): ClockWeight {
+  if (value === 'regular' || value === 'bold') return value;
+  return DEFAULT_BRANDING.clockWeight;
+}
+
+function backgroundStyle(value: unknown): BackgroundStyle {
+  if (value === 'solid' || value === 'vignette' || value === 'edge') return value;
+  return DEFAULT_BRANDING.backgroundStyle;
 }
 
 function colorField(value: unknown, fallback: string): string {
@@ -32,6 +49,8 @@ export function sanitizeBranding(value: unknown): Branding {
     logoUri: typeof raw.logoUri === 'string' && raw.logoUri.length > 0 ? raw.logoUri : null,
     logoPlacement: placement(raw.logoPlacement),
     logoBlur: raw.logoBlur !== false,
+    clockWeight: clockWeight(raw.clockWeight),
+    backgroundStyle: backgroundStyle(raw.backgroundStyle),
   };
 }
 

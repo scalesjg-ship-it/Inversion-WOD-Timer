@@ -1,12 +1,13 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View, type Pressable } from 'react-native';
 
+import { TvFocusPressable, TvTextField } from '@/src/components/TvFocus';
+import { useTvSetupFocus } from '@/src/components/TvSetupFocus';
+import type { TvFocusTag } from '@/src/components/TvTabFocus';
 import { chrome } from '@/src/theme/chrome';
-import { focusChrome } from '@/src/tv/controls';
-import { isTenFootLayout } from '@/src/tv/layout';
-import { tvParallaxProps } from '@/src/tv/pressable';
-import { usePointerFocus } from '@/src/tv/usePointerFocus';
+import { isTenFootLayout, tvScaled } from '@/src/tv/layout';
+import { tvSetupScaled } from '@/src/tv/setupLayout';
 import {
   deletePreset,
   listPresets,
@@ -39,12 +40,19 @@ export function PresetShelf({
   onClearSelection: () => void;
 }) {
   const { width, height } = useWindowDimensions();
+  const setup = useTvSetupFocus();
   const tv = Platform.isTV === true;
   const tenFoot = isTenFootLayout(width, height, tv);
   const [presets, setPresets] = useState<SavedPreset[]>([]);
-  const [editor, setEditor] = useState<{ intent: 'create' | 'rename'; id?: string; name: string; showInput: boolean } | null>(
-    null,
-  );
+  const [notice, setNotice] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editor, setEditor] = useState<{
+    intent: 'create' | 'rename';
+    id?: string;
+    name: string;
+    showInput: boolean;
+    confirmOverwrite: boolean;
+  } | null>(null);
 
   const refresh = useCallback(async () => {
     const next = await listPresets(mode);
@@ -67,23 +75,34 @@ export function PresetShelf({
   const selected = presets.find((preset) => preset.id === selectedId);
 
   const openCreate = () => {
+    setNotice(null);
+    setConfirmDeleteId(null);
     setEditor({
       intent: 'create',
       name: nextPresetName(presets, config, nameHint),
       showInput: Platform.isTV !== true,
+      confirmOverwrite: false,
     });
   };
 
   const openRename = (preset: SavedPreset) => {
+    setNotice(null);
+    setConfirmDeleteId(null);
     setEditor({
       intent: 'rename',
       id: preset.id,
       name: preset.name,
       showInput: Platform.isTV !== true,
+      confirmOverwrite: false,
     });
   };
 
   const confirmDelete = (preset: SavedPreset) => {
+    if (tv) {
+      setNotice(null);
+      setConfirmDeleteId(preset.id);
+      return;
+    }
     Alert.alert('Delete preset', `Remove ${preset.name}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -99,6 +118,8 @@ export function PresetShelf({
   const remove = async (preset: SavedPreset) => {
     try {
       await deletePreset(preset.id);
+      setConfirmDeleteId(null);
+      setNotice(null);
       await refresh();
       if (preset.id === selectedId) onClearSelection();
     } catch {
@@ -114,15 +135,18 @@ export function PresetShelf({
         if (!editor.id) return;
         const result = await renamePreset(editor.id, name);
         if (!result.ok && result.reason === 'empty-name') {
-          Alert.alert('Name the preset', 'Give the preset a name before saving it on this device.');
+          if (tv) setNotice('Give the preset a name before saving it.');
+          else Alert.alert('Name the preset', 'Give the preset a name before saving it on this device.');
           return;
         }
         if (!result.ok && result.reason === 'name-taken') {
-          Alert.alert('Name already used', 'A preset for this timer already uses that name.');
+          if (tv) setNotice('A preset for this timer already uses that name.');
+          else Alert.alert('Name already used', 'A preset for this timer already uses that name.');
           return;
         }
         if (!result.ok) {
-          Alert.alert('Preset not found', 'That preset is no longer on this device.');
+          if (tv) setNotice('That preset is no longer on this device.');
+          else Alert.alert('Preset not found', 'That preset is no longer on this device.');
           await refresh();
           return;
         }
@@ -134,10 +158,16 @@ export function PresetShelf({
 
       const result = await savePreset({ name, config, overwrite });
       if (!result.ok && result.reason === 'empty-name') {
-        Alert.alert('Name the preset', 'Give the preset a name before saving it on this device.');
+        if (tv) setNotice('Give the preset a name before saving it.');
+        else Alert.alert('Name the preset', 'Give the preset a name before saving it on this device.');
         return;
       }
       if (!result.ok && result.reason === 'name-taken') {
+        if (tv) {
+          setEditor({ ...editor, confirmOverwrite: true });
+          setNotice(`${name.trim()} is already saved. Update it, or edit the name.`);
+          return;
+        }
         Alert.alert('Update preset', `Replace ${name.trim()} with the current setup?`, [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Update', onPress: () => void commit(true) },
@@ -147,6 +177,7 @@ export function PresetShelf({
       if (!result.ok) return;
       await refresh();
       setEditor(null);
+      setNotice(null);
       onLoad(result.preset);
     } catch {
       Alert.alert('Preset not saved', 'The preset could not be saved on this device.');
@@ -158,7 +189,8 @@ export function PresetShelf({
     try {
       const result = await updatePreset(selected.id, config);
       if (!result.ok) {
-        Alert.alert('Preset not found', 'That preset is no longer on this device.');
+        if (tv) setNotice('That preset is no longer on this device.');
+        else Alert.alert('Preset not found', 'That preset is no longer on this device.');
         await refresh();
         onClearSelection();
         return;
@@ -169,6 +201,162 @@ export function PresetShelf({
       Alert.alert('Preset not saved', 'The preset could not be updated on this device.');
     }
   };
+
+  const previewConfirm = useRef(false);
+  useEffect(() => {
+    const preview = (globalThis as { __TV_PRESET_PREVIEW__?: string }).__TV_PRESET_PREVIEW__;
+    if (preview !== 'confirm' || previewConfirm.current || presets.length === 0) return;
+    previewConfirm.current = true;
+    setConfirmDeleteId(presets[0].id);
+    onLoad(presets[0]);
+  }, [onLoad, presets]);
+
+  if (tv) {
+    const rowHeight = Math.max(36, tvScaled(44, width, height));
+    const labelSize = Math.max(14, tvScaled(18, width, height));
+    const shelfUp = setup?.exitHosts[0] ?? setup?.abovePreset ?? null;
+    const shelfDown = setup?.startHost ?? setup?.startTag ?? null;
+    const pending = presets.find((preset) => preset.id === confirmDeleteId);
+    const confirming = pending != null && pending.id === selected?.id;
+    return (
+      <View style={styles.tvWrap} testID={`presets-${mode}`}>
+        <View style={styles.tvRow}>
+          <Text style={[styles.fieldLabel, { fontSize: labelSize }]}>Presets</Text>
+          {editor ? null : (
+            <TextButton
+              testID="save-preset"
+              label="Save preset"
+              color={accent}
+              tenFoot={false}
+              dense
+              onPress={openCreate}
+              onHost={setup?.bindPreset}
+              focusUp={shelfUp}
+              focusDown={shelfDown}
+            />
+          )}
+          {editor ? null : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.tvNames}
+              contentContainerStyle={styles.tvNamesContent}
+            >
+              {presets.length === 0 ? (
+                <Text style={[styles.empty, { fontSize: labelSize }]}>No saved presets yet.</Text>
+              ) : (
+                presets.map((preset) => (
+                  <TextButton
+                    key={preset.id}
+                    testID={`preset-${preset.id}`}
+                    label={preset.name}
+                    accessibilityLabel={`${preset.name}. Loads this preset`}
+                    color={preset.id === selectedId ? accent : chrome.text}
+                    tenFoot={false}
+                    dense
+                    focusUp={shelfUp}
+                    focusDown={shelfDown}
+                    onPress={() => {
+                      setConfirmDeleteId(null);
+                      onLoad(preset);
+                    }}
+                  />
+                ))
+              )}
+              {selected && !confirming ? (
+                <>
+                  <TextButton testID="update-preset" label="Update" color={accent} tenFoot={false} dense focusUp={shelfUp} focusDown={shelfDown} onPress={() => void updateSelected()} />
+                  <TextButton testID={`preset-rename-${selected.id}`} label="Rename" color={accent} tenFoot={false} dense focusUp={shelfUp} focusDown={shelfDown} onPress={() => openRename(selected)} />
+                  <TextButton
+                    testID={`preset-delete-${selected.id}`}
+                    label="Delete"
+                    color="#FF8A7A"
+                    tenFoot={false}
+                    dense
+                    focusUp={shelfUp}
+                    focusDown={shelfDown}
+                    onPress={() => confirmDelete(selected)}
+                  />
+                </>
+              ) : null}
+            </ScrollView>
+          )}
+          {confirming && selected ? (
+            <TextButton
+              testID="preset-delete-confirm"
+              label="Confirm delete"
+              color="#FF8A7A"
+              tenFoot={false}
+              dense
+              focusUp={shelfUp}
+              focusDown={shelfDown}
+              onPress={() => void remove(selected)}
+            />
+          ) : null}
+        </View>
+        {editor ? (
+          <View style={styles.tvRow}>
+            {editor.showInput ? (
+              <TvTextField
+                testID="preset-name"
+                accessibilityLabel="Preset name"
+                value={editor.name}
+                onChangeText={(name) => setEditor({ ...editor, name, confirmOverwrite: false })}
+                placeholder="Preset name"
+                placeholderTextColor={chrome.muted}
+                selectTextOnFocus
+                autoCapitalize="words"
+                returnKeyType="done"
+                onSubmitEditing={() => void commit(editor.confirmOverwrite)}
+                focusUp={setup?.lastEntry ?? null}
+                focusDown={setup?.startTag ?? null}
+                style={[styles.nameInput, { minHeight: rowHeight, fontSize: labelSize, flex: 1 }]}
+              />
+            ) : (
+              <Text style={[styles.tvName, { fontSize: labelSize + 2 }]} testID="preset-auto-name" numberOfLines={1}>
+                {editor.name}
+              </Text>
+            )}
+            {editor.showInput ? null : (
+              <TextButton
+                testID="preset-edit-name"
+                label="Edit name"
+                color={accent}
+                tenFoot={false}
+                dense
+                onHost={setup?.bindPreset}
+                focusUp={shelfUp}
+                focusDown={shelfDown}
+                onPress={() => setEditor({ ...editor, showInput: true })}
+              />
+            )}
+            {editor.confirmOverwrite ? (
+              <TextButton testID="preset-overwrite" label="Update" color={accent} tenFoot={false} dense focusUp={shelfUp} focusDown={shelfDown} onPress={() => void commit(true)} />
+            ) : null}
+            <TextButton testID="preset-name-cancel" label="Cancel" color={accent} tenFoot={false} dense focusUp={shelfUp} focusDown={shelfDown} onPress={() => { setEditor(null); setNotice(null); }} />
+            {editor.confirmOverwrite ? null : (
+              <TextButton
+                testID="preset-name-confirm"
+                label={editor.intent === 'rename' ? 'Rename' : 'Save'}
+                color={accent}
+                tenFoot={false}
+                dense
+                onHost={editor.showInput ? setup?.bindPreset : undefined}
+                focusUp={shelfUp}
+                focusDown={shelfDown}
+                onPress={() => void commit(false)}
+              />
+            )}
+          </View>
+        ) : null}
+        {notice ? (
+          <Text style={[styles.help, { fontSize: labelSize }]} testID="preset-notice">
+            {notice}
+          </Text>
+        ) : null}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.wrap} testID={`presets-${mode}`}>
@@ -197,7 +385,7 @@ export function PresetShelf({
             {editor.intent === 'rename' ? 'Rename preset' : 'Save preset'}
           </Text>
           {editor.showInput ? (
-            <TextInput
+            <TvTextField
               testID="preset-name"
               accessibilityLabel="Preset name"
               value={editor.name}
@@ -286,19 +474,16 @@ function PresetCard({
   onRename: () => void;
   onDelete: () => void;
 }) {
-  const pointer = usePointerFocus();
   const tv = Platform.isTV === true;
   return (
     <View style={[styles.card, tenFoot && styles.cardTv, { borderColor: selected ? accent : chrome.line }]}>
-      <Pressable
+      <TvFocusPressable
+        accent={accent}
         accessibilityRole="button"
         accessibilityLabel={`${preset.name}. ${presetSummary(preset.config)}`}
         accessibilityHint="Loads this preset into the setup"
         testID={`preset-${preset.id}`}
         onPress={onLoad}
-        onFocus={pointer.onFocus}
-        onBlur={pointer.onBlur}
-        {...tvParallaxProps()}
         onLongPress={() => {
           Alert.alert(preset.name, 'Rename or delete this preset.', [
             { text: 'Rename', onPress: onRename },
@@ -306,17 +491,13 @@ function PresetCard({
             { text: 'Cancel', style: 'cancel' },
           ]);
         }}
-        style={({ pressed, focused }) => [
-          styles.cardMain,
-          pressed ? styles.pressed : null,
-          focusChrome(tv, Boolean(focused) || pointer.focused, accent),
-        ]}
+        style={({ pressed }) => [styles.cardMain, pressed ? styles.pressed : null]}
       >
         <Text style={[styles.presetName, tenFoot && styles.presetNameTv, tv && styles.presetNameFrame]} numberOfLines={2}>
           {preset.name}
         </Text>
         <Text style={[styles.presetMeta, tenFoot && styles.presetMetaTv, tv && styles.presetMetaFrame]}>{presetSummary(preset.config)}</Text>
-      </Pressable>
+      </TvFocusPressable>
       <View style={styles.cardActions}>
         <TextButton
           testID={`preset-start-${preset.id}`}
@@ -355,6 +536,10 @@ function TextButton({
   tenFoot,
   accessibilityLabel,
   prominent = false,
+  dense = false,
+  focusUp = null,
+  focusDown = null,
+  onHost,
 }: {
   label: string;
   onPress: () => void;
@@ -364,32 +549,49 @@ function TextButton({
   accessibilityLabel?: string;
   /** Apple TV only: draw a boxed button instead of a text link. Phones keep the text link. */
   prominent?: boolean;
+  /** Television shelf. A short focusable control so the setup still fits on one screen. */
+  dense?: boolean;
+  focusUp?: TvFocusTag | ComponentRef<typeof Pressable> | null;
+  focusDown?: TvFocusTag | ComponentRef<typeof Pressable> | null;
+  onHost?: (node: ComponentRef<typeof Pressable> | null) => void;
 }) {
-  const pointer = usePointerFocus();
   const tv = Platform.isTV === true;
-  const boxed = tv && prominent;
+  const { width, height } = useWindowDimensions();
+  const boxed = tv && prominent && !dense;
+  const denseHeight = Math.max(36, tvSetupScaled(44, width, height));
+  const denseFont = Math.max(15, tvSetupScaled(20, width, height));
   return (
-    <Pressable
+    <TvFocusPressable
+      accent={color}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       testID={testID}
       onPress={onPress}
-      onFocus={pointer.onFocus}
-      onBlur={pointer.onBlur}
-      {...tvParallaxProps()}
-      style={({ focused, pressed }) => [
+      onHost={onHost}
+      focusUp={focusUp}
+      focusDown={focusDown}
+      style={({ pressed }) => [
         styles.textButton,
-        tenFoot && styles.textButtonTv,
-        tv && styles.textButtonApple,
+        tenFoot && !dense && styles.textButtonTv,
+        tv && !dense && styles.textButtonApple,
+        dense && { minHeight: denseHeight, paddingHorizontal: Math.max(8, tvScaled(10, width, height)) },
         boxed && [styles.textButtonBoxedApple, { borderColor: color }],
         { opacity: pressed ? 0.72 : 1 },
-        focusChrome(tv, Boolean(focused) || pointer.focused, color),
       ]}
     >
-      <Text style={[styles.textButtonLabel, tenFoot && styles.textButtonLabelTv, tv && styles.textButtonLabelApple, boxed && styles.textButtonLabelBoxedApple, { color }]}>
+      <Text
+        style={[
+          styles.textButtonLabel,
+          tenFoot && !dense && styles.textButtonLabelTv,
+          tv && !dense && styles.textButtonLabelApple,
+          dense && { fontSize: denseFont },
+          boxed && styles.textButtonLabelBoxedApple,
+          { color },
+        ]}
+      >
         {label}
       </Text>
-    </Pressable>
+    </TvFocusPressable>
   );
 }
 
@@ -397,12 +599,39 @@ const styles = StyleSheet.create({
   wrap: {
     gap: 10,
   },
+  tvWrap: {
+    gap: 4,
+    maxWidth: '100%',
+    alignItems: 'center',
+  },
+  tvRow: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    maxWidth: '100%',
+  },
+  tvNames: {
+    flex: 1,
+    minWidth: 0,
+  },
+  tvNamesContent: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  tvName: {
+    flexShrink: 1,
+    fontFamily: 'Oswald',
+    color: chrome.text,
+  },
   heading: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
     flexWrap: 'wrap',
+    maxWidth: '100%',
   },
   headingActions: {
     flexDirection: 'row',
@@ -551,15 +780,18 @@ const styles = StyleSheet.create({
   },
   /** Border width stays fixed; focus only tints and scales, so tvOS focus does not resize the frame. */
   textButtonBoxedApple: {
-    minHeight: 112,
-    paddingHorizontal: 40,
-    borderRadius: 24,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    minHeight: 72,
+    paddingHorizontal: 22,
+    borderRadius: 18,
     borderWidth: 4,
-    backgroundColor: chrome.surface,
+    backgroundColor: 'transparent',
   },
   textButtonLabelBoxedApple: {
-    fontSize: 44,
-    letterSpacing: 0.6,
+    fontSize: 28,
+    letterSpacing: 0.4,
+    backgroundColor: 'transparent',
   },
   headingActionsApple: {
     gap: 20,

@@ -1,11 +1,40 @@
-/** Focus scale used on TV. Layout props stay constant so the focus engine is not asked to move mid-update. */
-export const TV_FOCUS_SCALE = 1.08;
+/** Focus scale used on TV. The same border width is drawn focused and idle so the frame does not resize mid-update. */
+export const TV_FOCUS_SCALE = 1.15;
+
+/** Bright ring that stays readable on a dark gym background from across the room. */
+export const TV_FOCUS_RING = '#F5C518';
+
+/** Thick enough to read on 720p and 1080p. Kept constant so focus does not change layout. */
+export const TV_FOCUS_BORDER = 5;
+
+/** Idle TV controls step back so the focused one is obvious. */
+export const TV_UNFOCUSED_OPACITY = 0.62;
 
 export interface FocusChrome {
   borderWidth?: number;
   borderColor?: string;
   backgroundColor?: string;
   transform?: { scale: number }[];
+  opacity?: number;
+  shadowColor?: string;
+  shadowOpacity?: number;
+  shadowRadius?: number;
+  shadowOffset?: { width: number; height: number };
+  elevation?: number;
+}
+
+export interface FocusOptions {
+  /** Retained for callers. TV focus uses a ring and glow instead of a fill. */
+  tint?: boolean;
+  /** Dim the control when it is not focused. */
+  dim?: boolean;
+  /** Scale the control up when focused. Off for text fields. */
+  scale?: boolean;
+  /**
+   * TV ring thickness. Idle and focused must use the same value.
+   * Defaults to the 1080p ring; callers pass a window-scaled width at 4K.
+   */
+  borderWidth?: number;
 }
 
 export interface StepperMetrics {
@@ -25,24 +54,58 @@ export interface TabBarMetrics {
   barContentHeight: number;
   gap: number;
   paddingHorizontal: number;
+  paddingTop: number;
+  paddingBottom: number;
+}
+
+function readFocusOptions(tintOrOptions: boolean | FocusOptions | undefined): {
+  dim: boolean;
+  scale: boolean;
+  borderWidth?: number;
+} {
+  if (typeof tintOrOptions === 'object') {
+    return {
+      dim: tintOrOptions.dim !== false,
+      scale: tintOrOptions.scale !== false,
+      borderWidth: tintOrOptions.borderWidth,
+    };
+  }
+  return { dim: true, scale: true };
 }
 
 /**
- * Phone focus draws a thicker border. TV focus only scales and tints.
- * `borderWidth` is omitted on TV so the focused view's frame does not change
- * while UIKit is still applying the focus update.
+ * Phone focus draws a thicker border and otherwise leaves the control alone.
+ * TV focus keeps `borderWidth` constant and changes color, scale, opacity, and glow.
+ * Changing border width during a tvOS focus update resizes the frame and quits the app.
  */
-export function focusChrome(tv: boolean, focused: boolean, color: string, tint = true): FocusChrome | null {
+export function focusChrome(
+  tv: boolean,
+  focused: boolean,
+  color: string,
+  tintOrOptions: boolean | FocusOptions = true,
+): FocusChrome | null {
+  const options = readFocusOptions(tintOrOptions);
   if (!tv) {
     if (!focused) return null;
     return { borderWidth: 6, borderColor: color };
   }
-  if (!focused) return { transform: [{ scale: 1 }] };
+  const borderWidth = options.borderWidth ?? TV_FOCUS_BORDER;
   const chrome: FocusChrome = {
-    borderColor: color,
-    transform: [{ scale: TV_FOCUS_SCALE }],
+    borderWidth,
+    shadowOffset: { width: 0, height: 0 },
   };
-  if (tint) chrome.backgroundColor = tintHex(color, 0.3);
+  if (options.scale) chrome.transform = [{ scale: focused ? TV_FOCUS_SCALE : 1 }];
+  if (options.dim) chrome.opacity = focused ? 1 : TV_UNFOCUSED_OPACITY;
+  if (!focused) {
+    chrome.shadowOpacity = 0;
+    chrome.elevation = 0;
+    return chrome;
+  }
+  chrome.borderColor = TV_FOCUS_RING;
+  chrome.shadowColor = TV_FOCUS_RING;
+  chrome.shadowOpacity = 0.9;
+  chrome.shadowRadius = Math.round(16 * (borderWidth / TV_FOCUS_BORDER));
+  chrome.elevation = 12;
   return chrome;
 }
 
@@ -55,20 +118,116 @@ export function tintHex(color: string, alpha: number): string {
   return `rgba(${red},${green},${blue},${alpha})`;
 }
 
-/** Phone stepper metrics match the existing iPhone stylesheet. */
-export function stepperControlSize(tv: boolean): StepperMetrics {
+/**
+ * Setup and Rounds controls sit larger than the first compact pass, about a quarter,
+ * so a 1080p form fills more of the screen without spanning the bezel.
+ * Below 700px tall the growth eases off so a 960×540 frame still fits.
+ */
+export const TV_SETUP_SCALE = 1.25;
+
+export function tvSetupScale(screenHeight: number): number {
+  const height = screenHeight > 0 ? screenHeight : 1080;
+  if (height >= 720) return TV_SETUP_SCALE;
+  const t = Math.min(1, Math.max(0, (height - 540) / (720 - 540)));
+  return 1 + (TV_SETUP_SCALE - 1) * t;
+}
+
+function setupBasis(at1080: number, screenHeight: number): number {
+  return Math.round(at1080 * tvSetupScale(screenHeight));
+}
+
+/** Phone stepper metrics match the existing iPhone stylesheet. TV sizes scale from 1080p. Compact rows fit a whole setup on one screen. */
+export function stepperControlSize(tv: boolean, screenHeight = 1080, compact = false): StepperMetrics {
   if (!tv) {
     return { button: 52, glyph: 32, value: 32, suffix: 12, gap: 8, radius: 14, valueMinWidth: 56 };
   }
-  return { button: 120, glyph: 68, value: 60, suffix: 24, gap: 22, radius: 28, valueMinWidth: 108 };
+  const scale = Math.max(0.6, screenHeight / 1080);
+  const buttonBasis = compact ? setupBasis(56, screenHeight) : 96;
+  const glyphBasis = compact ? setupBasis(36, screenHeight) : 68;
+  const valueBasis = compact ? setupBasis(32, screenHeight) : 60;
+  const suffixBasis = compact ? setupBasis(14, screenHeight) : 24;
+  const gapBasis = compact ? setupBasis(8, screenHeight) : 22;
+  const radiusBasis = compact ? setupBasis(14, screenHeight) : 28;
+  const valueWidthBasis = compact ? setupBasis(48, screenHeight) : 108;
+  return {
+    button: Math.round(buttonBasis * scale),
+    glyph: Math.round(glyphBasis * scale),
+    value: Math.round(valueBasis * scale),
+    suffix: Math.round(suffixBasis * scale),
+    gap: Math.round(gapBasis * scale),
+    radius: Math.round(radiusBasis * scale),
+    valueMinWidth: Math.round(valueWidthBasis * scale),
+  };
 }
 
-/** Phone tab metrics match the existing iPhone tab bar. TV labels are 10-foot size. */
-export function tabBarControlSize(tv: boolean): TabBarMetrics {
+/**
+ * Phone tab metrics match the existing iPhone tab bar.
+ * TV metrics scale from 1080p with the window height, and the side inset is 5% of the width
+ * so a 960-wide Fire TV window still clears overscan. A 4K window doubles the type.
+ */
+export function tabBarControlSize(tv: boolean, screenHeight = 1080, screenWidth = 0): TabBarMetrics {
   if (!tv) {
-    return { label: 13, icon: 16, itemMinHeight: 49, barContentHeight: 64, gap: 0, paddingHorizontal: 0 };
+    return {
+      label: 13,
+      icon: 16,
+      itemMinHeight: 49,
+      barContentHeight: 64,
+      gap: 0,
+      paddingHorizontal: 0,
+      paddingTop: 6,
+      paddingBottom: 0,
+    };
   }
-  return { label: 48, icon: 56, itemMinHeight: 132, barContentHeight: 176, gap: 28, paddingHorizontal: 60 };
+  const height = screenHeight > 0 ? screenHeight : 1080;
+  const width = screenWidth > 0 ? screenWidth : Math.round(height * (16 / 9));
+  const scale = height / 1080;
+  const paddingHorizontal = Math.max(Math.round(width * 0.05), Math.round(60 * (width / 1920)));
+  return {
+    label: Math.max(16, Math.round(40 * scale)),
+    icon: Math.max(18, Math.round(44 * scale)),
+    itemMinHeight: Math.max(48, Math.round(104 * scale)),
+    barContentHeight: Math.max(64, Math.round(132 * scale)),
+    gap: Math.max(8, Math.round(16 * scale)),
+    paddingHorizontal,
+    paddingTop: Math.max(6, Math.round(12 * scale)),
+    paddingBottom: Math.max(6, Math.round(10 * scale)),
+  };
+}
+
+/** Height of the TV tab bar, including its own padding. */
+export function tvTabBarHeight(screenHeight: number, bottomInset = 0, screenWidth = 0): number {
+  const tab = tabBarControlSize(true, screenHeight, screenWidth);
+  return tab.paddingTop + tab.barContentHeight + Math.max(bottomInset, tab.paddingBottom);
+}
+
+export interface PhoneTabBarFrame {
+  /** Full bar height. Includes the bottom safe-area inset. */
+  height: number;
+  paddingTop: number;
+  /**
+   * Bottom padding equal to the safe-area inset.
+   * The letter and label sit in the band above this padding.
+   */
+  paddingBottom: number;
+}
+
+/**
+ * Phone tab bar frame for a custom numeric height.
+ *
+ * Expo Router uses that height as the entire bar and still pads the bottom by
+ * the safe-area inset. The inset has to be part of the height too, or the
+ * letter and label are squeezed into the home indicator (iPhone) or the
+ * navigation bar (Android gesture and 3-button). An inset of 0 — a Home-button
+ * iPhone — keeps the 64pt band. Television uses `tvTabBarHeight` instead.
+ */
+export function phoneTabBarFrame(bottomInset = 0): PhoneTabBarFrame {
+  const tab = tabBarControlSize(false);
+  const inset = Number.isFinite(bottomInset) && bottomInset > 0 ? bottomInset : 0;
+  return {
+    height: tab.barContentHeight + inset,
+    paddingTop: tab.paddingTop,
+    paddingBottom: inset,
+  };
 }
 
 /** Apple TV and Android TV have no Taptic Engine or vibration motor for this app. */

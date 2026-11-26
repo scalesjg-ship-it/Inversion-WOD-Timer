@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { contrastRatio, digitColor, hsvToHex, normalizeHex, phaseLabelInk, readableDigitColor, relativeLuminance } from './color';
-import { THEME_PRESETS } from './types';
+import { contrastRatio, digitColor, hsvToHex, normalizeHex, phaseLabelInk, readableDigitColor, relativeLuminance, sameHex } from './color';
+import { COLOR_PALETTES } from './palettes';
 
 describe('brand colors', () => {
+  it('matches the selected swatch without caring about case', () => {
+    expect(sameHex('#4c8dff', '#4C8DFF')).toBe(true);
+    expect(sameHex('80ff00', '#80FF00')).toBe(true);
+    expect(sameHex('#4C8DFF', '#80FF00')).toBe(false);
+    expect(sameHex('blue', '#0000FF')).toBe(false);
+  });
+
   it('accepts six-digit hex with or without a hash', () => {
     expect(normalizeHex('#ff4d2e')).toBe('#FF4D2E');
     expect(normalizeHex('3ddc97')).toBe('#3DDC97');
@@ -40,7 +47,7 @@ describe('brand colors', () => {
     expect(phaseLabelInk('#3DDC97', '#F4F7FB', '#FFFFFF')).toBe('#07080A');
     expect(phaseLabelInk('#FF4D2E', '#F4F7FB', '#FFFFFF')).toBe('#FF4D2E');
 
-    for (const theme of THEME_PRESETS) {
+    for (const theme of COLOR_PALETTES) {
       for (const accent of [theme.workColor, theme.restColor, theme.leadInColor, theme.warningColor, '#07080A', '#FFFFFF']) {
         expect(contrastRatio(phaseLabelInk(accent, theme.digitColor, theme.backgroundColor), theme.backgroundColor)).toBeGreaterThanOrEqual(3);
       }

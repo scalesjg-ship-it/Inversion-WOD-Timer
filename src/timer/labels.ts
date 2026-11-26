@@ -9,12 +9,8 @@ export function modeTitle(mode: TimerMode): string {
       return 'AMRAP';
     case 'emom':
       return 'EMOM';
-    case 'tabata':
-      return 'Tabata';
     case 'intervals':
       return 'Intervals';
-    case 'rounds':
-      return 'Rounds';
     case 'countdown':
       return 'Countdown';
     default: {
@@ -38,11 +34,7 @@ export function phaseLabel(phase: Phase, mode: TimerMode): string {
           return 'AMRAP';
         case 'emom':
           return 'Work';
-        case 'tabata':
-          return 'Work';
         case 'intervals':
-          return 'Work';
-        case 'rounds':
           return 'Work';
         case 'countdown':
           return 'Countdown';

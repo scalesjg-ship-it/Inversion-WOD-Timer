@@ -18,15 +18,7 @@ export type PresetResult = { ok: true; preset: SavedPreset } | { ok: false; reas
 export const PRESET_STORAGE_KEY = 'americana.presets.v1';
 export const PRESET_DOCUMENT_VERSION = 2;
 
-const TIMER_MODES: readonly TimerMode[] = [
-  'forTime',
-  'amrap',
-  'emom',
-  'tabata',
-  'intervals',
-  'rounds',
-  'countdown',
-];
+const TIMER_MODES: readonly TimerMode[] = ['forTime', 'amrap', 'emom', 'intervals', 'countdown'];
 
 const NAME_MAX = 48;
 
@@ -40,6 +32,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isTimerMode(value: unknown): value is TimerMode {
   return typeof value === 'string' && (TIMER_MODES as readonly string[]).includes(value);
+}
+
+/** Stored Tabata and Rounds clocks are Intervals. The timings stay on the preset. */
+function canonicalMode(value: unknown): TimerMode | null {
+  if (value === 'tabata' || value === 'rounds') return 'intervals';
+  return isTimerMode(value) ? value : null;
 }
 
 function sameName(left: string, right: string): boolean {
@@ -64,12 +62,8 @@ export function suggestPresetName(config: TimerConfig): string {
       return `AMRAP ${formatSeconds(normalized.workSeconds)}`;
     case 'emom':
       return `EMOM ${formatSeconds(normalized.workSeconds)} × ${normalized.rounds}`;
-    case 'tabata':
-      return `Tabata ${formatSeconds(normalized.workSeconds)}/${formatSeconds(normalized.restSeconds)} × ${normalized.rounds}`;
     case 'intervals':
       return `Intervals ${formatSeconds(normalized.workSeconds)}/${formatSeconds(normalized.restSeconds)} × ${normalized.rounds}`;
-    case 'rounds':
-      return `Rounds ${formatSeconds(normalized.workSeconds)}/${formatSeconds(normalized.restSeconds)} × ${normalized.rounds}`;
     case 'countdown':
       return `Countdown ${formatSeconds(normalized.workSeconds)}`;
     default: {
@@ -91,10 +85,7 @@ export function presetSummary(config: TimerConfig): string {
       return `${lead} · ${formatSeconds(normalized.workSeconds)}`;
     case 'emom':
       return `${lead} · every ${formatSeconds(normalized.workSeconds)} · ${normalized.rounds} rounds`;
-    case 'tabata':
-    case 'intervals':
-      return `${lead} · ${formatSeconds(normalized.workSeconds)} on / ${formatSeconds(normalized.restSeconds)} off · ${normalized.rounds} rounds`;
-    case 'rounds': {
+    case 'intervals': {
       const warn = normalized.warningSeconds > 0 ? ` · warn ${normalized.warningSeconds}s` : '';
       return `${lead} · ${formatSeconds(normalized.workSeconds)} on / ${formatSeconds(normalized.restSeconds)} off · ${normalized.rounds} rounds${warn}`;
     }
@@ -153,13 +144,12 @@ function configFromParts(
 }
 
 function sanitizeSaved(value: unknown, index: number): SavedPreset | null {
-  if (!isRecord(value) || !isTimerMode(value.mode)) return null;
-  if (typeof value.id !== 'string' || value.id.length === 0 || typeof value.name !== 'string') return null;
+  if (!isRecord(value)) return null;
+  const mode = canonicalMode(value.mode);
+  if (!mode || typeof value.id !== 'string' || value.id.length === 0 || typeof value.name !== 'string') return null;
   const name = normalizePresetName(value.name);
-  if (!name || !isRecord(value.config) || !isTimerMode(value.config.mode) || value.config.mode !== value.mode) {
-    return null;
-  }
-  const config = configFromParts(value.mode, {
+  if (!name || !isRecord(value.config) || canonicalMode(value.config.mode) !== mode) return null;
+  const config = configFromParts(mode, {
     leadInSeconds: numberField(value.config.leadInSeconds) ?? 0,
     workSeconds: numberField(value.config.workSeconds) ?? 0,
     restSeconds: numberField(value.config.restSeconds) ?? 0,
@@ -220,8 +210,8 @@ function legacyRound(value: Record<string, unknown>, index: number): SavedPreset
   return {
     id: value.id,
     name,
-    mode: 'rounds',
-    config: configFromParts('rounds', {
+    mode: 'intervals',
+    config: configFromParts('intervals', {
       leadInSeconds,
       workSeconds: roundSeconds,
       restSeconds,
@@ -248,18 +238,43 @@ function collect(items: readonly unknown[]): SavedPreset[] {
     seen.add(preset.id);
     presets.push(preset);
   });
-  return sortPresets(presets);
+  return sortPresets(keepBothNames(presets));
+}
+
+/** Two clocks that shared a name in different modes both survive as Intervals. */
+function keepBothNames(presets: readonly SavedPreset[]): SavedPreset[] {
+  const used = new Set<string>();
+  return presets.map((preset) => {
+    let name = preset.name;
+    let key = `${preset.mode}\n${name.toLocaleLowerCase()}`;
+    if (!used.has(key)) {
+      used.add(key);
+      return preset;
+    }
+    let suffix = 2;
+    while (suffix < 1000) {
+      const stamp = ` ${suffix}`;
+      name = `${preset.name.slice(0, NAME_MAX - stamp.length)}${stamp}`;
+      key = `${preset.mode}\n${name.toLocaleLowerCase()}`;
+      if (!used.has(key)) break;
+      suffix += 1;
+    }
+    used.add(key);
+    return name === preset.name ? preset : { ...preset, name };
+  });
 }
 
 export function readStoredPresets(parsed: unknown): { presets: SavedPreset[]; migrated: boolean } {
   if (parsed == null) return { presets: [], migrated: false };
   if (Array.isArray(parsed)) return { presets: collect(parsed), migrated: true };
-  if (!isRecord(parsed) || parsed.version !== PRESET_DOCUMENT_VERSION || !Array.isArray(parsed.presets)) {
-    return { presets: [], migrated: false };
+  if (isRecord(parsed) && parsed.version === PRESET_DOCUMENT_VERSION && Array.isArray(parsed.presets)) {
+    const presets = collect(parsed.presets);
+    const migrated = JSON.stringify(presets) !== JSON.stringify(parsed.presets);
+    return { presets, migrated };
   }
-  const presets = collect(parsed.presets);
-  const migrated = JSON.stringify(presets) !== JSON.stringify(parsed.presets);
-  return { presets, migrated };
+  const single = migrateItem(parsed, 0);
+  if (single) return { presets: [single], migrated: true };
+  return { presets: [], migrated: false };
 }
 
 export function serializePresetDocument(presets: readonly SavedPreset[]): string {

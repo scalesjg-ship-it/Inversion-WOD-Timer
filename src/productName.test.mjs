@@ -5,7 +5,33 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const TEXT_EXT = new Set(['.ts', '.tsx', '.js', '.mjs', '.json', '.md', '.html', '.css', '.py', '.svg', '.txt']);
+const TEXT_EXT = new Set([
+  '.ts',
+  '.tsx',
+  '.js',
+  '.mjs',
+  '.json',
+  '.md',
+  '.html',
+  '.css',
+  '.py',
+  '.svg',
+  '.txt',
+  '.plist',
+  '.yml',
+  '.yaml',
+  '.swift',
+  '.kt',
+  '.m',
+]);
+
+/** Target, scheme, module, and service names that must stay `Americana`. */
+const IDENTIFIER =
+  /Americana(?=Watch|UITests|Remote|Menu|Presses|Post|Install|Pop|-Timer|\.(?:app|xcodeproj|xcworkspace|xcarchive|ipa|xcscheme|xcresult)|\/)|__AMERICANA_PREVIEW_TV|AMERICANA_TVOS_NO_PKCS12|Americana (?:tvOS|iOS|Watch|target|scheme|build|bundle)|["']Americana["']|name = Americana|productName = Americana|SCHEME=Americana|\/ "Americana"|f"Americana |\/\* Americana \*\/|file added: Americana|to Americana and/g;
+
+function withoutIdentifiers(text) {
+  return text.replace(IDENTIFIER, '');
+}
 
 function textFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -47,10 +73,15 @@ describe('product name', () => {
     expect(readFileSync(join(ROOT, 'app/timer.tsx'), 'utf8')).toContain("'americana-timer'");
     expect(readFileSync(join(ROOT, 'src/branding/storage.ts'), 'utf8')).toContain("'americana.branding.v1'");
 
+    const watchPlist = readFileSync(join(ROOT, 'targets/watch/Info.plist'), 'utf8');
+    expect(watchPlist).toContain('<key>CFBundleDisplayName</key>\n  <string>Anthem Gym Timer</string>');
+    expect(watchPlist).toContain('<key>CFBundleName</key>\n  <string>Anthem Gym Timer</string>');
+    expect(watchPlist).toContain('<string>Americana-Timer</string>');
+
     const self = join(ROOT, 'src/productName.test.mjs');
     const hits = textFiles(ROOT).filter((path) => {
       if (path === self) return false;
-      const text = readFileSync(path, 'utf8');
+      const text = withoutIdentifiers(readFileSync(path, 'utf8'));
       return text.includes('Americana') || text.includes('AMERICANA');
     });
     expect(hits.map((path) => relative(ROOT, path))).toEqual([]);

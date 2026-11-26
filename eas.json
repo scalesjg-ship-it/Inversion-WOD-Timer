@@ -46,6 +46,18 @@
       },
       "channel": "production-android-apk"
     },
+    "production-google-play": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "env": {
+        "EXPO_TV": "1",
+        "EXPO_KEEP_ADAPTIVE_ICON": "1"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "channel": "production-google-play"
+    },
     "production-firetv": {
       "autoIncrement": true,
       "distribution": "internal",

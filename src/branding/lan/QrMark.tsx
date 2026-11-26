@@ -1,47 +1,40 @@
 import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import Svg, { Path, Rect } from 'react-native-svg';
 
-import { moduleRuns, qrModules } from './qrMatrix';
+import { tvScaled } from '@/src/tv/layout';
 
-const TARGET_PX = 520;
+import { QR_MARK_AT_1080, qrMarkSide, qrModules, qrSvgPath } from './qrMatrix';
 
 export function QrMark({ value }: { value: string }) {
+  const { width, height } = useWindowDimensions();
   const matrix = useMemo(() => qrModules(value), [value]);
-  const module = Math.max(8, Math.floor(TARGET_PX / Math.max(matrix.length, 1)));
-  const side = module * matrix.length;
+  const path = useMemo(() => qrSvgPath(matrix), [matrix]);
+  const modules = Math.max(matrix.length, 1);
+  const side = qrMarkSide(tvScaled(QR_MARK_AT_1080, width, height), modules);
   return (
     <View
       testID="tv-brand-qr"
       focusable={false}
+      accessible={false}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={styles.card}
     >
-      <View style={{ width: side, height: side }}>
-        {matrix.map((row, y) => (
-          <View key={y} style={{ flexDirection: 'row', height: module }}>
-            {moduleRuns(row).map((run, index) => (
-              <View
-                key={index}
-                style={{
-                  width: run.length * module,
-                  height: module,
-                  backgroundColor: run.dark ? '#07080A' : '#FFFFFF',
-                }}
-              />
-            ))}
-          </View>
-        ))}
-      </View>
+      <Svg width={side} height={side} viewBox={`0 0 ${modules} ${modules}`} accessible={false}>
+        <Rect x={0} y={0} width={modules} height={modules} fill="#FFFFFF" />
+        <Path d={path} fill="#000000" />
+      </Svg>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 8,
+    padding: 8,
+    overflow: 'hidden',
   },
 });

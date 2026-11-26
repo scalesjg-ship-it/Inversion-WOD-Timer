@@ -14,6 +14,17 @@ describe('saved gym branding', () => {
     expect(saved.logoPlacement).toBe('watermark');
     expect(saved.workColor).toBe('#FF4D2E');
     expect(saved.backgroundColor).toBe('#07080A');
+    expect(saved.clockWeight).toBe('bold');
+    expect(saved.backgroundStyle).toBe('solid');
+  });
+
+  it('keeps a saved clock weight and background style and ignores unknown ones', () => {
+    const saved = sanitizeBranding({ clockWeight: 'regular', backgroundStyle: 'vignette' });
+    expect(saved.clockWeight).toBe('regular');
+    expect(saved.backgroundStyle).toBe('vignette');
+    const ignored = sanitizeBranding({ clockWeight: 'thin', backgroundStyle: 'gradient' });
+    expect(ignored.clockWeight).toBe('bold');
+    expect(ignored.backgroundStyle).toBe('solid');
   });
 
   it('reads older work and rest colors and fills the newer roles', () => {

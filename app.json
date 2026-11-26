@@ -3,23 +3,24 @@
     "name": "Anthem Gym Timer",
     "slug": "americana",
     "owner": "scalesgym",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "americana",
     "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "com.garrettscales.americana",
+      "buildNumber": "24",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Anthem Gym Timer uses your photo library so your gym logo can appear on the timer.",
-        "NSLocalNetworkUsageDescription": "Anthem Gym Timer listens on your Wi-Fi so a phone on the same network can send a gym logo to this TV. The logo is saved on this TV and is not sent to a server.",
-        "UIBackgroundModes": ["audio"]
+        "NSLocalNetworkUsageDescription": "Anthem Gym Timer listens on your Wi-Fi so a phone on the same network can send a gym logo to this TV. The logo is saved on this TV and is not sent to a server."
       }
     },
     "android": {
       "package": "com.garrettscales.americana",
+      "versionCode": 20,
       "adaptiveIcon": {
         "backgroundColor": "#07080A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -44,9 +45,14 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/withPlayAdaptiveIcon",
+      "./plugins/withOptionalWifi",
       "expo-router",
       "./plugins/withTvLogoLan",
+      "./plugins/withTvTcpSocket",
       "expo-image",
+      "./plugins/withCenteredSplash",
+      "./plugins/withTvBuildNumber",
       [
         "expo-splash-screen",
         {
@@ -56,6 +62,8 @@
           "imageWidth": 280
         }
       ],
+      "./plugins/withTvForegroundAudio",
+      "./plugins/withTvMenuKey",
       [
         "expo-audio",
         {
@@ -104,11 +112,26 @@
             "./assets/sounds/start.wav",
             "./assets/sounds/warning.wav",
             "./assets/sounds/bell.wav",
-            "./assets/sounds/tick.wav"
+            "./assets/sounds/tick.wav",
+            "./assets/sounds/three.wav",
+            "./assets/sounds/two.wav",
+            "./assets/sounds/one.wav"
           ],
           "enableRemoteNotifications": false
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ],
+      "./plugins/withAndroidSystemBars",
+      "./plugins/withAndroidResourceKeeps",
+      "./plugins/withAppleWatch"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,7 +1,8 @@
 import { AppState, Platform } from 'react-native';
 
+import { CUE_SOUND_FILE, notificationFallbackSound } from './cueFiles';
 import { notificationPlan, selectUpcoming } from '@/src/timer/notificationPlan';
-import type { EngineState, SoundName } from '@/src/timer/types';
+import type { CueScheduleOptions, EngineState, SoundName } from '@/src/timer/types';
 import { allowsSystemNotifications } from '@/src/tv/controls';
 
 // expo-notifications has no tvOS native module and throws when imported there,
@@ -14,13 +15,6 @@ function loadNotifications(): Promise<NotificationsModule> {
   notificationsModule ??= import('expo-notifications');
   return notificationsModule;
 }
-
-const SOUND_FILE: Record<SoundName, string> = {
-  tick: 'tick.wav',
-  warning: 'warning.wav',
-  start: 'start.wav',
-  bell: 'bell.wav',
-};
 
 const PENDING_LIMIT = 60;
 
@@ -46,17 +40,19 @@ async function ensureNotifications(): Promise<NotificationsModule | null> {
         };
       },
     });
-    await Promise.all(
-      (Object.keys(SOUND_FILE) as SoundName[]).map((sound) =>
-        notifications.setNotificationChannelAsync(channelId(sound), {
+    for (const sound of Object.keys(CUE_SOUND_FILE) as SoundName[]) {
+      try {
+        await notifications.setNotificationChannelAsync(channelId(sound), {
           name: `Anthem Gym Timer ${sound}`,
           importance: notifications.AndroidImportance.MAX,
-          sound: SOUND_FILE[sound],
+          sound: CUE_SOUND_FILE[sound],
           vibrationPattern: [0, 180, 80, 180],
           lockscreenVisibility: notifications.AndroidNotificationVisibility.PUBLIC,
-        }),
-      ),
-    );
+        });
+      } catch {
+        // A voice channel that this binary cannot install must not block the horns.
+      }
+    }
     ready = true;
   }
 
@@ -78,10 +74,32 @@ export async function clearScheduledCues(): Promise<void> {
   }
 }
 
+async function scheduleOne(
+  notifications: NotificationsModule,
+  entry: { fireAtMs: number; item: { title: string; body: string; sound: SoundName } },
+  sound: SoundName,
+): Promise<void> {
+  await notifications.scheduleNotificationAsync({
+    content: {
+      title: entry.item.title,
+      body: entry.item.body,
+      sound: CUE_SOUND_FILE[sound],
+      interruptionLevel: 'active',
+    },
+    trigger: {
+      type: notifications.SchedulableTriggerInputTypes.DATE,
+      date: new Date(entry.fireAtMs),
+      channelId: channelId(sound),
+      delivery: 'alarmClock',
+    },
+  });
+}
+
 export async function syncScheduledCues(
   state: EngineState,
   nowMs: number,
   gymName: string,
+  options?: CueScheduleOptions,
 ): Promise<void> {
   if (state.status !== 'running') {
     await clearScheduledCues();
@@ -95,23 +113,20 @@ export async function syncScheduledCues(
     if (!notifications || ticket !== generation) return;
     await notifications.cancelAllScheduledNotificationsAsync();
     if (ticket !== generation) return;
-    const plan = selectUpcoming(notificationPlan(state, gymName), state, nowMs, PENDING_LIMIT);
+    const plan = selectUpcoming(notificationPlan(state, gymName, options), state, nowMs, PENDING_LIMIT);
     for (const entry of plan) {
       if (ticket !== generation) return;
-      await notifications.scheduleNotificationAsync({
-        content: {
-          title: entry.item.title,
-          body: entry.item.body,
-          sound: SOUND_FILE[entry.item.sound],
-          interruptionLevel: 'active',
-        },
-        trigger: {
-          type: notifications.SchedulableTriggerInputTypes.DATE,
-          date: new Date(entry.fireAtMs),
-          channelId: channelId(entry.item.sound),
-          delivery: 'alarmClock',
-        },
-      });
+      try {
+        await scheduleOne(notifications, entry, entry.item.sound);
+      } catch {
+        const fallback = notificationFallbackSound(entry.item.sound);
+        if (!fallback || ticket !== generation) continue;
+        try {
+          await scheduleOne(notifications, entry, fallback);
+        } catch {
+          // One missing clip should not drop the bells that follow.
+        }
+      }
     }
   } catch {
     // Locked-screen bells require a dev or production build and notification permission.

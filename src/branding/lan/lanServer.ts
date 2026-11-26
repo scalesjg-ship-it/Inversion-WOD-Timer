@@ -1,5 +1,7 @@
-import TcpSocket from 'react-native-tcp-socket';
+import { NativeModules } from 'react-native';
 
+import { isReachableLanIPv4 } from './address';
+import { encodeUtf8 } from './bytes';
 import { encodeHtmlResponse, HttpAccumulator } from './http';
 import { messagePage } from './page';
 import type { LogoTransferSession } from './session';
@@ -8,6 +10,41 @@ export type LanServer = {
   port: number;
   close: () => void;
 };
+
+/**
+ * Apple TV's binary has no TcpSockets class: `SecPKCS12Import` is not in the
+ * tvOS SDK, so the pod that claims tvOS support never registers. Importing
+ * `react-native-tcp-socket` anyway runs `new NativeEventEmitter(null)` and
+ * Expo rewrites that into "a native module that doesn't exist", which is the
+ * Brand-tab error boundary. Load it only after the class is actually there.
+ */
+export class LanListenerUnavailableError extends Error {
+  constructor() {
+    super('This TV cannot open a Wi-Fi link for a logo. Paste an https image link below to save one on this TV.');
+    this.name = 'LanListenerUnavailableError';
+  }
+}
+
+type TcpSocketModule = typeof import('react-native-tcp-socket').default;
+
+async function loadTcpSocket(): Promise<TcpSocketModule> {
+  let sockets: unknown;
+  try {
+    sockets = NativeModules.TcpSockets;
+  } catch {
+    throw new LanListenerUnavailableError();
+  }
+  if (sockets == null) throw new LanListenerUnavailableError();
+  try {
+    const loaded = await import('react-native-tcp-socket');
+    const tcp = loaded.default;
+    if (tcp == null || typeof tcp.createServer !== 'function') throw new LanListenerUnavailableError();
+    return tcp;
+  } catch (error) {
+    if (error instanceof LanListenerUnavailableError) throw error;
+    throw new LanListenerUnavailableError();
+  }
+}
 
 /** Methods used from react-native-tcp-socket. The package types do not re-export the socket class. */
 type ConnectedSocket = {
@@ -20,7 +57,36 @@ type ConnectedSocket = {
   setTimeout(ms: number): void;
 };
 
-export function startLanServer(session: LogoTransferSession): Promise<LanServer> {
+/**
+ * Ask the TV which address it would use to reach the internet.
+ * Fire TV on Ethernet often has no Wi-Fi address. The socket is closed as soon as it connects.
+ */
+export async function readRouteLanAddress(): Promise<string> {
+  const TcpSocket = await loadTcpSocket();
+  return await new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (ip: string) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        socket.destroy();
+      } catch {
+        // The probe socket may already be closed.
+      }
+      if (isReachableLanIPv4(ip)) resolve(ip);
+      else reject(new Error('This TV could not find an address on the local network.'));
+    };
+    const timer = setTimeout(() => finish(''), 3000);
+    const socket = TcpSocket.createConnection({ port: 443, host: '1.1.1.1' }, () => {
+      finish(typeof socket.localAddress === 'string' ? socket.localAddress : '');
+    });
+    socket.on('error', () => finish(''));
+  });
+}
+
+export async function startLanServer(session: LogoTransferSession): Promise<LanServer> {
+  const TcpSocket = await loadTcpSocket();
   const sockets = new Set<ConnectedSocket>();
   const server = TcpSocket.createServer({ noDelay: true }, (socket) => {
     const connected = socket as unknown as ConnectedSocket;
@@ -112,7 +178,7 @@ function serveConnection(socket: ConnectedSocket, session: LogoTransferSession):
 }
 
 function asBytes(data: Uint8Array | string): Uint8Array {
-  if (typeof data === 'string') return new TextEncoder().encode(data);
+  if (typeof data === 'string') return encodeUtf8(data);
   const copy = new Uint8Array(data.byteLength);
   copy.set(data);
   return copy;

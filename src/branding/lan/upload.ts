@@ -1,5 +1,6 @@
 import { normalizeHex } from '../color';
 import type { BrandColors, LogoPlacement } from '../types';
+import { decodeLatin1, decodeUtf8, encodeLatin1 } from './bytes';
 import { MAX_IMAGE_BYTES } from './limits';
 
 const HEIC_BRANDS = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs', 'mif1', 'msf1']);
@@ -123,7 +124,7 @@ export function decideUpload(parts: MultipartPart[]): UploadDecision {
 export function textField(parts: MultipartPart[], name: string): string {
   const part = parts.find((item) => item.name === name && !item.filename);
   if (!part) return '';
-  return new TextDecoder('utf-8', { fatal: false }).decode(part.body).replace(/\0/g, '').trim();
+  return decodeUtf8(part.body).replace(/\0/g, '').trim();
 }
 
 function wantsColors(value: string): boolean {
@@ -185,11 +186,11 @@ function dispositionParam(header: string | null, key: string): string | undefine
 }
 
 function latin1(bytes: Uint8Array): string {
-  return new TextDecoder('latin1').decode(bytes);
+  return decodeLatin1(bytes);
 }
 
 function latin1Bytes(value: string): Uint8Array {
-  return new TextEncoder().encode(value);
+  return encodeLatin1(value);
 }
 
 function indexOfBytes(haystack: Uint8Array, needle: Uint8Array, from = 0): number {

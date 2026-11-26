@@ -1,3 +1,4 @@
+import { decodeLatin1, encodeUtf8 } from './bytes';
 import { MAX_BODY_BYTES, MAX_HEADER_BYTES } from './limits';
 
 const HEADER_END = new Uint8Array([13, 10, 13, 10]);
@@ -96,7 +97,7 @@ export class HttpAccumulator {
 }
 
 export function encodeHtmlResponse(status: number, html: string): Uint8Array {
-  const body = new TextEncoder().encode(html);
+  const body = encodeUtf8(html);
   const reason = STATUS_TEXT[status] ?? 'OK';
   const head = [
     `HTTP/1.1 ${status} ${reason}`,
@@ -105,12 +106,12 @@ export function encodeHtmlResponse(status: number, html: string): Uint8Array {
     'Connection: close',
     'Cache-Control: no-store',
     'Referrer-Policy: no-referrer',
-    "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'self'; base-uri 'none'",
+    "Content-Security-Policy: default-src 'none'; img-src blob:; connect-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'self'; base-uri 'none'",
     'X-Content-Type-Options: nosniff',
     '',
     '',
   ].join('\r\n');
-  const headBytes = new TextEncoder().encode(head);
+  const headBytes = encodeUtf8(head);
   const out = new Uint8Array(headBytes.length + body.length);
   out.set(headBytes, 0);
   out.set(body, headBytes.length);
@@ -120,7 +121,7 @@ export function encodeHtmlResponse(status: number, html: string): Uint8Array {
 function parseHead(headerBytes: Uint8Array):
   | { type: 'error'; status: number; message: string }
   | { type: 'head'; head: Omit<ParsedRequest, 'body'>; bodyLength: number } {
-  const text = new TextDecoder('latin1').decode(headerBytes);
+  const text = decodeLatin1(headerBytes);
   const lines = text.split('\r\n');
   const requestLine = lines[0] ?? '';
   const match = /^([A-Z]+)\s+(\S+)\s+HTTP\/1\.[01]$/.exec(requestLine);

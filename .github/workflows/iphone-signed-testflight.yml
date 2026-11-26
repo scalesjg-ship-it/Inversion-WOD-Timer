@@ -1,0 +1,320 @@
+# Signed iPhone + Apple Watch archive uploaded to TestFlight for internal testing.
+#
+# Manual only. A push to main must not build or upload a signed iOS binary.
+# The IPA stays on the runner and is deleted in the cleanup step. It is not a
+# GitHub Actions artifact: this repository is public.
+#
+# Team is fixed to BNP9QFC679 (CrossFit Inversion LLC). The job refuses any
+# other team, including PushPress. The App Store Connect app is 6833266123.
+# Upload uses altool --upload-app -t ios. That hands the IPA to App Store
+# Connect for TestFlight processing. It does not submit the app for App Review,
+# does not start an external beta review, and does not select this build on the
+# App Store version that is already in review (iOS 1.0 build 18).
+#
+# Marketing version is 1.0.1 from app.json. build_number (default 24) is the
+# CFBundleVersion for both the iPhone app and the embedded watch app. It must
+# be greater than 23, the last TestFlight upload. EXPO_TV is not set, so this
+# is not a tvOS archive.
+#
+# confirm=VERIFY_ONLY archives, exports, and checks the signature, then stops.
+# confirm=UPLOAD does that and then sends the IPA to internal TestFlight.
+name: iPhone signed TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type UPLOAD to build, verify, and send to internal TestFlight. Type VERIFY_ONLY to build and verify the signed IPA without uploading.
+        required: true
+        type: string
+      build_number:
+        description: CFBundleVersion for the iPhone app and the embedded watch app. Positive integer greater than 23. Marketing version is 1.0.1.
+        required: false
+        default: "24"
+        type: string
+
+concurrency:
+  group: iphone-signed-testflight
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  iphone-signed-testflight:
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      EXPO_NO_TELEMETRY: "1"
+      COCOAPODS_DISABLE_STATS: "1"
+      ASC_APP_ID: "6833266123"
+      BUNDLE_ID: "com.garrettscales.americana"
+      WATCH_BUNDLE_ID: "com.garrettscales.americana.watchkitapp"
+      CONFIRM: ${{ inputs.confirm }}
+      IOS_BUILD_NUMBER: ${{ inputs.build_number }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      IOS_APP_PROFILE_BASE64: ${{ secrets.IOS_APP_PROFILE_BASE64 }}
+      WATCH_APP_PROFILE_BASE64: ${{ secrets.WATCH_APP_PROFILE_BASE64 }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Require an explicit confirmation
+        run: |
+          set -euo pipefail
+          if [ "$CONFIRM" != "UPLOAD" ] && [ "$CONFIRM" != "VERIFY_ONLY" ]; then
+            echo "::error::Refusing to sign. Re-run workflow_dispatch with confirm set to UPLOAD or VERIFY_ONLY."
+            exit 1
+          fi
+          if [ "$CONFIRM" = "VERIFY_ONLY" ]; then
+            echo "VERIFY_ONLY: the signed IPA will be checked and will not be uploaded."
+          fi
+
+      - name: Check secrets and pin the Apple team
+        run: |
+          set -euo pipefail
+          if [ -n "${APPLE_CERTIFICATE_PASSWORD:-}" ]; then
+            echo "::add-mask::${APPLE_CERTIFICATE_PASSWORD}"
+          fi
+          python3 scripts/ci-ios-signing.py check-env
+
+      - name: Select Xcode 26.4 or newer
+        run: |
+          set -euo pipefail
+          DEVELOPER_DIR=$(python3 scripts/ci-select-xcode.py)
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR
+          sudo xcode-select -s "$DEVELOPER_DIR"
+          xcodebuild -version
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild the iPhone app
+        run: |
+          set -euo pipefail
+          if [ -n "${EXPO_TV:-}" ]; then
+            echo "::error::EXPO_TV must be unset for the iPhone and Watch archive."
+            exit 1
+          fi
+          npx expo prebuild --platform ios
+          if ! grep -q 'SDKROOT = iphoneos;' ios/*.xcodeproj/project.pbxproj; then
+            echo "::error::expo prebuild did not produce an iPhone project"
+            exit 1
+          fi
+          if ! grep -q 'WATCHOS_DEPLOYMENT_TARGET' ios/*.xcodeproj/project.pbxproj; then
+            echo "::error::expo prebuild did not embed the Apple Watch app"
+            exit 1
+          fi
+          python3 scripts/ci-ios-signing.py verify-prebuild --ios-dir ios --env-file "$RUNNER_TEMP/prebuild.env"
+          # shellcheck disable=SC1091
+          source "$RUNNER_TEMP/prebuild.env"
+          echo "workspace=$WORKSPACE scheme=$SCHEME"
+          echo "CFBundleVersion=$IOS_BUILD_NUMBER marketing=$MARKETING_VERSION"
+
+      - name: Install the distribution certificate and iOS profiles
+        run: bash scripts/ci-ios-install-signing.sh
+
+      - name: Show codesigning identities
+        run: |
+          set -euo pipefail
+          echo "Keychain search list:"
+          security list-keychains -d user
+          echo "Codesigning identities (hash and name only):"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+      - name: Apply manual signing to the iPhone and watch targets
+        run: |
+          set -euo pipefail
+          set -- ios/*.xcodeproj/project.pbxproj
+          if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+            echo "::error::Expected one app project.pbxproj under ios/, found $#."
+            exit 1
+          fi
+          python3 scripts/ci-ios-signing.py apply-signing \
+            --pbx "$1" \
+            --ios-profile "$IOS_PROFILE_NAME" \
+            --watch-profile "$WATCH_PROFILE_NAME" \
+            --identity "$CODE_SIGN_IDENTITY"
+
+      - name: Archive for iOS
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          security unlock-keychain -p "$(cat "$SIGNING_DIR/keychain.password")" "$KEYCHAIN_PATH"
+          ARCHIVE_PATH="$RUNNER_TEMP/Americana.xcarchive"
+          echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
+          echo "Archiving $SCHEME from $WORKSPACE for generic/platform=iOS"
+          echo "CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=BNP9QFC679"
+          echo "CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY"
+          echo "iPhone profile=$IOS_PROFILE_NAME"
+          echo "Watch profile=$WATCH_PROFILE_NAME"
+          echo "CURRENT_PROJECT_VERSION=$IOS_BUILD_NUMBER MARKETING_VERSION=1.0.1"
+          if [ "$MARKETING_VERSION" != "1.0.1" ]; then
+            echo "::error::Refusing to archive marketing version '${MARKETING_VERSION}'. iOS stays 1.0.1."
+            exit 1
+          fi
+          # Do not pass PRODUCT_BUNDLE_IDENTIFIER or PROVISIONING_PROFILE_SPECIFIER.
+          # One command-line value would be applied to both targets. The project
+          # file already has each bundle id and its own profile.
+          # Do not pass CODE_SIGN_IDENTITY[sdk=iphoneos*]=... xcodebuild splits
+          # a build setting on the first '='.
+          xcodebuild -workspace "$WORKSPACE" -list
+          xcodebuild archive \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            FORCE_BUNDLING=1 \
+            RCT_NO_LAUNCH_PACKAGER=1 \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=BNP9QFC679 \
+            "CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY" \
+            "CURRENT_PROJECT_VERSION=$IOS_BUILD_NUMBER" \
+            MARKETING_VERSION=1.0.1 \
+            | tee artifacts/xcodebuild.log
+
+      - name: Export the App Store IPA
+        run: |
+          set -euo pipefail
+          security unlock-keychain -p "$(cat "$SIGNING_DIR/keychain.password")" "$KEYCHAIN_PATH"
+          EXPORT_PATH="$RUNNER_TEMP/ios-export"
+          rm -rf "$EXPORT_PATH"
+          mkdir -p "$EXPORT_PATH"
+          echo "EXPORT_PATH=$EXPORT_PATH" >> "$GITHUB_ENV"
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -exportOptionsPlist "$EXPORT_OPTIONS_PLIST" \
+            | tee artifacts/export.log
+          ipa_count=$(find "$EXPORT_PATH" -name '*.ipa' -type f | wc -l | tr -d ' ')
+          if [ "$ipa_count" -ne 1 ]; then
+            echo "::error::Expected one IPA from export, found $ipa_count"
+            exit 1
+          fi
+          IPA=$(find "$EXPORT_PATH" -name '*.ipa' -type f)
+          echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
+          echo "Exported $(basename "$IPA") for TestFlight upload. It will not be saved as an artifact."
+
+      - name: Verify the signed iPhone and watch build
+        run: |
+          set -euo pipefail
+          IPA_UNPACK_DIR="$RUNNER_TEMP/ios-ipa"
+          rm -rf "$IPA_UNPACK_DIR"
+          mkdir -p "$IPA_UNPACK_DIR"
+          echo "IPA_UNPACK_DIR=$IPA_UNPACK_DIR" >> "$GITHUB_ENV"
+          # ditto keeps the symlinks and resource forks Xcode sealed into the IPA.
+          ditto -x -k "$IPA_PATH" "$IPA_UNPACK_DIR"
+          app_count=$(find "$IPA_UNPACK_DIR/Payload" -maxdepth 1 -type d -name '*.app' | wc -l | tr -d ' ')
+          if [ "$app_count" -ne 1 ]; then
+            echo "::error::Expected one .app in the IPA, found $app_count"
+            exit 1
+          fi
+          APP=$(find "$IPA_UNPACK_DIR/Payload" -maxdepth 1 -type d -name '*.app')
+          python3 scripts/ci-ios-signing.py verify-built-app --app "$APP"
+
+      - name: Upload to TestFlight
+        if: inputs.confirm == 'UPLOAD'
+        run: |
+          set -euo pipefail
+          KEY_DIR="$RUNNER_TEMP/asc-private-keys"
+          python3 scripts/ci-ios-signing.py write-api-key --dir "$KEY_DIR"
+          export API_PRIVATE_KEYS_DIR="$KEY_DIR"
+          echo "API_PRIVATE_KEYS_DIR=$KEY_DIR" >> "$GITHUB_ENV"
+          for dir in "$HOME/private_keys" "$HOME/.private_keys" "$HOME/.appstoreconnect/private_keys"; do
+            mkdir -p "$dir"
+            cp "$KEY_DIR/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8" "$dir/"
+            chmod 600 "$dir/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          done
+          echo "Uploading iOS 1.0.1 (${IOS_BUILD_NUMBER}) to App Store Connect app ${ASC_APP_ID} for TestFlight processing."
+          echo "Team BNP9QFC679. This does not submit the app for App Review and does not attach the build to the in-review version."
+          # -t ios is the iPhone platform. appletvos is not used. There is no
+          # submit step and no beta review call after the upload.
+          if xcrun --find altool >/dev/null 2>&1; then
+            xcrun altool --upload-app \
+              -f "$IPA_PATH" \
+              -t ios \
+              --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+              --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
+              --output-format xml \
+              | tee artifacts/upload.log
+          else
+            echo "altool is not on this Xcode. Uploading with iTMSTransporter."
+            xcrun iTMSTransporter \
+              -m upload \
+              -assetFile "$IPA_PATH" \
+              -apiKey "$APP_STORE_CONNECT_KEY_ID" \
+              -apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
+              | tee artifacts/upload.log
+          fi
+
+      - name: Report the verified IPA
+        if: inputs.confirm == 'VERIFY_ONLY'
+        run: |
+          set -euo pipefail
+          echo "Verified iOS ${MARKETING_VERSION} (${IOS_BUILD_NUMBER}) for ${BUNDLE_ID} and ${WATCH_BUNDLE_ID}."
+          echo "Team BNP9QFC679 (CrossFit Inversion LLC). The IPA was not uploaded."
+          {
+            echo "## Signed IPA verified"
+            echo
+            echo "- App: Anthem Gym Timer (\`${BUNDLE_ID}\`) and watch (\`${WATCH_BUNDLE_ID}\`)"
+            echo "- Team: BNP9QFC679 (CrossFit Inversion LLC)"
+            echo "- CFBundleVersion: ${IOS_BUILD_NUMBER} (iPhone and watch)"
+            echo "- CFBundleShortVersionString: ${MARKETING_VERSION}"
+            echo "- Result: signature verified with codesign --verify --deep --strict. Not uploaded."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report the TestFlight upload
+        if: inputs.confirm == 'UPLOAD'
+        run: |
+          set -euo pipefail
+          echo "Uploaded iOS CFBundleVersion ${IOS_BUILD_NUMBER} (${MARKETING_VERSION}) for ${BUNDLE_ID} and ${WATCH_BUNDLE_ID}."
+          echo "App Store Connect app ${ASC_APP_ID}, team BNP9QFC679 (CrossFit Inversion LLC)."
+          echo "TestFlight will process this as an internal build. It was not submitted for App Review or external beta review."
+          {
+            echo "## TestFlight upload"
+            echo
+            echo "- App: Anthem Gym Timer (\`${BUNDLE_ID}\`) and watch (\`${WATCH_BUNDLE_ID}\`)"
+            echo "- App Store Connect app: ${ASC_APP_ID}"
+            echo "- Team: BNP9QFC679 (CrossFit Inversion LLC)"
+            echo "- Platform: iOS + watchOS"
+            echo "- CFBundleVersion: ${IOS_BUILD_NUMBER} (iPhone and watch)"
+            echo "- CFBundleShortVersionString: ${MARKETING_VERSION}"
+            echo "- app.json version: ${SOURCE_MARKETING_VERSION}"
+            echo "- Result: uploaded for TestFlight processing. Not submitted for App Review. Not attached to the in-review iOS 1.0 version."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare redacted log tails
+        if: always()
+        run: python3 scripts/ci-ios-signing.py prepare-logs --source artifacts --dest artifacts/public-logs
+
+      - name: Remove signing material and the IPA
+        if: always()
+        run: bash scripts/ci-ios-cleanup-signing.sh
+
+      - name: Upload non-sensitive logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iphone-testflight-logs
+          if-no-files-found: warn
+          retention-days: 14
+          path: artifacts/public-logs/*.log

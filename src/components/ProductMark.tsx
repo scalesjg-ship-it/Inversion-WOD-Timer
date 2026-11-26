@@ -2,7 +2,7 @@ import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-nat
 
 import { PRODUCT_NAME } from '@/src/productName';
 import { chrome } from '@/src/theme/chrome';
-import { TV_SAFE_HORIZONTAL } from '@/src/tv/layout';
+import { lockupSubtitleSize, TV_SAFE_HORIZONTAL } from '@/src/tv/layout';
 
 type Variant = 'wordmark' | 'kicker';
 
@@ -14,17 +14,23 @@ export function ProductMark({
   variant,
   color,
   large = false,
+  size,
+  flush = false,
 }: {
   variant: Variant;
   color?: string;
   /** Ten-foot wordmark, including a TV. Kickers ignore this and key off the TV runtime. */
   large?: boolean;
+  /** Title size in px. The subtitle is half of this, matching `lockupBlockHeight`. */
+  size?: number;
+  /** Drop the wordmark's top margin when the parent already pads the header. */
+  flush?: boolean;
 }) {
   const { width } = useWindowDimensions();
   const tv = Platform.isTV === true;
   const ink = color ?? (variant === 'kicker' ? chrome.muted : chrome.text);
-  const titleSize = titleFontSize(variant, tv, large);
-  const subSize = subtitleFontSize(variant, tv, large);
+  const titleSize = size ?? titleFontSize(variant, tv, large);
+  const subSize = size == null ? subtitleFontSize(variant, tv, large) : lockupSubtitleSize(size);
   const gutter = widthBudgetGutter(variant, tv);
   const budget = width > 0 ? Math.max(titleSize * 4, width - gutter) : undefined;
 
@@ -35,14 +41,15 @@ export function ProductMark({
       style={[
         styles.block,
         variant === 'kicker' ? styles.kickerBlock : styles.wordmarkBlock,
-        variant === 'wordmark' && (tv || large) && styles.wordmarkBlockLarge,
+        variant === 'wordmark' && (tv || large) && !flush && styles.wordmarkBlockLarge,
+        flush && styles.flush,
       ]}
     >
       <Text
         style={[
           styles.title,
           variant === 'kicker' ? styles.kickerTitle : styles.wordmarkTitle,
-          { color: ink, fontSize: titleSize, maxWidth: budget },
+          { color: ink, fontSize: titleSize, lineHeight: titleSize, maxWidth: budget },
         ]}
         numberOfLines={1}
         adjustsFontSizeToFit
@@ -54,7 +61,7 @@ export function ProductMark({
         style={[
           styles.sub,
           variant === 'kicker' ? styles.kickerSub : styles.wordmarkSub,
-          { color: ink, fontSize: subSize, maxWidth: budget },
+          { color: ink, fontSize: subSize, lineHeight: subSize, maxWidth: budget },
         ]}
         numberOfLines={1}
         adjustsFontSizeToFit
@@ -114,6 +121,9 @@ const styles = StyleSheet.create({
   },
   wordmarkBlockLarge: {
     marginTop: 12,
+  },
+  flush: {
+    marginTop: 0,
   },
   kickerBlock: {
     alignSelf: 'flex-end',

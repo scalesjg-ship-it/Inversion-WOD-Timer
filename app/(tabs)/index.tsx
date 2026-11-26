@@ -1,21 +1,27 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View, type LayoutChangeEvent, type ScrollViewInstance, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { unlockAudio } from '@/src/audio/sounds';
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { ProductMark } from '@/src/components/ProductMark';
+import { TvFocusPressable } from '@/src/components/TvFocus';
+import { TvMenuCell } from '@/src/components/TvMenuCell';
+import { useTvTabFocus, type TvFocusTag } from '@/src/components/TvTabFocus';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { chrome } from '@/src/theme/chrome';
-import { focusChrome } from '@/src/tv/controls';
-import { TV_BODY_FONT, TV_MENU_FONT, TV_SECTION_FONT, isTenFootLayout, tvSafeBox, tvSafeInset } from '@/src/tv/layout';
-import { tvParallaxProps } from '@/src/tv/pressable';
-import { usePointerFocus } from '@/src/tv/usePointerFocus';
+import { isTenFootLayout, tvFocusGutter, tvSafeInset, type TvHomeLayout } from '@/src/tv/layout';
+import { isTvGridEntrance } from '@/src/tv/tabFocus';
+import { useTvMenuFrame } from '@/src/tv/useTvMenuFrame';
+import { scrollOffsetForFocus } from '@/src/tv/scroll';
 import { modeTitle } from '@/src/timer/labels';
 import { loadPresets, presetSummary, type SavedPreset } from '@/src/timer/presetStorage';
 import type { TimerMode } from '@/src/timer/types';
+
+/** The first visit prefers the For Time card. Later visits leave focus on the tab bar. */
+let wodFocusArmed = true;
 
 const MODES: { mode: TimerMode; detail: string }[] = [
   {
@@ -31,12 +37,8 @@ const MODES: { mode: TimerMode; detail: string }[] = [
     detail: 'Every X minutes. The clock resets when the interval does.',
   },
   {
-    mode: 'tabata',
-    detail: '20 seconds on, 10 seconds off, eight rounds.',
-  },
-  {
     mode: 'intervals',
-    detail: 'Your own work, rest, and number of rounds.',
+    detail: 'Work and rest. Tabata and martial-arts rounds are one tap.',
   },
   {
     mode: 'countdown',
@@ -49,11 +51,28 @@ export default function WodScreen() {
   const { setSession } = useTimerSession();
   const { width, height } = useWindowDimensions();
   const tv = Platform.isTV === true;
+  const tabFocus = useTvTabFocus();
   const tenFoot = isTenFootLayout(width, height, tv);
   const inset = tvSafeInset(tenFoot);
-  const box = tvSafeBox(tv);
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
+  const menu = useTvMenuFrame(MODES.length, { header: 'home', insets: true });
+  const home = tv ? menu.frame : null;
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const scrollOffset = useRef(0);
+  const viewportHeight = useRef(0);
+  const gridTop = useRef(0);
+  const cardLocal = useRef<Record<string, { y: number; height: number }>>({});
+  const presetListTop = useRef(0);
+  const presetLocal = useRef<Record<string, { y: number; height: number }>>({});
   const [presets, setPresets] = useState<SavedPreset[] | null>(null);
+
+  const fitted = tv && (presets == null || presets.length === 0);
+  const reveal = useCallback((top: number, itemHeight: number) => {
+    const next = scrollOffsetForFocus(top, itemHeight, viewportHeight.current, scrollOffset.current);
+    if (next === scrollOffset.current) return;
+    scrollOffset.current = next;
+    scrollRef.current?.scrollTo({ y: next, animated: true });
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -75,51 +94,217 @@ export default function WodScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={tv ? [] : ['top']}>
-      <ScrollView
-        contentContainerStyle={[
+      <WodFrame
+        fitted={fitted}
+        scrollRef={scrollRef}
+        scrollEnabled={!tv || (presets != null && presets.length > 0)}
+        tv={tv}
+        onLayout={(event) => {
+          viewportHeight.current = event.nativeEvent.layout.height;
+          if (tv) menu.onSceneLayout(event);
+        }}
+        onScroll={(offset) => {
+          scrollOffset.current = offset;
+        }}
+        contentStyle={[
           styles.content,
           tenFoot && !tv && { paddingHorizontal: inset, paddingBottom: inset },
-          tv && {
-            width: '100%',
-            flexGrow: 1,
-            paddingHorizontal: box.horizontal,
-            paddingTop: box.vertical,
-            paddingBottom: 28,
-            gap: 14,
-          },
+          tv && home
+            ? {
+                paddingHorizontal: home.padHorizontal,
+                paddingTop: home.padTop,
+                paddingBottom: home.stackGap,
+                gap: home.stackGap,
+              }
+            : null,
         ]}
-        testID="screen-wod"
       >
-        <ProductMark variant="wordmark" color={accent} large={tenFoot} />
-        <Text style={[styles.gym, tenFoot && styles.gymTv, tv && styles.gymFrame]} numberOfLines={2} adjustsFontSizeToFit>
+        <ProductMark
+          variant="wordmark"
+          color={accent}
+          large={tenFoot && !tv}
+          size={tv && home ? home.wordmarkSize : undefined}
+          flush={tv}
+        />
+        <Text
+          style={[
+            styles.gym,
+            tenFoot && !tv && styles.gymTv,
+            tv && home ? { fontSize: home.gymSize, lineHeight: home.gymLine } : null,
+          ]}
+          numberOfLines={1}
+        >
           {branding.gymName}
         </Text>
-        <Text style={[styles.section, tv && styles.sectionFrame]}>Conditioning</Text>
-        <View style={[styles.list, tv && styles.listFrame]}>
-          {MODES.map((item, index) => (
-            <ModeCard key={item.mode} item={item} accent={accent} preferred={index === 0} tenFoot={tenFoot} />
-          ))}
+        <Text
+          testID="screen-wod"
+          style={[
+            styles.section,
+            tv && home ? { fontSize: home.sectionSize, lineHeight: home.sectionLine, marginTop: 0, marginBottom: 0 } : null,
+          ]}
+        >
+          Conditioning
+        </Text>
+        <View
+          style={[styles.list, tv && styles.grid]}
+          onLayout={(event) => {
+            gridTop.current = event.nativeEvent.layout.y;
+          }}
+        >
+          {MODES.map((item, index) =>
+            tv && home ? (
+              <TvMenuCell
+                key={item.mode}
+                basis={home.cellWidth}
+                frame={home}
+                onLayout={(event) => {
+                  cardLocal.current[item.mode] = {
+                    y: event.nativeEvent.layout.y,
+                    height: event.nativeEvent.layout.height,
+                  };
+                }}
+              >
+                {(focus) => (
+                  <ModeCard
+                    item={item}
+                    accent={accent}
+                    preferred={index === 0 && wodFocusArmed}
+                    tenFoot={false}
+                    frame={home}
+                    focusUp={
+                      isTvGridEntrance(index, MODES.length, home.columns) ? tabFocus?.upTag ?? null : null
+                    }
+                    onFocus={() => {
+                      if (index === 0) wodFocusArmed = false;
+                      focus.onFocus();
+                    }}
+                    onBlur={focus.onBlur}
+                    onReveal={() => {
+                      const local = cardLocal.current[item.mode];
+                      if (!local) return;
+                      reveal(gridTop.current + local.y, local.height);
+                    }}
+                  />
+                )}
+              </TvMenuCell>
+            ) : (
+              <View
+                key={item.mode}
+                onLayout={(event) => {
+                  cardLocal.current[item.mode] = {
+                    y: event.nativeEvent.layout.y,
+                    height: event.nativeEvent.layout.height,
+                  };
+                }}
+              >
+                <ModeCard
+                  item={item}
+                  accent={accent}
+                  preferred={index === 0}
+                  tenFoot={tenFoot && !tv}
+                  frame={null}
+                  onReveal={() => {
+                    const local = cardLocal.current[item.mode];
+                    if (!local) return;
+                    reveal(gridTop.current + local.y, local.height);
+                  }}
+                />
+              </View>
+            ),
+          )}
         </View>
         {presets && presets.length > 0 ? (
           <>
-            <Text style={styles.section}>My presets</Text>
-            <View style={styles.list}>
-              {presets.map((preset) => (
-                <SavedPresetCard
+            <Text style={[styles.section, tv && home ? { fontSize: home.sectionSize, lineHeight: home.sectionLine, marginTop: 0 } : null]}>
+              My presets
+            </Text>
+            <View
+              style={styles.list}
+              onLayout={(event) => {
+                presetListTop.current = event.nativeEvent.layout.y;
+              }}
+            >
+              {presets.map((preset) => {
+                const gutter = home ? tvFocusGutter(width - home.padHorizontal * 2) : 0;
+                return (
+                <View
                   key={preset.id}
-                  preset={preset}
-                  accent={accent}
-                  tenFoot={tenFoot}
-                  onOpen={() => openPreset(preset)}
-                  onStart={() => startPreset(preset)}
-                />
-              ))}
+                  style={tv && home ? { paddingHorizontal: gutter, paddingVertical: home.gutterTop, zIndex: 0 } : undefined}
+                  onLayout={(event) => {
+                    presetLocal.current[preset.id] = {
+                      y: event.nativeEvent.layout.y,
+                      height: event.nativeEvent.layout.height,
+                    };
+                  }}
+                >
+                  <SavedPresetCard
+                    preset={preset}
+                    accent={accent}
+                    tenFoot={tenFoot && !tv}
+                    tall={tv && home ? Math.round(home.cardHeight * 0.62) : 0}
+                    titleSize={tv && home ? home.titleSize : 0}
+                    detailSize={tv && home ? home.detailSize : 0}
+                    onOpen={() => openPreset(preset)}
+                    onStart={() => startPreset(preset)}
+                    onReveal={() => {
+                      const local = presetLocal.current[preset.id];
+                      if (!local) return;
+                      reveal(presetListTop.current + local.y, local.height);
+                    }}
+                  />
+                </View>
+                );
+              })}
             </View>
           </>
         ) : null}
-        <Text style={[styles.hint, tv && styles.hintFrame]}>Jiu-jitsu, boxing, and sparring rounds are on the Rounds tab.</Text>
-      </ScrollView>
+        <Text style={[styles.hint, tv && home ? { fontSize: home.hintSize, lineHeight: home.hintLine, marginTop: 0 } : null]}>
+          Tabata, BJJ, boxing, MMA, and Muay Thai are presets on Intervals.
+        </Text>
+      </WodFrame>
     </SafeAreaView>
+  );
+}
+
+function WodFrame({
+  fitted,
+  children,
+  scrollRef,
+  scrollEnabled,
+  tv,
+  onLayout,
+  onScroll,
+  contentStyle,
+}: {
+  fitted: boolean;
+  children: ReactNode;
+  scrollRef: React.RefObject<ScrollViewInstance | null>;
+  scrollEnabled: boolean;
+  tv: boolean;
+  onLayout: (event: LayoutChangeEvent) => void;
+  onScroll: (offset: number) => void;
+  contentStyle: StyleProp<ViewStyle>;
+}) {
+  if (fitted) {
+    return (
+      <View style={[styles.scrollTv, contentStyle]} onLayout={onLayout} testID="screen-wod" collapsable={false}>
+        {children}
+      </View>
+    );
+  }
+  return (
+    <ScrollView
+      ref={scrollRef}
+      style={tv ? styles.scrollTv : undefined}
+      scrollEnabled={scrollEnabled}
+      scrollEventThrottle={16}
+      onLayout={onLayout}
+      onScroll={(event) => onScroll(event.nativeEvent.contentOffset.y)}
+      contentContainerStyle={contentStyle}
+      testID="screen-wod"
+    >
+      {children}
+    </ScrollView>
   );
 }
 
@@ -128,13 +313,9 @@ function openPreset(preset: SavedPreset) {
     case 'countdown':
       router.push({ pathname: '/countdown', params: { presetId: preset.id } });
       return;
-    case 'rounds':
-      router.navigate({ pathname: '/rounds', params: { presetId: preset.id } });
-      return;
     case 'forTime':
     case 'amrap':
     case 'emom':
-    case 'tabata':
     case 'intervals':
       router.push({ pathname: '/setup', params: { mode: preset.mode, presetId: preset.id } });
       return;
@@ -149,61 +330,72 @@ function SavedPresetCard({
   preset,
   accent,
   tenFoot,
+  tall = 0,
+  titleSize = 0,
+  detailSize = 0,
   onOpen,
   onStart,
+  onReveal,
+  focusDown = null,
 }: {
   preset: SavedPreset;
   accent: string;
   tenFoot: boolean;
+  tall?: number;
+  titleSize?: number;
+  detailSize?: number;
   onOpen: () => void;
   onStart: () => void;
+  onReveal: () => void;
+  focusDown?: TvFocusTag | null;
 }) {
-  const bodyPointer = usePointerFocus();
-  const startPointer = usePointerFocus();
   const tv = Platform.isTV === true;
   return (
-    <View style={[styles.card, tenFoot && styles.cardTv, tv && styles.cardFrame]}>
+    <View style={[styles.card, tenFoot && styles.cardTv, tv && styles.presetCardTv, tall > 0 ? { minHeight: tall, height: tall } : null]}>
       <View style={[styles.bar, { backgroundColor: accent }]} />
-      <Pressable
+      <TvFocusPressable
+        accent={accent}
         testID={`my-preset-${preset.id}`}
         accessibilityRole="button"
         accessibilityLabel={`${preset.name}, ${modeTitle(preset.mode)}`}
         accessibilityHint="Opens this preset in its setup"
+        focusDown={focusDown}
         onPress={onOpen}
-        onFocus={bodyPointer.onFocus}
-        onBlur={bodyPointer.onBlur}
-        {...tvParallaxProps()}
-        style={({ pressed, focused }) => [
-          styles.cardBody,
-          tv && styles.cardBodyFrame,
-          { opacity: pressed ? 0.78 : 1 },
-          focusChrome(tv, Boolean(focused) || bodyPointer.focused, accent),
-        ]}
+        onFocus={onReveal}
+        style={({ pressed }) => [styles.cardBody, { opacity: pressed ? 0.78 : 1 }]}
       >
-        <Text style={[styles.cardTitle, tenFoot && styles.cardTitleTv, tv && styles.cardTitleFrame]} numberOfLines={2}>
+        <Text
+          style={[
+            styles.cardTitle,
+            tenFoot && styles.cardTitleTv,
+            titleSize > 0 ? { fontSize: titleSize, lineHeight: titleSize + 6 } : null,
+          ]}
+          numberOfLines={2}
+        >
           {preset.name}
         </Text>
-        <Text style={[styles.cardDetail, tenFoot && styles.cardDetailTv, tv && styles.cardDetailFrame]}>
+        <Text
+          style={[
+            styles.cardDetail,
+            tenFoot && styles.cardDetailTv,
+            detailSize > 0 ? { fontSize: detailSize, lineHeight: detailSize + 8 } : null,
+          ]}
+        >
           {modeTitle(preset.mode)} · {presetSummary(preset.config)}
         </Text>
-      </Pressable>
-      <Pressable
+      </TvFocusPressable>
+      <TvFocusPressable
+        accent={accent}
         testID={`my-preset-start-${preset.id}`}
         accessibilityRole="button"
         accessibilityLabel={`Start ${preset.name}`}
+        focusDown={focusDown}
         onPress={onStart}
-        onFocus={startPointer.onFocus}
-        onBlur={startPointer.onBlur}
-        {...tvParallaxProps()}
-        style={({ pressed, focused }) => [
-          styles.start,
-          tenFoot && styles.startTv,
-          { opacity: pressed ? 0.78 : 1 },
-          focusChrome(tv, Boolean(focused) || startPointer.focused, accent),
-        ]}
+        onFocus={onReveal}
+        style={({ pressed }) => [styles.start, tenFoot && styles.startTv, { opacity: pressed ? 0.78 : 1 }]}
       >
         <Text style={[styles.startLabel, { color: accent }, tenFoot && styles.startLabelTv]}>Start</Text>
-      </Pressable>
+      </TvFocusPressable>
     </View>
   );
 }
@@ -213,47 +405,83 @@ function ModeCard({
   accent,
   preferred,
   tenFoot,
+  frame,
+  onFocus,
+  onBlur,
+  onReveal,
+  focusUp = null,
 }: {
   item: (typeof MODES)[number];
   accent: string;
   preferred: boolean;
   tenFoot: boolean;
+  frame: TvHomeLayout | null;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  onReveal: () => void;
+  focusUp?: TvFocusTag | null;
 }) {
-  const pointer = usePointerFocus();
-  const tv = Platform.isTV === true;
+  const tv = frame !== null;
   return (
-            <Pressable
-              testID={`mode-${item.mode}`}
-              accessibilityRole="button"
-              accessibilityLabel={modeTitle(item.mode)}
-              hasTVPreferredFocus={preferred}
-              onFocus={pointer.onFocus}
-              onBlur={pointer.onBlur}
-              {...tvParallaxProps()}
-              onPress={() => {
-                if (item.mode === 'countdown') {
-                  router.push('/countdown');
-                  return;
-                }
-                router.push({ pathname: '/setup', params: { mode: item.mode } });
-              }}
-              style={({ pressed, focused }) => [
-                styles.card,
-                tenFoot && styles.cardTv,
-                tv && styles.cardFrame,
-                { opacity: pressed ? 0.78 : 1 },
-                focusChrome(tv, Boolean(focused) || pointer.focused, accent),
-              ]}
-            >
-              <View style={[styles.bar, { backgroundColor: accent }]} />
-              <View style={[styles.cardBody, tv && styles.cardBodyFrame]}>
-                <Text style={[styles.cardTitle, tenFoot && styles.cardTitleTv, tv && styles.cardTitleFrame]}>{modeTitle(item.mode)}</Text>
-                <Text style={[styles.cardDetail, tenFoot && styles.cardDetailTv, tv && styles.cardDetailFrame]} numberOfLines={2}>
-                  {item.detail}
-                </Text>
-              </View>
-              <Text style={[styles.chevron, tv && styles.chevronFrame, { color: accent }]}>›</Text>
-            </Pressable>
+    <TvFocusPressable
+      accent={accent}
+      testID={`mode-${item.mode}`}
+      accessibilityRole="button"
+      accessibilityLabel={modeTitle(item.mode)}
+      focusUp={focusUp}
+      hasTVPreferredFocus={preferred}
+      onFocus={() => {
+        onFocus?.();
+        onReveal();
+      }}
+      onBlur={() => onBlur?.()}
+      onPress={() => {
+        if (item.mode === 'countdown') {
+          router.push('/countdown');
+          return;
+        }
+        router.push({ pathname: '/setup', params: { mode: item.mode } });
+      }}
+      style={({ pressed }) => [
+        styles.card,
+        tenFoot && styles.cardTv,
+        tv && frame
+          ? {
+              width: '100%',
+              height: frame.cardHeight,
+              minHeight: frame.cardHeight,
+              borderRadius: 16,
+              flexGrow: 0,
+            }
+          : null,
+        { opacity: pressed ? 0.78 : 1 },
+      ]}
+    >
+      <View style={[styles.bar, { backgroundColor: accent }]} />
+        <View style={[styles.cardBody, frame ? styles.cardBodyFrame : null]}>
+        <Text
+          style={[
+            styles.cardTitle,
+            tenFoot && styles.cardTitleTv,
+            frame ? { fontSize: frame.titleSize, lineHeight: frame.titleSize + Math.max(4, Math.round(frame.titleSize * 0.12)) } : null,
+          ]}
+          numberOfLines={1}
+        >
+          {modeTitle(item.mode)}
+        </Text>
+        <Text
+          style={[
+            styles.cardDetail,
+            tenFoot && styles.cardDetailTv,
+            frame ? { fontSize: frame.detailSize, lineHeight: frame.detailSize + Math.max(6, Math.round(frame.detailSize * 0.25)) } : null,
+          ]}
+          numberOfLines={frame ? frame.detailLines : 2}
+        >
+          {item.detail}
+        </Text>
+      </View>
+      <Text style={[styles.chevron, frame ? { fontSize: frame.titleSize + 4 } : null, { color: accent }]}>›</Text>
+    </TvFocusPressable>
   );
 }
 
@@ -300,6 +528,16 @@ const styles = StyleSheet.create({
   list: {
     gap: 10,
   },
+  scrollTv: {
+    flex: 1,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 0,
+    marginHorizontal: 0,
+    overflow: 'visible',
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -321,9 +559,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   cardBodyFrame: {
-    paddingVertical: 22,
-    paddingHorizontal: 24,
-    gap: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    gap: 2,
   },
   cardTitle: {
     fontFamily: 'Oswald',
@@ -360,46 +598,14 @@ const styles = StyleSheet.create({
   startLabelTv: {
     fontSize: 32,
   },
+  presetCardTv: {
+    minHeight: 96,
+    borderRadius: 18,
+  },
   hint: {
     marginTop: 8,
     color: chrome.muted,
     fontSize: 14,
     lineHeight: 20,
-  },
-  gymFrame: {
-    fontSize: 72,
-    lineHeight: 80,
-  },
-  sectionFrame: {
-    fontSize: TV_SECTION_FONT,
-    marginTop: 8,
-  },
-  listFrame: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  cardFrame: {
-    flexBasis: '46%',
-    flexGrow: 1,
-    minHeight: 156,
-    borderRadius: 28,
-  },
-  cardTitleFrame: {
-    fontSize: TV_MENU_FONT,
-    lineHeight: TV_MENU_FONT + 6,
-  },
-  cardDetailFrame: {
-    fontSize: TV_BODY_FONT,
-    lineHeight: TV_BODY_FONT + 8,
-  },
-  chevronFrame: {
-    fontSize: 64,
-    paddingRight: 28,
-  },
-  hintFrame: {
-    fontSize: TV_BODY_FONT,
-    lineHeight: TV_BODY_FONT + 8,
-    marginTop: 4,
   },
 });

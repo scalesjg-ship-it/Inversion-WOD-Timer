@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  TV_FOCUS_BORDER,
+  TV_FOCUS_RING,
   TV_FOCUS_SCALE,
+  TV_UNFOCUSED_OPACITY,
   allowsDeviceHaptics,
   allowsSystemNotifications,
   focusChrome,
+  phoneTabBarFrame,
   stepperControlSize,
   tabBarControlSize,
+  tvTabBarHeight,
 } from './controls';
 
 describe('TV focus chrome', () => {
@@ -15,15 +20,32 @@ describe('TV focus chrome', () => {
     expect(focusChrome(false, true, '#FF4D2E')).toEqual({ borderWidth: 6, borderColor: '#FF4D2E' });
   });
 
-  it('scales and highlights on TV without changing border width', () => {
+  it('draws a constant thick ring, scales, glows, and dims idle controls on TV', () => {
     const idle = focusChrome(true, false, '#FF4D2E');
     const focused = focusChrome(true, true, '#FF4D2E');
-    expect(idle).toEqual({ transform: [{ scale: 1 }] });
-    expect(focused).not.toHaveProperty('borderWidth');
+    expect(idle?.borderWidth).toBe(TV_FOCUS_BORDER);
+    expect(focused?.borderWidth).toBe(TV_FOCUS_BORDER);
+    expect(idle?.borderWidth).toBe(focused?.borderWidth);
+    expect(idle).not.toHaveProperty('borderColor');
+    expect(focused?.borderColor).toBe(TV_FOCUS_RING);
     expect(focused?.transform).toEqual([{ scale: TV_FOCUS_SCALE }]);
-    expect(focused?.borderColor).toBe('#FF4D2E');
-    expect(focused?.backgroundColor).toBe('rgba(255,77,46,0.3)');
-    expect(TV_FOCUS_SCALE).toBeGreaterThan(1);
+    expect(idle?.transform).toEqual([{ scale: 1 }]);
+    expect(TV_FOCUS_SCALE).toBeGreaterThanOrEqual(1.15);
+    expect(TV_FOCUS_SCALE).toBeLessThanOrEqual(1.2);
+    expect(focused?.shadowOpacity).toBeGreaterThan(0.5);
+    expect(focused?.shadowRadius).toBeGreaterThanOrEqual(12);
+    expect(idle?.opacity).toBe(TV_UNFOCUSED_OPACITY);
+    expect(focused?.opacity).toBe(1);
+    expect(TV_UNFOCUSED_OPACITY).toBeLessThan(0.75);
+    expect(focused).not.toHaveProperty('backgroundColor');
+  });
+
+  it('keeps a text field at scale 1 so the caret does not jump', () => {
+    const idle = focusChrome(true, false, '#F5C518', { scale: false });
+    const focused = focusChrome(true, true, '#F5C518', { scale: false });
+    expect(idle).not.toHaveProperty('transform');
+    expect(focused).not.toHaveProperty('transform');
+    expect(focused?.borderWidth).toBe(idle?.borderWidth);
   });
 });
 
@@ -33,15 +55,55 @@ describe('TV control sizes', () => {
     expect(tabBarControlSize(false)).toMatchObject({ label: 13, icon: 16, barContentHeight: 64 });
   });
 
-  it('makes TV steppers easy to focus and tab labels 10-foot readable', () => {
+  it('makes TV steppers easy to focus and keeps the tab bar inside a shorter 10-foot row', () => {
+    expect(stepperControlSize(true, 1080, true).button).toBe(70);
     const step = stepperControlSize(true);
-    const tab = tabBarControlSize(true);
+    const tab = tabBarControlSize(true, 1080, 1920);
     expect(step.button).toBeGreaterThanOrEqual(96);
     expect(step.glyph).toBeGreaterThanOrEqual(48);
-    expect(tab.label).toBeGreaterThanOrEqual(40);
+    expect(tab.label).toBeGreaterThanOrEqual(36);
+    expect(tab.label).toBeLessThan(48);
     expect(tab.icon).toBeGreaterThanOrEqual(40);
-    expect(tab.itemMinHeight).toBeGreaterThanOrEqual(120);
-    expect(tab.barContentHeight).toBeGreaterThanOrEqual(160);
+    expect(tab.itemMinHeight).toBeGreaterThanOrEqual(96);
+    expect(tab.itemMinHeight).toBeLessThan(120);
+    expect(tab.barContentHeight).toBeGreaterThanOrEqual(120);
+    expect(tab.barContentHeight).toBeLessThan(160);
+    expect(tab.paddingHorizontal).toBeGreaterThanOrEqual(Math.round(1920 * 0.05));
+    const fourK = tabBarControlSize(true, 2160, 3840);
+    expect(fourK.label).toBeGreaterThanOrEqual(tab.label * 2 - 1);
+    expect(fourK.barContentHeight).toBeGreaterThanOrEqual(tab.barContentHeight * 2 - 1);
+    expect(fourK.paddingHorizontal).toBeGreaterThanOrEqual(Math.round(3840 * 0.05));
+    const fire = tabBarControlSize(true, 540, 960);
+    expect(fire.paddingHorizontal).toBeGreaterThanOrEqual(Math.round(960 * 0.05));
+    expect(fire.barContentHeight).toBeLessThan(tab.barContentHeight);
+  });
+});
+
+describe('phone tab bar safe area', () => {
+  it('keeps a 64pt band when the bottom inset is 0', () => {
+    expect(phoneTabBarFrame(0)).toEqual({ height: 64, paddingTop: 6, paddingBottom: 0 });
+    expect(phoneTabBarFrame(-8)).toEqual({ height: 64, paddingTop: 6, paddingBottom: 0 });
+    expect(phoneTabBarFrame(Number.NaN).height).toBe(64);
+  });
+
+  it('lifts the band by the iPhone home-indicator inset and the Android navigation inset', () => {
+    const island = phoneTabBarFrame(34);
+    expect(island).toEqual({ height: 98, paddingTop: 6, paddingBottom: 34 });
+    expect(island.height - island.paddingBottom).toBe(tabBarControlSize(false).barContentHeight);
+
+    const gesture = phoneTabBarFrame(24);
+    expect(gesture).toEqual({ height: 88, paddingTop: 6, paddingBottom: 24 });
+
+    const threeButton = phoneTabBarFrame(48);
+    expect(threeButton).toEqual({ height: 112, paddingTop: 6, paddingBottom: 48 });
+  });
+
+  it('leaves the television tab bar on its own metrics', () => {
+    const tv = tabBarControlSize(true, 1080, 1920);
+    expect(tvTabBarHeight(1080, 0, 1920)).toBe(tv.paddingTop + tv.barContentHeight + tv.paddingBottom);
+    expect(tvTabBarHeight(1080, 34, 1920)).toBe(tv.paddingTop + tv.barContentHeight + 34);
+    expect(phoneTabBarFrame(34).height).not.toBe(tvTabBarHeight(1080, 34, 1920));
+    expect(tabBarControlSize(false).barContentHeight).toBe(64);
   });
 });
 

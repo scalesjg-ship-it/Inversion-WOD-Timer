@@ -2,14 +2,35 @@ import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-aud
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
 
+import { cueAudioMode } from '@/src/audio/mode';
 import { soundsForCues, type Cue, type SoundName } from '@/src/timer/engine';
 import { allowsDeviceHaptics } from '@/src/tv/controls';
+import bell from '../../assets/sounds/bell.wav';
+import one from '../../assets/sounds/one.wav';
+import start from '../../assets/sounds/start.wav';
+import three from '../../assets/sounds/three.wav';
+import tick from '../../assets/sounds/tick.wav';
+import two from '../../assets/sounds/two.wav';
+import warning from '../../assets/sounds/warning.wav';
+
+/**
+ * Spoken counts are rendered clips, not on-device text-to-speech, so they
+ * play offline on tvOS and Fire TV. Piper TTS 1.8.0 spoke "Three!", "Two!",
+ * and "One!" with the en_US-ljspeech-medium voice. That voice was trained
+ * from scratch on the public-domain LJ Speech recordings of Linda Johnson
+ * (https://keithito.com/LJ-Speech-Dataset/). The model and the engine are
+ * not bundled. Each clip is mono 16-bit PCM at 44.1 kHz, trimmed, faded,
+ * and peak-normalized to -1 dBFS, and each is shorter than 0.7 seconds.
+ */
 
 const sources: Record<SoundName, number> = {
-  tick: require('../../assets/sounds/tick.wav'),
-  warning: require('../../assets/sounds/warning.wav'),
-  start: require('../../assets/sounds/start.wav'),
-  bell: require('../../assets/sounds/bell.wav'),
+  tick,
+  warning,
+  start,
+  bell,
+  three,
+  two,
+  one,
 };
 
 const players = new Map<SoundName, AudioPlayer>();
@@ -17,11 +38,7 @@ let modeReady = false;
 
 async function ensureMode(): Promise<void> {
   if (modeReady) return;
-  await setAudioModeAsync({
-    playsInSilentMode: true,
-    shouldPlayInBackground: true,
-    interruptionMode: 'duckOthers',
-  });
+  await setAudioModeAsync(cueAudioMode(Platform.OS, Platform.isTV === true));
   modeReady = true;
 }
 
@@ -47,6 +64,36 @@ export function unlockAudio(): void {
   }
 }
 
+function hapticKind(name: SoundName): 'warning' | 'light' | 'heavy' {
+  switch (name) {
+    case 'warning':
+      return 'warning';
+    case 'tick':
+    case 'three':
+    case 'two':
+    case 'one':
+      return 'light';
+    case 'start':
+    case 'bell':
+      return 'heavy';
+    default: {
+      const unexpected: never = name;
+      return unexpected;
+    }
+  }
+}
+
+/** Pause cuts off a word that has already started. */
+export function stopSounds(): void {
+  for (const player of players.values()) {
+    try {
+      player.pause();
+    } catch {
+      // Stopping is best-effort if a player was never started.
+    }
+  }
+}
+
 export async function playSound(name: SoundName): Promise<void> {
   try {
     await ensureMode();
@@ -60,9 +107,10 @@ export async function playSound(name: SoundName): Promise<void> {
 
   if (!allowsDeviceHaptics(Platform.isTV === true)) return;
   try {
-    if (name === 'warning') {
+    const kind = hapticKind(name);
+    if (kind === 'warning') {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    } else if (name === 'tick') {
+    } else if (kind === 'light') {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } else {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);

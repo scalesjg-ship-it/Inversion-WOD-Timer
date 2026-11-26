@@ -1,17 +1,24 @@
 import { Link, Stack } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { chrome } from '@/src/theme/chrome';
 
 export default function NotFoundScreen() {
+  const androidPhone = Platform.OS === 'android' && Platform.isTV !== true;
+  const appleTv = Platform.isTV === true && Platform.OS === 'ios';
+  const insets = useSafeAreaInsets();
+
   return (
     <>
-      <Stack.Screen options={{ title: 'Anthem Gym Timer', headerShown: true }} />
-      <View style={styles.container}>
+      <Stack.Screen options={{ title: 'Anthem Gym Timer', headerShown: !appleTv }} />
+      <View style={[styles.container, androidPhone ? { paddingBottom: 24 + insets.bottom } : null]}>
         <Text style={styles.title}>That screen is not on the clock.</Text>
-        <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Back to Anthem Gym Timer</Text>
-        </Link>
+        {appleTv ? null : (
+          <Link href="/" style={styles.link}>
+            <Text style={styles.linkText}>Back to Anthem Gym Timer</Text>
+          </Link>
+        )}
       </View>
     </>
   );

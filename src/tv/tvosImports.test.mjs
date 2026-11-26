@@ -5,14 +5,19 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * A package whose podspec leaves out tvOS is not compiled into the Apple TV app.
- * If its JS calls `requireNativeModule` (not the optional variant), importing it
- * throws "Cannot find native module", and a release build closes on the spot.
- * Expo Router loads a screen's file the first time it is shown, so the crash
- * lands when that screen opens: Start opens the timer, the Brand tab opens Brand.
+ * Two ways a package takes down an Apple TV screen the moment Expo Router loads it:
  *
- * Such packages must be loaded with `await import()` behind a TV check, never
- * with a top-level `import`.
+ * 1. Its podspec leaves out tvOS, and its JS calls `requireNativeModule` (not the
+ *    optional variant). Importing it throws "Cannot find native module".
+ * 2. Its JS constructs `new NativeEventEmitter(NativeModules.X)` at module scope.
+ *    On Apple TV `Platform.OS` is still `ios`, so a missing native class throws
+ *    "`new NativeEventEmitter()` requires a non-null argument." Expo's production
+ *    handler rewrites that to "a native module that doesn't exist", which is the
+ *    Brand-tab boundary. `react-native-tcp-socket` does this: its podspec lists
+ *    tvOS, but `SecPKCS12Import` is not in the tvOS SDK, so the class is absent.
+ *
+ * Such packages must be loaded with `await import()` after a presence check,
+ * never with a top-level `import`.
  */
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -72,7 +77,24 @@ function jsFiles(dir) {
 
 const verdicts = new Map();
 
-/** True when importing the package on Apple TV throws. */
+/**
+ * True when the package builds `new NativeEventEmitter(someNativeModule)` while
+ * the module is still being evaluated. An object-literal stub is not that.
+ */
+function eventEmitterAtLoad(pkg) {
+  const dir = join(ROOT, 'node_modules', pkg);
+  const files = [...jsFiles(join(dir, 'src')), ...jsFiles(join(dir, 'build'))];
+  return files.some((file) =>
+    /^const \w+ = new NativeEventEmitter\([A-Za-z_$][\w$]*\);/m.test(readFileSync(file, 'utf8')),
+  );
+}
+
+/** True when importing the package on Apple TV throws before any app code runs. */
+function crashesWhenImportedOnAppleTv(pkg) {
+  return throwsOnTvos(pkg) || eventEmitterAtLoad(pkg);
+}
+
+/** True when a missing tvOS pod plus requireNativeModule throws on import. */
 function throwsOnTvos(pkg) {
   const cached = verdicts.get(pkg);
   if (cached !== undefined) return cached;
@@ -95,15 +117,20 @@ describe('Apple TV imports', () => {
     expect(throwsOnTvos('expo-document-picker')).toBe(true);
     expect(throwsOnTvos('expo-haptics')).toBe(false);
     expect(throwsOnTvos('expo-audio')).toBe(false);
+    expect(throwsOnTvos('expo-image')).toBe(false);
+    expect(throwsOnTvos('expo-image-manipulator')).toBe(false);
+    expect(throwsOnTvos('expo-file-system')).toBe(false);
+    expect(throwsOnTvos('expo-network')).toBe(false);
+    expect(eventEmitterAtLoad('react-native-tcp-socket')).toBe(true);
   });
 
-  it.skipIf(!installed)('never imports an iOS-only native package at the top of a file', () => {
+  it.skipIf(!installed)('never imports an Apple-TV-crashing native package at the top of a file', () => {
     const offenders = [];
     for (const dir of SOURCE_DIRS) {
       for (const file of sourceFiles(join(ROOT, dir))) {
         for (const specifier of valueImports(readFileSync(file, 'utf8'))) {
           const pkg = packageName(specifier);
-          if (pkg && throwsOnTvos(pkg)) offenders.push(`${relative(ROOT, file)} imports ${specifier}`);
+          if (pkg && crashesWhenImportedOnAppleTv(pkg)) offenders.push(`${relative(ROOT, file)} imports ${specifier}`);
         }
       }
     }

@@ -4,10 +4,14 @@
 Requires cairosvg, cairo, and Pillow. From the repo root:
 
     python3 scripts/render-brand.py
+
+`python3 scripts/render-brand.py --watch-icon` rewrites only the watch icon
+from assets/images/icon.png.
 """
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import cairosvg
@@ -25,6 +29,10 @@ RED = (255, 59, 36, 255)
 BG = (12, 13, 16, 255)
 TITLE = "ANTHEM"
 SUBTITLE = "GYM TIMER"
+WATCH_ICON = ROOT / "targets" / "watch" / "Assets.xcassets" / "AppIcon.appiconset" / "AppIcon.png"
+# watchOS clips the square to a circle. A few pixels of bleed puts the
+# anti-aliased rim outside that circle so the ring is not inset.
+WATCH_BLEED = 8
 
 
 def svg_text() -> str:
@@ -64,6 +72,11 @@ def font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(str(FONT), size)
 
 
+def require_inside(box: tuple[float, float, float, float], width: int, height: int, label: str) -> None:
+    if box[0] < 1 or box[1] < 1 or box[2] > width - 1 or box[3] > height - 1:
+        raise SystemExit(f"{label!r} overflows {width}x{height}: {tuple(round(edge, 1) for edge in box)}")
+
+
 def draw_centered(
     draw: ImageDraw.ImageDraw,
     text: str,
@@ -95,9 +108,45 @@ def draw_left(
     draw.text((x, y), text, font=font, fill=fill)
 
 
-def require_inside(box: tuple[float, float, float, float], width: int, height: int, label: str) -> None:
-    if box[0] < 1 or box[1] < 1 or box[2] > width - 1 or box[3] > height - 1:
-        raise SystemExit(f"{label!r} overflows {width}x{height}: {tuple(round(edge, 1) for edge in box)}")
+def opaque(image: Image.Image) -> Image.Image:
+    """Amazon Fire TV rejects an alpha channel on the background and the 1280×720 icon."""
+    if image.mode != "RGBA":
+        image = image.convert("RGBA")
+    flat = Image.new("RGB", image.size, BG[:3])
+    flat.paste(image, mask=image.getchannel("A"))
+    return flat
+
+
+def firetv_background(width: int, height: int) -> Image.Image:
+    """Put the mark in the upper-right mini-detail.
+
+    Amazon shows this 1920×1080 image in the circle at the top right of Apps and
+    subscriptions. The safe subject box is 1214×830, kept off the left side where
+    the title sits. A left-aligned banner leaves that circle empty.
+    """
+    image = Image.new("RGBA", (width, height), BG)
+    safe_w = round(width * (1214 / 1920))
+    safe_h = round(height * (830 / 1080))
+    safe_x = width - round(width * (64 / 1920)) - safe_w
+    safe_y = max(0, (height - safe_h) // 2)
+    mark = int(min(safe_w, safe_h) * 0.92)
+    paste_mark(image, mark, (safe_x + (safe_w - mark) // 2, safe_y + (safe_h - mark) // 2), "full")
+    return opaque(image)
+
+
+def firetv_square_icon(size: int) -> Image.Image:
+    image = Image.new("RGBA", (size, size), BG)
+    mark = int(size * 0.86)
+    paste_mark(image, mark, ((size - mark) // 2, (size - mark) // 2), "full")
+    return opaque(image)
+
+
+def firetv_wide_icon(width: int, height: int) -> Image.Image:
+    """1280×720 Fire TV app icon. The mark is centered so a circular crop still shows it."""
+    image = Image.new("RGBA", (width, height), BG)
+    mark = int(height * 0.86)
+    paste_mark(image, mark, ((width - mark) // 2, (height - mark) // 2), "full")
+    return opaque(image)
 
 
 def banner(width: int, height: int, title_size: int, sub_size: int) -> Image.Image:
@@ -117,6 +166,56 @@ def banner(width: int, height: int, title_size: int, sub_size: int) -> Image.Ima
     draw_left(draw, TITLE, text_x, y, title, INK, width, height)
     draw_left(draw, SUBTITLE, text_x, y + (title_box[3] - title_box[1]) + gap, sub, RED, width, height)
     return image
+
+
+def content_bounds(image: Image.Image, tolerance: int = 12) -> tuple[int, int, int, int]:
+    """Bounding box of pixels that are not the corner background."""
+    rgba = image.convert("RGBA")
+    pixels = rgba.load()
+    width, height = rgba.size
+    background = pixels[0, 0]
+    min_x, min_y, max_x, max_y = width, height, -1, -1
+    for y in range(height):
+        for x in range(width):
+            pixel = pixels[x, y]
+            if pixel[3] < 16:
+                continue
+            if all(abs(pixel[channel] - background[channel]) <= tolerance for channel in range(3)):
+                continue
+            min_x = min(min_x, x)
+            min_y = min(min_y, y)
+            max_x = max(max_x, x)
+            max_y = max(max_y, y)
+    if max_x < 0:
+        raise SystemExit("iPhone icon has no mark to derive the watch icon from")
+    return min_x, min_y, max_x, max_y
+
+
+def watch_app_icon(phone: Image.Image) -> Image.Image:
+    """Full-bleed opaque watch icon derived from the iPhone icon.
+
+    The iPhone mark keeps a margin. The same file looks small on Apple Watch
+    because the system masks the square to a circle. Scale the mark until it
+    crosses the canvas edge, then flatten to RGB. Corners stay square.
+    """
+    source = phone.convert("RGBA")
+    min_x, min_y, max_x, max_y = content_bounds(source)
+    span = max(max_x - min_x + 1, max_y - min_y + 1)
+    scale = (1024 + WATCH_BLEED * 2) / span
+    resized = source.resize(
+        (round(source.width * scale), round(source.height * scale)),
+        Image.Resampling.LANCZOS,
+    )
+    center_x = ((min_x + max_x) / 2) * scale
+    center_y = ((min_y + max_y) / 2) * scale
+    left = round(center_x - 512)
+    top = round(center_y - 512)
+    if left < 0 or top < 0 or left + 1024 > resized.width or top + 1024 > resized.height:
+        raise SystemExit(f"watch icon crop {left},{top} falls outside {resized.size}")
+    cropped = resized.crop((left, top, left + 1024, top + 1024))
+    flat = Image.new("RGB", (1024, 1024), BG[:3])
+    flat.paste(cropped, mask=cropped.getchannel("A"))
+    return flat
 
 
 def splash() -> Image.Image:
@@ -141,8 +240,12 @@ def splash() -> Image.Image:
 
 
 def main() -> None:
+    if "--watch-icon" in sys.argv[1:]:
+        save(watch_app_icon(Image.open(IMAGES / "icon.png")), WATCH_ICON)
+        return
     icon = render_svg(mark_only("full"), 1024, 1024)
     save(icon, IMAGES / "icon.png")
+    save(watch_app_icon(icon), WATCH_ICON)
     save(icon.resize((48, 48), Image.Resampling.LANCZOS), IMAGES / "favicon.png")
 
     foreground = render_svg(mark_only("front"), 1024, 1024)
@@ -186,14 +289,14 @@ def main() -> None:
     save(banner(4640, 1440, 220, 80), TV / "topshelf-wide-4640x1440.png")
 
     save(banner(320, 180, 28, 12), TV / "android-tv-banner.png")
-    tv_icon = Image.new("RGBA", (320, 180), BG)
-    paste_mark(tv_icon, 168, (76, 6), "front")
-    save(tv_icon, TV / "android-tv-icon.png")
+    # Square launcher icon. config-tv points android:icon at this file on Fire TV.
+    # A 320×180 bitmap is cropped into the hero circle and the mark falls outside it.
+    save(firetv_square_icon(512), TV / "android-tv-icon.png")
 
     save(icon.resize((512, 512), Image.Resampling.LANCZOS), STORE / "amazon-icon-512.png")
     save(icon.resize((114, 114), Image.Resampling.LANCZOS), STORE / "amazon-icon-114.png")
-    save(banner(1280, 720, 84, 30), STORE / "firetv-background-1280x720.png")
-    save(banner(1920, 1080, 128, 44), STORE / "firetv-background-1920x1080.png")
+    save(firetv_wide_icon(1280, 720), STORE / "firetv-background-1280x720.png")
+    save(firetv_background(1920, 1080), STORE / "firetv-background-1920x1080.png")
 
     old = list(TV.glob("placeholder-*"))
     for path in old:

@@ -1,0 +1,368 @@
+import Foundation
+import Network
+import SwiftUI
+import WatchKit
+
+struct WatchFaceModel: Equatable {
+  var phase: String
+  var phaseText: String
+  var timeText: String
+  var roundText: String
+  var primaryTitle: String
+  var primaryCommand: String
+  var canReset: Bool
+  var status: String
+  var connected: Bool
+  var showsForget: Bool
+
+  static let waiting = WatchFaceModel(
+    phase: "idle",
+    phaseText: "READY",
+    timeText: "--:--",
+    roundText: "Round",
+    primaryTitle: "Start",
+    primaryCommand: "start",
+    canReset: false,
+    status: "Not paired. Open Settings to pair.",
+    connected: false,
+    showsForget: false
+  )
+}
+
+enum WatchScreen: Equatable {
+  case face
+  case pad
+}
+
+/// Listens for the Apple TV. The TV presents DeviceDiscoveryUI and connects here.
+/// A tap fires when a phase, round, or the finish arrives. No health data is read.
+@MainActor
+final class WatchSession: ObservableObject {
+  @Published private(set) var model = WatchFaceModel.waiting
+  @Published private(set) var screen: WatchScreen = .face
+  @Published private(set) var codeDigits = ""
+  @Published private(set) var pairStatus = "Enter the 6-digit code"
+
+  private var listener: NWListener?
+  private var connection: NWConnection?
+  private let framer = WatchFramer()
+  private let relay = WatchRelayClient()
+  private var directReady = false
+  /// Debug screenshot launches already show a preview face and must not open the listener.
+  private let showsLaunchPreview: Bool
+  private var restartAttempts = 0
+  private var restartQueued = false
+  private let restartLimit = 4
+
+  init() {
+    #if DEBUG
+    let preview = WatchSession.launchPreviewModel()
+    showsLaunchPreview = preview != nil
+    if let face = preview {
+      model = face
+    }
+    #else
+    showsLaunchPreview = false
+    #endif
+    if !showsLaunchPreview {
+      relay.onLine = { [weak self] line in
+        self?.apply(line)
+      }
+      relay.onStatus = { [weak self] text, connected in
+        self?.noteRelay(text, connected: connected)
+      }
+      start()
+      relay.resumeStored()
+    }
+  }
+
+  func beginPairing() {
+    codeDigits = ""
+    pairStatus = "Enter the 6-digit code"
+    screen = .pad
+  }
+
+  func cancelPairing() {
+    screen = .face
+  }
+
+  func typeDigit(_ digit: String) {
+    guard codeDigits.count < 6, digit.count == 1, digit.first?.isNumber == true else { return }
+    codeDigits.append(digit)
+  }
+
+  func deleteDigit() {
+    if !codeDigits.isEmpty { codeDigits.removeLast() }
+  }
+
+  func submitCode() {
+    guard codeDigits.count == 6 else { return }
+    pairStatus = "Connecting…"
+    relay.pair(code: codeDigits)
+  }
+
+  func forgetTV() {
+    relay.forget()
+    screen = .face
+    refreshLink(status: directReady ? "Apple TV" : "Waiting for Apple TV")
+  }
+
+  /// Foreground launches the listener again after a failure or a cancel.
+  func noteForeground() {
+    guard !showsLaunchPreview else { return }
+    restartAttempts = 0
+    start()
+    relay.resumeIfNeeded()
+  }
+
+  func start() {
+    guard !showsLaunchPreview else { return }
+    guard listener == nil else { return }
+    guard #available(watchOS 9.0, *) else {
+      model.status = "Needs watchOS 9"
+      return
+    }
+    do {
+      let listener = try NWListener(using: .applicationService)
+      listener.service = NWListener.Service(applicationService: WatchWire.serviceName)
+      listener.stateUpdateHandler = { [weak self] state in
+        Task { @MainActor in
+          self?.noteListener(state)
+        }
+      }
+      listener.newConnectionHandler = { [weak self] connection in
+        Task { @MainActor in
+          self?.accept(connection)
+        }
+      }
+      listener.start(queue: .main)
+      self.listener = listener
+      log("listener started")
+    } catch {
+      log("listener error \(error.localizedDescription)")
+      model.status = "Could not listen"
+      scheduleRestart()
+    }
+  }
+
+  func sendCommand(_ name: String) {
+    guard model.connected, let line = WatchWire.commandLine(id: UUID().uuidString, name: name) else { return }
+    if directReady {
+      guard let data = line.data(using: .utf8) else { return }
+      connection?.send(content: data, completion: .contentProcessed { _ in })
+      return
+    }
+    relay.sendLine(line)
+  }
+
+  private func noteListener(_ state: NWListener.State) {
+    switch state {
+    case .ready:
+      restartAttempts = 0
+      log("listener ready")
+    case .failed(let error):
+      log("listener failed \(error.localizedDescription)")
+      model.status = "Listener failed"
+      guard listener != nil else { return }
+      dropListener()
+      scheduleRestart()
+    case .cancelled:
+      log("listener cancelled")
+      guard listener != nil else { return }
+      listener = nil
+      scheduleRestart()
+    case .waiting(let error):
+      log("listener waiting \(error.localizedDescription)")
+    case .setup:
+      log("listener setup")
+    @unknown default:
+      log("listener unknown")
+    }
+  }
+
+  private func dropListener() {
+    let dead = listener
+    listener = nil
+    dead?.stateUpdateHandler = nil
+    dead?.newConnectionHandler = nil
+    dead?.cancel()
+  }
+
+  private func scheduleRestart() {
+    guard !showsLaunchPreview else { return }
+    guard !restartQueued else { return }
+    guard restartAttempts < restartLimit else {
+      log("listener restart gave up")
+      return
+    }
+    restartQueued = true
+    restartAttempts += 1
+    let attempt = restartAttempts
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 500_000_000)
+      self.restartQueued = false
+      self.log("listener restart \(attempt)")
+      self.start()
+    }
+  }
+
+  private func log(_ message: String) {
+    print("AmericanaWatchLink \(message)")
+  }
+
+  private func accept(_ next: NWConnection) {
+    connection?.cancel()
+    framer.reset()
+    connection = next
+    next.stateUpdateHandler = { [weak self] state in
+      Task { @MainActor in
+        self?.noteConnection(state)
+      }
+    }
+    next.start(queue: .main)
+    receive(on: next)
+  }
+
+  private func noteConnection(_ state: NWConnection.State) {
+    switch state {
+    case .ready:
+      directReady = true
+      screen = .face
+      refreshLink(status: "Apple TV")
+    case .failed(_):
+      directReady = false
+      connection = nil
+      refreshLink(status: relayReady ? "Apple TV" : "Waiting for Apple TV")
+    case .cancelled:
+      directReady = false
+      connection = nil
+      refreshLink(status: relayReady ? "Apple TV" : "Waiting for Apple TV")
+    case .setup, .preparing:
+      break
+    case .waiting(_):
+      break
+    @unknown default:
+      break
+    }
+  }
+
+  private var relayReady: Bool { relay.isConnected }
+
+  private func noteRelay(_ text: String, connected: Bool) {
+    if connected {
+      screen = .face
+      refreshLink(status: "Apple TV")
+      return
+    }
+    if screen == .pad {
+      pairStatus = text
+    }
+    refreshLink(status: directReady ? "Apple TV" : text)
+  }
+
+  private func refreshLink(status: String) {
+    model.connected = directReady || relay.isConnected
+    model.showsForget = relay.hasPairing
+    if model.status == "Not now" { return }
+    if !model.connected && !relay.hasPairing && (status == "Waiting for Apple TV" || status.isEmpty) {
+      model.status = "Not paired. Open Settings to pair."
+      return
+    }
+    model.status = status
+  }
+
+  private func receive(on connection: NWConnection) {
+    connection.receive(minimumIncompleteLength: 1, maximumLength: WatchWire.maxBytes) { [weak self] data, _, isComplete, error in
+      let captured = data
+      Task { @MainActor in
+        guard let self else { return }
+        if let captured {
+          for line in self.framer.append(captured) {
+            self.apply(line)
+          }
+        }
+        if isComplete || error != nil {
+          self.directReady = false
+          self.refreshLink(status: self.relay.isConnected ? "Apple TV" : "Waiting for Apple TV")
+          return
+        }
+        self.receive(on: connection)
+      }
+    }
+  }
+
+  private func apply(_ line: String) {
+    guard let object = WatchWire.decodeObject(line), let type = object["type"] as? String else { return }
+    switch type {
+    case "state":
+      applyState(object)
+    case "event":
+      play(object["name"] as? String)
+    case "ack":
+      if object["ok"] as? Bool == false {
+        model.status = "Not now"
+      }
+    default:
+      break
+    }
+  }
+
+  private func applyState(_ object: [String: Any]) {
+    guard let phase = object["phase"] as? String,
+          let phaseText = object["phaseText"] as? String,
+          let timeText = object["timeText"] as? String,
+          let roundText = object["roundText"] as? String,
+          let primary = object["primary"] as? String,
+          let canReset = object["canReset"] as? Bool else {
+      return
+    }
+    model.phase = phase
+    model.phaseText = phaseText
+    model.timeText = timeText
+    model.roundText = roundText
+    model.primaryCommand = primary
+    model.primaryTitle = title(for: primary)
+    model.canReset = canReset
+    model.connected = true
+    if model.status == "Not now" || model.status == "Waiting for Apple TV" || model.status == "Reconnecting…" {
+      model.status = "Apple TV"
+    }
+  }
+
+  private func title(for primary: String) -> String {
+    switch primary {
+    case "pause":
+      return "Pause"
+    case "resume":
+      return "Resume"
+    default:
+      return "Start"
+    }
+  }
+
+  #if DEBUG
+  /// Screenshot runs pass `-AmericanaWatchPreview waiting|getReady|work|rest|finished`.
+  /// The faces are the SwiftUI previews. Release builds omit this path.
+  private static func launchPreviewModel() -> WatchFaceModel? {
+    let args = ProcessInfo.processInfo.arguments
+    let flag = "-AmericanaWatchPreview"
+    guard let index = args.firstIndex(of: flag),
+          index + 1 < args.count,
+          let face = WatchPreviewFace(rawValue: args[index + 1]) else {
+      return nil
+    }
+    return face.model
+  }
+  #endif
+
+  private func play(_ name: String?) {
+    switch name {
+    case "phase", "round":
+      WKInterfaceDevice.current().play(.click)
+    case "finished":
+      WKInterfaceDevice.current().play(.notification)
+    default:
+      break
+    }
+  }
+}

@@ -18,3 +18,17 @@ export function isReachableLanIPv4(value: string): boolean {
 export function pairingUrl(ip: string, port: number, token: string): string {
   return `http://${ip}:${port}/?t=${token}`;
 }
+
+/**
+ * Pick a private address a phone on the same network can open.
+ * Wi-Fi is preferred over a link-local fallback. `0.0.0.0` and public addresses are ignored.
+ */
+export function chooseLanIPv4(candidates: readonly string[]): string | null {
+  const reachable: string[] = [];
+  for (const candidate of candidates) {
+    const ip = candidate.trim();
+    if (!isReachableLanIPv4(ip) || reachable.includes(ip)) continue;
+    reachable.push(ip);
+  }
+  return reachable.find((ip) => !ip.startsWith('169.254.')) ?? reachable[0] ?? null;
+}

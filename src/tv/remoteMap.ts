@@ -8,6 +8,8 @@ export type RemoteCommand =
   | { type: 'stepRound'; direction: -1 | 1 }
   | { type: 'showControls' }
   | { type: 'hideControls' }
+  | { type: 'pause'; focusResume: boolean }
+  | { type: 'menu' }
   | { type: 'exit' }
   | { type: 'ignore' };
 
@@ -15,17 +17,16 @@ export interface RemoteContext {
   mode: TimerMode;
   controlsVisible: boolean;
   confirmOpen: boolean;
+  /**
+   * Television keeps Pause and Finish mounted. Down must not unmount them.
+   * A phone or a browser preview still hides the row.
+   */
+  stableControls: boolean;
+  /** The clock is running. Select and Back pause it instead of leaving. */
+  running: boolean;
 }
 
-const ROUND_STEP_MODES = new Set<TimerMode>(['rounds', 'intervals', 'tabata']);
-
-/**
- * Key-up repeats the same event. Act on key-down (0) and on events that do not
- * report an action (-1 or missing), which is how Apple TV often delivers them.
- */
-export function shouldHandleKeyAction(eventKeyAction: number | string | undefined): boolean {
-  return eventKeyAction !== 1 && eventKeyAction !== '1';
-}
+const ROUND_STEP_MODES = new Set<TimerMode>(['intervals']);
 
 function nudge(mode: TimerMode, direction: -1 | 1): RemoteCommand {
   if (ROUND_STEP_MODES.has(mode)) return { type: 'stepRound', direction };
@@ -45,7 +46,11 @@ export function mapRemoteEvent(eventType: string, context: RemoteContext): Remot
 
   switch (eventType) {
     case 'select':
-      return context.controlsVisible ? { type: 'ignore' } : { type: 'toggle' };
+      // A visible row handles Select on the focused button. Mapping it to
+      // Pause swallowed Reset and Finish, so those needed a second press.
+      if (context.controlsVisible) return { type: 'ignore' };
+      if (context.running) return { type: 'pause', focusResume: true };
+      return { type: 'toggle' };
     case 'playPause':
     case 'play':
     case 'pause':
@@ -62,13 +67,16 @@ export function mapRemoteEvent(eventType: string, context: RemoteContext): Remot
       return context.controlsVisible ? { type: 'ignore' } : nudge(context.mode, 1);
     case 'up':
     case 'swipeUp':
-      return { type: 'showControls' };
+      return context.controlsVisible ? { type: 'ignore' } : { type: 'showControls' };
     case 'down':
     case 'swipeDown':
+      if (context.stableControls) return { type: 'ignore' };
       return context.controlsVisible ? { type: 'hideControls' } : { type: 'ignore' };
     case 'back':
     case 'menu':
-      return { type: 'exit' };
+      // Television decides from the live clock. A phone preview still leaves once stopped.
+      if (context.stableControls) return { type: 'menu' };
+      return context.running ? { type: 'pause', focusResume: true } : { type: 'exit' };
     default:
       return { type: 'ignore' };
   }

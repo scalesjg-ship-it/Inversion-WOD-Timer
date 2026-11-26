@@ -1,0 +1,168 @@
+# Records an Apple TV simulator pass of the Siri Remote UI test.
+# macos-26 is the hosted image that carries Xcode 26.4+ (Expo SDK 58) and a tvOS simulator runtime.
+# workflow_dispatch has no inputs. Run it on the branch under test.
+# Screenshots land in the appletv-simulator artifact, one per step name:
+# "tab Settings", "tab Help", "Intervals presets", "paused For Time shows Watch",
+# and "unsupported Apple TV HD message".
+name: Apple TV simulator
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cursor/appletv-sim-uitest-8dd8
+      - cursor/appletv-uitest-finish-sound-bfec
+
+concurrency:
+  group: appletv-simulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  appletv-simulator:
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      EXPO_NO_TELEMETRY: "1"
+      EXPO_TV: "1"
+      COCOAPODS_DISABLE_STATS: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26.4 or newer
+        run: |
+          set -euo pipefail
+          DEVELOPER_DIR=$(python3 scripts/ci-select-xcode.py)
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR
+          sudo xcode-select -s "$DEVELOPER_DIR"
+          xcodebuild -version
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild the Apple TV app
+        run: |
+          set -euo pipefail
+          npx expo prebuild --platform ios
+          if ! grep -Eq 'appletvos|appletvsimulator|TVOS_DEPLOYMENT_TARGET' ios/*.xcodeproj/project.pbxproj; then
+            echo "expo prebuild did not produce a tvOS project"
+            grep -nE 'SDKROOT|TARGETED_DEVICE_FAMILY|TVOS' ios/*.xcodeproj/project.pbxproj | head -n 40
+            exit 1
+          fi
+          python3 scripts/ci-tvos-signing.py check-watch-browse --ios-dir ios
+
+      - name: Add the XCUITest target
+        run: node scripts/wire-tvos-ui-test.mjs
+
+      - name: Boot, record, and test
+        id: test
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          xcodebuild -version
+          xcrun simctl list devices available
+          xcrun simctl list runtimes
+          UDID=$(python3 scripts/ci-select-tvos-udid.py)
+          echo "UDID=$UDID" | tee -a "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          VIDEO="$PWD/artifacts/appletv.mp4"
+          rec_pid=""
+          stop_recording() {
+            if [ -n "${rec_pid}" ] && kill -0 "$rec_pid" 2>/dev/null; then
+              kill -INT "$rec_pid" 2>/dev/null || true
+              local waited=0
+              while kill -0 "$rec_pid" 2>/dev/null && [ "$waited" -lt 30 ]; do
+                sleep 1
+                waited=$((waited + 1))
+              done
+              if kill -0 "$rec_pid" 2>/dev/null; then
+                kill -TERM "$rec_pid" 2>/dev/null || true
+                wait "$rec_pid" 2>/dev/null || true
+              fi
+              rec_pid=""
+            fi
+          }
+          trap stop_recording EXIT
+          xcrun simctl io "$UDID" recordVideo --codec h264 --force "$VIDEO" &
+          rec_pid=$!
+          sleep 2
+          WORKSPACE=$(ls -d ios/*.xcworkspace | grep -v '/Pods' | head -n 1)
+          SCHEME_FILE=$(grep -l AmericanaUITests ios/*.xcodeproj/xcshareddata/xcschemes/*.xcscheme | head -n 1)
+          SCHEME=$(basename "$SCHEME_FILE" .xcscheme)
+          echo "workspace=$WORKSPACE scheme=$SCHEME"
+          xcodebuild -workspace "$WORKSPACE" -list
+          set +e
+          FORCE_BUNDLING=1 RCT_NO_LAUNCH_PACKAGER=1 \
+            xcodebuild test \
+              -workspace "$WORKSPACE" \
+              -scheme "$SCHEME" \
+              -configuration Release \
+              -sdk appletvsimulator \
+              -destination "id=$UDID" \
+              -only-testing:AmericanaUITests/AmericanaRemoteUITests \
+              -resultBundlePath "$PWD/artifacts/Americana.xcresult" \
+              -parallel-testing-enabled NO \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY=- \
+              COMPILER_INDEX_STORE_ENABLE=NO \
+              | tee artifacts/xcodebuild.log
+          status=${PIPESTATUS[0]}
+          set -e
+          xcrun simctl io "$UDID" screenshot artifacts/final.png || true
+          stop_recording
+          trap - EXIT
+          if [ -f artifacts/appletv.mp4 ]; then
+            ls -lh artifacts/appletv.mp4
+          fi
+          exit "$status"
+
+      - name: Collect results
+        if: always()
+        run: |
+          set +e
+          mkdir -p artifacts/screenshots
+          XCRESULT="artifacts/Americana.xcresult"
+          if [ -d "$XCRESULT" ]; then
+            xcrun xcresulttool get test-results summary --path "$XCRESULT" > artifacts/xcresult-summary.json
+            if [ $? -ne 0 ]; then
+              xcrun xcresulttool get --legacy --format json --path "$XCRESULT" > artifacts/xcresult-summary.json
+            fi
+            xcrun xcresulttool get test-results tests --path "$XCRESULT" > artifacts/xcresult-tests.json
+            xcrun xcresulttool export attachments --path "$XCRESULT" --output-path artifacts/screenshots
+            if [ $? -ne 0 ]; then
+              xcrun xcresulttool export --type directory --path "$XCRESULT" --output-path artifacts/xcresult-export
+            fi
+          fi
+          if [ -f artifacts/xcodebuild.log ]; then
+            awk '/APPLETV_REPORT_BEGIN/,/APPLETV_REPORT_END/' artifacts/xcodebuild.log > artifacts/step-report.txt
+            tail -n 200 artifacts/xcodebuild.log > artifacts/xcodebuild-tail.log
+          fi
+          echo "----- step report -----"
+          cat artifacts/step-report.txt || true
+          ls -lh artifacts artifacts/screenshots || true
+
+      - name: Upload recording, screenshots, and test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: appletv-simulator
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            artifacts/appletv.mp4
+            artifacts/final.png
+            artifacts/step-report.txt
+            artifacts/xcresult-summary.json
+            artifacts/xcresult-tests.json
+            artifacts/xcodebuild-tail.log
+            artifacts/screenshots/**
+            artifacts/xcresult-export/**

@@ -1,20 +1,23 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBranding } from '@/src/branding/BrandingProvider';
 import { readableDigitColor } from '@/src/branding/color';
 import { PresetShelf } from '@/src/components/PresetShelf';
 import { ProductMark } from '@/src/components/ProductMark';
-import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvToggle } from '@/src/components/ui';
+import { TvSetupFocus } from '@/src/components/TvSetupFocus';
+import { BigButton, Chip, HeaderBack, NumberStepper, TimeField, TvCountRow, TvLinkedStart, TvToggle } from '@/src/components/ui';
 import { useTimerSession } from '@/src/session/TimerSession';
 import { unlockAudio } from '@/src/audio/sounds';
 import { chrome } from '@/src/theme/chrome';
-import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, TV_SECTION_FONT, TV_TITLE_FONT, tvSafeBox } from '@/src/tv/layout';
+import { TV_BODY_FONT, TV_SAFE_HORIZONTAL, tvSafeBox } from '@/src/tv/layout';
+import { tvSetupFrame, tvSetupMetrics, tvSetupScaled } from '@/src/tv/setupLayout';
+import { showsOnScreenBack } from '@/src/tv/timerTransport';
 import { normalizeConfig } from '@/src/timer/engine';
 import { modeTitle } from '@/src/timer/labels';
-import { defaultConfig } from '@/src/timer/presets';
+import { defaultConfig, INTERVAL_PRESETS, type IntervalPreset } from '@/src/timer/presets';
 import { listPresets, presetSummary, type SavedPreset } from '@/src/timer/presetStorage';
 import type { TimerConfig, TimerMode } from '@/src/timer/types';
 
@@ -28,9 +31,11 @@ function readMode(value: string | string[] | undefined): TimerMode | null {
     case 'forTime':
     case 'amrap':
     case 'emom':
-    case 'tabata':
-    case 'intervals':
       return raw;
+    case 'tabata':
+    case 'rounds':
+    case 'intervals':
+      return 'intervals';
     default:
       return null;
   }
@@ -45,10 +50,11 @@ export default function SetupScreen() {
   const accent = readableDigitColor(branding.uiColor, branding.backgroundColor);
 
   if (!mode) {
+    const showBack = showsOnScreenBack(Platform.isTV === true, Platform.OS);
     return (
       <SafeAreaView style={styles.safe}>
         <Text style={styles.title}>Pick a conditioning mode.</Text>
-        <BigButton label="Back" color={accent} onPress={() => router.back()} />
+        {showBack ? <BigButton label="Back" color={accent} onPress={() => router.back()} /> : null}
       </SafeAreaView>
     );
   }
@@ -80,13 +86,16 @@ function SetupForm({
   onStart: (config: TimerConfig, label: string) => void;
 }) {
   const tv = Platform.isTV === true;
-  const box = tvSafeBox(tv);
+  const { width, height } = useWindowDimensions();
+  const box = tvSafeBox(tv, width, height);
   const initial = defaultConfig(mode);
   const [leadInSeconds, setLeadInSeconds] = useState(initial.leadInSeconds);
   const [workSeconds, setWorkSeconds] = useState(mode === 'forTime' ? 12 * 60 : initial.workSeconds);
   const [restSeconds, setRestSeconds] = useState(initial.restSeconds);
   const [rounds, setRounds] = useState(initial.rounds);
+  const [warningSeconds, setWarningSeconds] = useState(initial.warningSeconds);
   const [capOn, setCapOn] = useState(false);
+  const [pickedPreset, setPickedPreset] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [runLabel, setRunLabel] = useState(modeTitle(mode));
 
@@ -94,6 +103,8 @@ function SetupForm({
     setLeadInSeconds(preset.config.leadInSeconds);
     setRestSeconds(preset.config.restSeconds);
     setRounds(preset.config.rounds);
+    setWarningSeconds(preset.config.warningSeconds);
+    setPickedPreset(null);
     if (preset.config.mode === 'forTime') {
       if (preset.config.workSeconds > 0) {
         setCapOn(true);
@@ -127,10 +138,188 @@ function SetupForm({
     workSeconds: mode === 'forTime' && !capOn ? 0 : workSeconds,
     restSeconds,
     rounds,
-    warningSeconds: 0,
+    warningSeconds: mode === 'intervals' ? warningSeconds : 0,
   });
 
   const summary = presetSummary(config);
+  const applyBuiltIn = (preset: IntervalPreset) => {
+    setWorkSeconds(preset.workSeconds);
+    setRestSeconds(preset.restSeconds);
+    setRounds(preset.rounds);
+    setLeadInSeconds(preset.leadInSeconds);
+    setWarningSeconds(preset.warningSeconds);
+    setPickedPreset(preset.id);
+    setSelectedId('');
+    setRunLabel(preset.name);
+  };
+  const editInterval = () => setPickedPreset(null);
+  const intervalPresets = mode === 'intervals' ? (
+    <ChipRow
+      centered={tv}
+      accent={accent}
+      options={INTERVAL_PRESETS.map((preset) => ({
+        label: preset.name,
+        selected: pickedPreset === preset.id,
+        onPress: () => applyBuiltIn(preset),
+        testID: `interval-preset-${preset.id}`,
+      }))}
+    />
+  ) : null;
+  const intervalWarning = mode === 'intervals' ? (
+    <ChipRow
+      centered={tv}
+      accent={accent}
+      options={[0, 10, 30].map((seconds) => ({
+        label: seconds === 0 ? 'Off' : `${seconds}s`,
+        selected: warningSeconds === seconds,
+        onPress: () => {
+          editInterval();
+          setWarningSeconds(seconds);
+        },
+        testID: `interval-warning-${seconds}`,
+      }))}
+    />
+  ) : null;
+  const shelf = (
+    <PresetShelf
+      mode={mode}
+      accent={accent}
+      config={config}
+      selectedId={selectedId}
+      onLoad={loadPreset}
+      onStart={(preset) => onStart(preset.config, preset.name)}
+      onClearSelection={() => {
+        setSelectedId('');
+        setRunLabel(modeTitle(mode));
+      }}
+    />
+  );
+
+  if (tv) {
+    const metrics = tvSetupMetrics(width, height);
+    const frame = tvSetupFrame(width, height);
+    const titleSize = tvSetupScaled(40, width, height);
+    const formWidth = frame.formWidth;
+    const appleTv = !showsOnScreenBack(true, Platform.OS);
+    return (
+      <TvSetupFocus>
+      <View style={[styles.safe, { paddingHorizontal: frame.horizontal, paddingTop: frame.vertical }]}>
+        <View style={[styles.header, appleTv && styles.headerApple]}>
+          <HeaderBack onPress={() => router.back()} color={accent} />
+          <ProductMark variant="kicker" color={chrome.text} />
+        </View>
+        <View style={[styles.tvBody, { paddingBottom: frame.vertical, gap: metrics.rowGap }]}>
+          <Text testID="screen-setup" style={[styles.title, styles.titleCenter, { fontSize: titleSize, lineHeight: titleSize + 6 }]}>{modeTitle(mode)}</Text>
+          <Text style={[styles.summary, styles.summaryTv, styles.titleCenter]}>{summary}</Text>
+          <View style={[styles.tvForm, { width: formWidth, gap: metrics.rowGap }]}>
+            {mode === 'forTime' ? (
+              <TvToggle
+                preferred
+                label="Time cap"
+                help="Stop the clock when the cap hits."
+                value={capOn}
+                onValueChange={setCapOn}
+                testID="for-time-cap"
+                accent={accent}
+              />
+            ) : null}
+            {mode === 'forTime' && capOn ? (
+              <TimeField compact label="Cap" seconds={workSeconds} onChange={setWorkSeconds} testID="cap" accent={accent} />
+            ) : null}
+            {mode === 'amrap' ? (
+              <>
+                <ChipRow
+                  centered
+                  preferred
+                  accent={accent}
+                  options={[8, 10, 12, 15, 20].map((minutes) => ({
+                    label: `${minutes} min`,
+                    selected: workSeconds === minutes * 60,
+                    onPress: () => setWorkSeconds(minutes * 60),
+                    testID: `amrap-${minutes}`,
+                  }))}
+                />
+                <TimeField compact label="Time" seconds={workSeconds} onChange={setWorkSeconds} testID="amrap" accent={accent} />
+              </>
+            ) : null}
+            {mode === 'emom' ? (
+              <>
+                <TimeField compact preferred label="Every" seconds={workSeconds} onChange={setWorkSeconds} testID="emom-every" accent={accent} />
+                <ChipRow
+                  centered
+                  accent={accent}
+                  options={[8, 10, 12, 20].map((count) => ({
+                    label: `${count} rounds`,
+                    selected: rounds === count,
+                    onPress: () => setRounds(count),
+                    testID: `emom-rounds-${count}`,
+                  }))}
+                />
+              </>
+            ) : null}
+            {mode === 'intervals' ? (
+              <>
+                {intervalPresets}
+                <TimeField
+                  compact
+                  preferred
+                  label="Work"
+                  seconds={workSeconds}
+                  onChange={(value) => {
+                    editInterval();
+                    setWorkSeconds(value);
+                  }}
+                  testID="work"
+                  accent={accent}
+                />
+                <TimeField
+                  compact
+                  label="Rest"
+                  seconds={restSeconds}
+                  onChange={(value) => {
+                    editInterval();
+                    setRestSeconds(value);
+                  }}
+                  testID="rest"
+                  accent={accent}
+                />
+              </>
+            ) : null}
+            {mode !== 'forTime' && mode !== 'amrap' ? (
+              <TvCountRow
+                label="Rounds"
+                value={rounds}
+                min={1}
+                max={99}
+                suffix="rds"
+                testID="rounds"
+                accent={accent}
+                onChange={(value) => {
+                  editInterval();
+                  setRounds(value);
+                }}
+              />
+            ) : null}
+            {intervalWarning}
+            <TimeField
+              compact
+              exit
+              label="Lead-in"
+              seconds={leadInSeconds}
+              onChange={(value) => setLeadInSeconds(Math.min(600, value))}
+              testID="lead-in"
+              accent={accent}
+            />
+          </View>
+          <View style={styles.tvShelf}>{shelf}</View>
+          <View style={styles.footer}>
+            <TvLinkedStart roomy testID="start-timer" label="Start" color={accent} onPress={() => onStart(config, runLabel)} />
+          </View>
+        </View>
+      </View>
+      </TvSetupFocus>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -230,10 +419,29 @@ function SetupForm({
             />
           </>
         ) : null}
-        {mode === 'tabata' || mode === 'intervals' ? (
+        {mode === 'intervals' ? (
           <>
-            <TimeField label="Work" seconds={workSeconds} onChange={setWorkSeconds} testID="work" accent={accent} />
-            <TimeField label="Rest" seconds={restSeconds} onChange={setRestSeconds} testID="rest" accent={accent} />
+            {intervalPresets}
+            <TimeField
+              label="Work"
+              seconds={workSeconds}
+              onChange={(value) => {
+                editInterval();
+                setWorkSeconds(value);
+              }}
+              testID="work"
+              accent={accent}
+            />
+            <TimeField
+              label="Rest"
+              seconds={restSeconds}
+              onChange={(value) => {
+                editInterval();
+                setRestSeconds(value);
+              }}
+              testID="rest"
+              accent={accent}
+            />
           </>
         ) : null}
         {mode !== 'forTime' && mode !== 'amrap' ? (
@@ -250,6 +458,7 @@ function SetupForm({
             />
           </View>
         ) : null}
+        {intervalWarning}
         <TimeField
           label="Lead-in"
           seconds={leadInSeconds}
@@ -268,13 +477,17 @@ function SetupForm({
 function ChipRow({
   options,
   accent,
+  centered = false,
+  preferred = false,
 }: {
   accent: string;
   options: { label: string; selected: boolean; onPress: () => void; testID: string }[];
+  centered?: boolean;
+  preferred?: boolean;
 }) {
   return (
-    <View style={styles.chips}>
-      {options.map((option) => (
+    <View style={[styles.chips, centered && styles.chipsCentered]}>
+      {options.map((option, index) => (
         <Chip
           key={option.testID}
           label={option.label}
@@ -282,6 +495,7 @@ function ChipRow({
           onPress={option.onPress}
           color={accent}
           testID={option.testID}
+          preferred={preferred && index === 0}
         />
       ))}
     </View>
@@ -300,6 +514,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 8,
   },
+  headerApple: {
+    justifyContent: 'flex-end',
+  },
+  tvStack: {
+    flex: 1,
+    justifyContent: 'space-evenly',
+  },
+  tvBody: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tvForm: {
+    alignSelf: 'center',
+  },
+  tvShelf: {
+    alignSelf: 'center',
+    maxWidth: '100%',
+  },
+  titleCenter: {
+    textAlign: 'center',
+    alignSelf: 'stretch',
+  },
   // The scroll view reaches the screen edge so a focused control's 1.08 scale is not clipped;
   // the content pads back in to the safe margin.
   scrollTv: {
@@ -314,9 +551,13 @@ const styles = StyleSheet.create({
   },
   contentTv: {
     paddingHorizontal: TV_SAFE_HORIZONTAL,
-    gap: 22,
+    gap: 14,
     paddingTop: 4,
     paddingBottom: 8,
+  },
+  tvPage: {
+    gap: 12,
+    paddingBottom: 4,
   },
   title: {
     fontFamily: 'Oswald',
@@ -325,8 +566,8 @@ const styles = StyleSheet.create({
     lineHeight: 52,
   },
   titleTv: {
-    fontSize: TV_TITLE_FONT,
-    lineHeight: TV_TITLE_FONT + 8,
+    fontSize: 56,
+    lineHeight: 64,
   },
   summary: {
     color: chrome.muted,
@@ -334,6 +575,7 @@ const styles = StyleSheet.create({
     marginTop: -8,
   },
   summaryTv: {
+    color: chrome.muted,
     fontSize: TV_BODY_FONT,
     lineHeight: TV_BODY_FONT + 8,
   },
@@ -348,8 +590,9 @@ const styles = StyleSheet.create({
     fontFamily: 'OswaldMedium',
   },
   fieldLabelTv: {
-    fontSize: TV_SECTION_FONT,
-    letterSpacing: 2,
+    color: chrome.muted,
+    fontSize: 20,
+    letterSpacing: 1.2,
   },
   switchRow: {
     flexDirection: 'row',
@@ -365,6 +608,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  chipsCentered: {
+    justifyContent: 'center',
+    alignSelf: 'center',
   },
   footer: {
     paddingVertical: 12,
