@@ -153,6 +153,10 @@ final class AmericanaRemoteUITests: XCTestCase {
     step("store-rounds") { storeRounds() }
   }
 
+  func testStoreRoundsOnly() {
+    step("store-rounds") { storeRounds() }
+  }
+
   private func relaunchForStore() {
     app.terminate()
     app.launch()
@@ -188,16 +192,32 @@ final class AmericanaRemoteUITests: XCTestCase {
 
   private func storeRounds() -> String {
     XCTAssertTrue(any("mode-intervals").waitForExistence(timeout: 120), "WOD did not appear. \(snapshot())")
-    XCTAssertTrue(nudge("mode-intervals", directions: [.down, .right, .left], limit: 10), "Could not focus Intervals. \(snapshot())")
+    guard nudge("mode-intervals", directions: [.down, .right, .left], limit: 10) else {
+      XCTFail("Could not focus Intervals. \(snapshot())")
+      return "failed intervals \(snapshot())"
+    }
     press(.select, settle: 1.0)
     XCTAssertTrue(any("interval-preset-bjj").waitForExistence(timeout: 15), "Intervals setup did not open. \(snapshot())")
-    XCTAssertTrue(nudge("interval-preset-bjj", directions: [.down, .right, .left], limit: 10), "Could not focus BJJ roll. \(snapshot())")
+    // Setup often leaves focus on Start. Move up to the preset row first.
+    if focused("start-timer") {
+      press(.up, settle: 0.7)
+      press(.up, settle: 0.7)
+    }
+    guard nudge("interval-preset-bjj", directions: [.up, .left, .right, .down], limit: 16) else {
+      XCTFail("Could not focus BJJ roll. \(snapshot())")
+      return "failed BJJ \(snapshot())"
+    }
     press(.select, settle: 0.8)
-    XCTAssertTrue(nudge("start-timer", directions: [.down, .right], limit: 16), "Could not focus Start. \(snapshot())")
+    guard nudge("start-timer", directions: [.down, .right], limit: 16) else {
+      XCTFail("Could not focus Start. \(snapshot())")
+      return "failed Start \(snapshot())"
+    }
     press(.select, settle: 1.0)
     XCTAssertTrue(any("timer-face").waitForExistence(timeout: 15), "Timer did not open. \(snapshot())")
-    let running = waitFace(timeout: 30) { !$0.isEmpty && !$0.hasPrefix("Get ready") }
-    XCTAssertTrue(running, "Rounds did not leave the lead-in. \(snapshot())")
+    let running = waitFace(timeout: 30) {
+      !$0.isEmpty && !$0.contains("Get ready") && ($0.contains("BJJ") || $0.contains("Round 1") || $0.contains("Work") || $0.contains("WORK"))
+    }
+    XCTAssertTrue(running, "BJJ roll did not leave the lead-in. \(snapshot())")
     Thread.sleep(forTimeInterval: 1.2)
     return "face=\(faceLabel())"
   }

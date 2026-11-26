@@ -8,10 +8,22 @@ on:
   push:
     branches:
       - cursor/store-screenshots-anthem
+  workflow_dispatch:
+    inputs:
+      job:
+        description: Which capture job to run. A push runs only Apple TV.
+        required: true
+        default: appletv
+        type: choice
+        options:
+          - appletv
+          - iphone
+          - android
+          - all
 
 concurrency:
-  group: store-screenshots-${{ github.ref }}-android2
-  cancel-in-progress: true
+  group: store-screenshots-${{ github.ref }}-${{ github.event_name }}-${{ github.event.inputs.job || 'push' }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -22,6 +34,7 @@ env:
 
 jobs:
   android:
+    if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'android' || github.event.inputs.job == 'all') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -101,6 +114,7 @@ jobs:
           retention-days: 14
 
   iphone:
+    if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'iphone' || github.event.inputs.job == 'all') }}
     runs-on: macos-26
     timeout-minutes: 75
     steps:
@@ -164,7 +178,7 @@ jobs:
           retention-days: 14
 
   appletv:
-    if: ${{ false }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.job == 'appletv' || github.event.inputs.job == 'all' }}
     runs-on: macos-26
     timeout-minutes: 75
     env:
@@ -219,7 +233,7 @@ jobs:
           python3 -c 'import json,sys; json.dump({"americana.branding.v1": json.dumps({"gymName": "North Gym"})}, open(sys.argv[1], "w"))' "$DATA/Library/Caches/RCTAsyncLocalStorage_V1/manifest.json"
           XCTESTRUN=$(ls "$DD"/Build/Products/*.xctestrun | head -n 1)
           xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination "id=$UDID" \
-            -only-testing:AmericanaUITests/AmericanaRemoteUITests/testStoreScreenshots \
+            -only-testing:AmericanaUITests/AmericanaRemoteUITests/testStoreRoundsOnly \
             -resultBundlePath "$PWD/artifacts/appletv/Store.xcresult" -parallel-testing-enabled NO \
             > artifacts/appletv/xcodebuild-test.log 2>&1
           echo "test exit $?"
