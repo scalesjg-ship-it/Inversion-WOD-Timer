@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
+const { MENU_SOURCE_FILE, iosProjectFolderName, menuCancelFilePath } = require('../plugins/withTvMenuKey.js');
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const iosDir = path.resolve(process.argv[2] ?? path.join(repoRoot, 'ios'));
@@ -13,14 +17,12 @@ function xid(name) {
 }
 
 function findProject() {
-  const entries = fs.readdirSync(iosDir, { withFileTypes: true });
-  const match = entries.find((entry) => entry.isDirectory() && entry.name.endsWith('.xcodeproj'));
-  if (!match) throw new Error(`No xcodeproj under ${iosDir}`);
-  return {
-    name: match.name,
-    dir: path.join(iosDir, match.name),
-    pbx: path.join(iosDir, match.name, 'project.pbxproj'),
-  };
+  const folderName = iosProjectFolderName(iosDir);
+  const name = `${folderName}.xcodeproj`;
+  const dir = path.join(iosDir, name);
+  const pbx = path.join(dir, 'project.pbxproj');
+  if (!fs.existsSync(pbx)) throw new Error(`No xcodeproj for ${folderName} under ${iosDir}`);
+  return { name, dir, pbx };
 }
 
 function nativeTargets(pbx) {
@@ -128,8 +130,13 @@ function wireScheme(schemePath, projectName, targetId) {
   fs.writeFileSync(schemePath, scheme);
 }
 
-function addMenuCancelSource(pbx) {
-  if (pbx.includes('AmericanaMenuCancel.m')) return pbx;
+function pbxString(value) {
+  return /[^A-Za-z0-9._$/]/.test(value) ? `"${value}"` : value;
+}
+
+function addMenuCancelSource(pbx, folderName) {
+  if (pbx.includes(MENU_SOURCE_FILE)) return pbx;
+  const filePath = menuCancelFilePath(folderName);
   const fileId = xid('menu-cancel-file');
   const buildId = xid('menu-cancel-build');
   if (!pbx.includes('/* AppDelegate.swift */')) {
@@ -138,28 +145,35 @@ function addMenuCancelSource(pbx) {
   let next = insertBeforeEnd(
     pbx,
     'PBXFileReference',
-    `\t\t${fileId} /* AmericanaMenuCancel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = AmericanaMenuCancel.m; path = Americana/AmericanaMenuCancel.m; sourceTree = "<group>"; };`,
+    `\t\t${fileId} /* ${MENU_SOURCE_FILE} */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = ${MENU_SOURCE_FILE}; path = ${pbxString(filePath)}; sourceTree = "<group>"; };`,
   );
   next = insertBeforeEnd(
     next,
     'PBXBuildFile',
-    `\t\t${buildId} /* AmericanaMenuCancel.m in Sources */ = {isa = PBXBuildFile; fileRef = ${fileId} /* AmericanaMenuCancel.m */; };`,
+    `\t\t${buildId} /* ${MENU_SOURCE_FILE} in Sources */ = {isa = PBXBuildFile; fileRef = ${fileId} /* ${MENU_SOURCE_FILE} */; };`,
   );
   next = next.replace(
     '/* AppDelegate.swift */,',
-    `/* AppDelegate.swift */,\n\t\t\t\t${fileId} /* AmericanaMenuCancel.m */,`,
+    `/* AppDelegate.swift */,\n\t\t\t\t${fileId} /* ${MENU_SOURCE_FILE} */,`,
   );
   next = next.replace(
     '/* AppDelegate.swift in Sources */,',
-    `/* AppDelegate.swift in Sources */,\n\t\t\t\t${buildId} /* AmericanaMenuCancel.m in Sources */,`,
+    `/* AppDelegate.swift in Sources */,\n\t\t\t\t${buildId} /* ${MENU_SOURCE_FILE} in Sources */,`,
   );
   return next;
+}
+
+function isDirectRun() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return fileURLToPath(import.meta.url) === path.resolve(entry);
 }
 
 function main() {
   if (!fs.existsSync(sourceSwift)) throw new Error(`Missing ${sourceSwift}`);
   const project = findProject();
-  let pbx = addMenuCancelSource(fs.readFileSync(project.pbx, 'utf8'));
+  const folderName = iosProjectFolderName(iosDir);
+  let pbx = addMenuCancelSource(fs.readFileSync(project.pbx, 'utf8'), folderName);
   fs.writeFileSync(project.pbx, pbx);
   if (!/appletvos|appletvsimulator|TVOS_DEPLOYMENT_TARGET/.test(pbx)) {
     throw new Error('Xcode project is not a tvOS project. Prebuild must run with EXPO_TV=1.');
@@ -278,4 +292,8 @@ function main() {
   console.log(`Added ${targetName} to ${project.name}, depending on ${app.name}, scheme ${preferred}, tvOS ${deployment}`);
 }
 
-main();
+export { addMenuCancelSource, iosProjectFolderName };
+
+if (isDirectRun()) {
+  main();
+}
