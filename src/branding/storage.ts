@@ -10,7 +10,8 @@ import {
   type LogoPlacement,
 } from './types';
 
-const KEY = 'americana.branding.v1';
+/** Saved branding. The key stays put so a gym name already on the device is not dropped. */
+export const BRANDING_STORAGE_KEY = 'americana.branding.v1';
 
 function placement(value: unknown): LogoPlacement {
   if (value === 'watermark' || value === 'fullBleed' || value === 'corner') return value;
@@ -56,7 +57,7 @@ export function sanitizeBranding(value: unknown): Branding {
 
 export async function loadBranding(): Promise<Branding> {
   try {
-    const raw = await AsyncStorage.getItem(KEY);
+    const raw = await AsyncStorage.getItem(BRANDING_STORAGE_KEY);
     if (!raw) return DEFAULT_BRANDING;
     return sanitizeBranding(JSON.parse(raw) as unknown);
   } catch {
@@ -65,5 +66,5 @@ export async function loadBranding(): Promise<Branding> {
 }
 
 export async function saveBranding(branding: Branding): Promise<void> {
-  await AsyncStorage.setItem(KEY, JSON.stringify(sanitizeBranding(branding)));
+  await AsyncStorage.setItem(BRANDING_STORAGE_KEY, JSON.stringify(sanitizeBranding(branding)));
 }

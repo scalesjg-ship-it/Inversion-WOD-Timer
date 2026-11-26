@@ -25,7 +25,7 @@ describe('brand palettes and templates', () => {
         'Monochrome',
         'Ocean',
         'Forest',
-        'Inversion',
+        'Default',
         'Dark',
         'High-contrast',
         'Fight',
@@ -41,7 +41,7 @@ describe('brand palettes and templates', () => {
 
   it('applies a template as colors plus layout and leaves the logo file alone', () => {
     expect(BRAND_TEMPLATES.map((template) => template.name)).toEqual(
-      expect.arrayContaining(['Inversion', 'Dark', 'High-contrast', 'Neon', 'Fight']),
+      expect.arrayContaining(['Default', 'Dark', 'High-contrast', 'Neon', 'Fight']),
     );
     expect(BRAND_TEMPLATES.length).toBeGreaterThanOrEqual(4);
     for (const template of BRAND_TEMPLATES) {

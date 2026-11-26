@@ -26,8 +26,16 @@ export interface Branding extends BrandColors {
   backgroundStyle: BackgroundStyle;
 }
 
+/** First-run gym name. A name already stored on the device is left as saved. */
+export const DEFAULT_GYM_NAME = 'Your Gym';
+
+/** Brand-screen control. Reset writes DEFAULT_BRANDING, including this name, and clears the logo. */
+export const RESET_BRAND_LABEL = 'Reset to default';
+
+export const RESET_BRAND_MESSAGE = `Restore the default colors and the name ${DEFAULT_GYM_NAME}, and remove the logo from this device?`;
+
 export const DEFAULT_BRANDING: Branding = {
-  gymName: 'CrossFit Inversion',
+  gymName: DEFAULT_GYM_NAME,
   workColor: '#FF4D2E',
   restColor: '#3DDC97',
   leadInColor: '#F5C451',

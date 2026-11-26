@@ -19,7 +19,7 @@ import { TvSettings } from '@/src/components/TvSettings';
 import { prepareLogo } from '@/src/branding/logo';
 import { TvLogoTransfer } from '@/src/branding/lan/TvLogoTransfer';
 import { clockFontFamily } from '@/src/branding/palettes';
-import type { LogoPlacement } from '@/src/branding/types';
+import { RESET_BRAND_LABEL, RESET_BRAND_MESSAGE, type LogoPlacement } from '@/src/branding/types';
 import { BrandChoices } from '@/src/components/BrandChoices';
 import { ColorPicker } from '@/src/components/ColorPicker';
 import { CornerLogo, LogoBackdrop } from '@/src/components/LogoBackdrop';
@@ -103,8 +103,8 @@ export default function BrandScreen() {
 
   const confirmReset = () => {
     Alert.alert(
-      'Reset to Inversion',
-      'Restore CrossFit Inversion colors and name, and remove the logo from this device?',
+      RESET_BRAND_LABEL,
+      RESET_BRAND_MESSAGE,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Reset', style: 'destructive', onPress: () => void reset() },
@@ -285,7 +285,7 @@ export default function BrandScreen() {
           onPress={confirmReset}
           style={({ pressed }) => [styles.reset, tv && styles.resetTv, tv && pressed ? { opacity: 0.75 } : null]}
         >
-          <Text style={[styles.resetLabel, tv && styles.resetLabelTv]}>Reset to Inversion</Text>
+          <Text style={[styles.resetLabel, tv && styles.resetLabelTv]}>{RESET_BRAND_LABEL}</Text>
         </TvFocusPressable>
       </ScrollView>
     </SafeAreaView>

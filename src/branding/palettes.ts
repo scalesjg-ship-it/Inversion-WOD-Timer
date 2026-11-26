@@ -95,7 +95,7 @@ export const COLOR_PALETTES: ThemePreset[] = [
   },
   {
     id: 'inversion',
-    name: 'Inversion',
+    name: 'Default',
     workColor: '#FF4D2E',
     restColor: '#3DDC97',
     leadInColor: '#F5C451',
@@ -133,7 +133,7 @@ export interface BrandTemplate {
 export const BRAND_TEMPLATES: BrandTemplate[] = [
   {
     id: 'inversion-classic',
-    name: 'Inversion',
+    name: 'Default',
     paletteId: 'inversion',
     logoPlacement: 'watermark',
     clockWeight: 'bold',
