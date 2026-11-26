@@ -1,19 +1,33 @@
 appId: com.garrettscales.americana
 ---
+# Android TV: Settings opens when its tab gains focus. Down reaches the Brand
+# category, Right enters the gym name field, Center opens the keyboard.
 - launchApp:
     stopApp: true
 - extendedWaitUntil:
     visible:
-      id: "tab-settings"
+      id: "mode-forTime"
     timeout: 120000
-- tapOn:
-    id: "tab-settings"
-- tapOn:
-    id: "settings-category-brand"
-    optional: true
-- tapOn:
-    id: "brand-name"
+- pressKey: Remote Dpad Up
+- pressKey: Remote Dpad Up
+- pressKey: Remote Dpad Right
+- extendedWaitUntil:
+    visible:
+      id: "screen-settings"
+    timeout: 10000
+- pressKey: Remote Dpad Down
+- extendedWaitUntil:
+    visible:
+      id: "brand-name"
+    timeout: 10000
+- pressKey: Remote Dpad Right
+- pressKey: Remote Dpad Center
 - eraseText: 60
 - inputText: "North Gym"
 - pressKey: Enter
 - pressKey: back
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: "North Gym"
+    timeout: 60000

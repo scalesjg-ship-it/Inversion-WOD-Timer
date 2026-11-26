@@ -14,6 +14,7 @@ if [ "$kind" = tablet ]; then
   adb -s $serial shell wm density 240
   adb -s $serial shell settings put system accelerometer_rotation 0
   adb -s $serial shell settings put system user_rotation 0
+  adb -s $serial shell settings put global policy_control immersive.full=*
 fi
 adb -s $serial shell wm density | tee -a "$out/logs/$kind-wm.txt"
 adb -s $serial install -r -g "$APK" || adb -s $serial install -r "$APK"

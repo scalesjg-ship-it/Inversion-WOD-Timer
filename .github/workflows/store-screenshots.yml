@@ -10,7 +10,7 @@ on:
       - cursor/store-screenshots-anthem
 
 concurrency:
-  group: store-screenshots-${{ github.ref }}-tv
+  group: store-screenshots-${{ github.ref }}-android2
   cancel-in-progress: true
 
 permissions:
@@ -22,7 +22,6 @@ env:
 
 jobs:
   android:
-    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -72,6 +71,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: bash store-capture/android-run.sh tv "$PWD/artifacts/android"
       - name: Android phone 1080x1920
+        if: ${{ false }}
         uses: reactivecircus/android-emulator-runner@v2
         continue-on-error: true
         with:
@@ -86,7 +86,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         continue-on-error: true
         with:
-          api-level: 34
+          api-level: 29
           target: google_apis
           arch: x86_64
           profile: pixel_c
@@ -101,7 +101,6 @@ jobs:
           retention-days: 14
 
   iphone:
-    if: ${{ false }}
     runs-on: macos-26
     timeout-minutes: 75
     steps:
@@ -165,6 +164,7 @@ jobs:
           retention-days: 14
 
   appletv:
+    if: ${{ false }}
     runs-on: macos-26
     timeout-minutes: 75
     env:
