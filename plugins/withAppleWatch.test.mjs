@@ -43,7 +43,7 @@ describe('withAppleWatch', () => {
   });
 
   it('embeds the watch app in an iPhone project and not as a second tvOS bundle', () => {
-    const project = xcode.project('ios/Americana.xcodeproj/project.pbxproj');
+    const project = xcode.project('ios/AnthemGymTimer.xcodeproj/project.pbxproj');
     // The fixture is created by the test runner when prebuild has not run.
     // linkWatchTarget is exercised against a parsed project in the prebuild check.
     expect(plugin.WATCH_BUNDLE_ID).toBe('com.garrettscales.americana.watchkitapp');
