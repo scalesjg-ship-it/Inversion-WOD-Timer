@@ -1,0 +1,42 @@
+appId: com.garrettscales.americana
+---
+- launchApp:
+    stopApp: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      id: "mode-countdown"
+    timeout: 120000
+- tapOn:
+    id: "mode-countdown"
+- extendedWaitUntil:
+    visible:
+      id: "screen-countdown"
+    timeout: 20000
+- tapOn:
+    id: "add-300"
+    optional: true
+- tapOn:
+    id: "add-60"
+    optional: true
+- tapOn:
+    id: "add-60"
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: "start-countdown"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "start-countdown"
+- tapOn:
+    text: "Allow"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "timer-face"
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: "Get ready.*"
+    timeout: 30000

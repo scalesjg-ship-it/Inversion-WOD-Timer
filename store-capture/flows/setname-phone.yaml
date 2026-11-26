@@ -1,0 +1,22 @@
+appId: com.garrettscales.americana
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "tab-brand"
+    timeout: 120000
+- tapOn:
+    id: "tab-brand"
+- scrollUntilVisible:
+    element:
+      id: "brand-name"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "brand-name"
+- eraseText: 60
+- inputText: "North Gym"
+- pressKey: Enter
+- hideKeyboard:
+    optional: true

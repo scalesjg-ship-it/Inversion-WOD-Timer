@@ -1,0 +1,13 @@
+appId: com.garrettscales.americana
+---
+- launchApp:
+    stopApp: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      id: "mode-forTime"
+    timeout: 120000
+- extendedWaitUntil:
+    visible: "North Gym"
+    timeout: 10000

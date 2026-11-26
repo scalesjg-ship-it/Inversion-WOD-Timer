@@ -1,0 +1,35 @@
+appId: com.garrettscales.americana
+---
+- launchApp:
+    stopApp: true
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      id: "mode-intervals"
+    timeout: 120000
+- tapOn:
+    id: "mode-intervals"
+- extendedWaitUntil:
+    visible:
+      id: "interval-preset-bjj"
+    timeout: 20000
+- tapOn:
+    id: "interval-preset-bjj"
+- scrollUntilVisible:
+    element:
+      id: "start-timer"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "start-timer"
+- tapOn:
+    text: "Allow"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "timer-face"
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: "Get ready.*"
+    timeout: 30000

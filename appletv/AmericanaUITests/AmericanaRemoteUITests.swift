@@ -142,6 +142,66 @@ final class AmericanaRemoteUITests: XCTestCase {
     }
   }
 
+  /// Store screenshots only. The workflow seeds the demo gym name "North Gym"
+  /// before launch. Each screen relaunches the app so it starts from WOD.
+  /// Step names are the attachment names the capture workflow exports.
+  func testStoreScreenshots() {
+    step("store-modes") { storeModes() }
+    relaunchForStore()
+    step("store-countdown") { storeCountdown() }
+    relaunchForStore()
+    step("store-rounds") { storeRounds() }
+  }
+
+  private func relaunchForStore() {
+    app.terminate()
+    app.launch()
+    XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "App did not stay in the foreground")
+  }
+
+  private func storeModes() -> String {
+    XCTAssertTrue(any("mode-forTime").waitForExistence(timeout: 120), "WOD did not appear. \(snapshot())")
+    Thread.sleep(forTimeInterval: 2.5)
+    return "focus=\(focusedIdentifier())"
+  }
+
+  private func storeCountdown() -> String {
+    XCTAssertTrue(any("mode-countdown").waitForExistence(timeout: 120), "WOD did not appear. \(snapshot())")
+    XCTAssertTrue(nudge("mode-countdown", directions: [.down, .right, .left], limit: 10), "Could not focus Countdown. \(snapshot())")
+    press(.select, settle: 1.0)
+    XCTAssertTrue(any("screen-countdown").waitForExistence(timeout: 15), "Countdown setup did not open. \(snapshot())")
+    if nudge("add-300", directions: [.down, .right], limit: 10) {
+      press(.select, settle: 0.6)
+      if nudge("add-60", directions: [.right, .left], limit: 4) {
+        press(.select, settle: 0.5)
+        press(.select, settle: 0.5)
+      }
+    }
+    XCTAssertTrue(nudge("start-countdown", directions: [.down, .right], limit: 16), "Could not focus Start countdown. \(snapshot())")
+    press(.select, settle: 1.0)
+    XCTAssertTrue(any("timer-face").waitForExistence(timeout: 15), "Timer did not open. \(snapshot())")
+    let running = waitFace(timeout: 30) { !$0.isEmpty && !$0.hasPrefix("Get ready") }
+    XCTAssertTrue(running, "Countdown did not leave the lead-in. \(snapshot())")
+    Thread.sleep(forTimeInterval: 1.2)
+    return "face=\(faceLabel())"
+  }
+
+  private func storeRounds() -> String {
+    XCTAssertTrue(any("mode-intervals").waitForExistence(timeout: 120), "WOD did not appear. \(snapshot())")
+    XCTAssertTrue(nudge("mode-intervals", directions: [.down, .right, .left], limit: 10), "Could not focus Intervals. \(snapshot())")
+    press(.select, settle: 1.0)
+    XCTAssertTrue(any("interval-preset-bjj").waitForExistence(timeout: 15), "Intervals setup did not open. \(snapshot())")
+    XCTAssertTrue(nudge("interval-preset-bjj", directions: [.down, .right, .left], limit: 10), "Could not focus BJJ roll. \(snapshot())")
+    press(.select, settle: 0.8)
+    XCTAssertTrue(nudge("start-timer", directions: [.down, .right], limit: 16), "Could not focus Start. \(snapshot())")
+    press(.select, settle: 1.0)
+    XCTAssertTrue(any("timer-face").waitForExistence(timeout: 15), "Timer did not open. \(snapshot())")
+    let running = waitFace(timeout: 30) { !$0.isEmpty && !$0.hasPrefix("Get ready") }
+    XCTAssertTrue(running, "Rounds did not leave the lead-in. \(snapshot())")
+    Thread.sleep(forTimeInterval: 1.2)
+    return "face=\(faceLabel())"
+  }
+
   // MARK: - Steps
 
   private func openWodTab() -> String {
